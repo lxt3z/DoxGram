@@ -210,6 +210,9 @@ genrule(
 
         cp -R "submodules/ffmpeg/Sources/FFMpeg" "$$SOURCE_PATH"
 
+        chmod +x "$$SOURCE_PATH/pkg-config"
+        chmod +x "$$SOURCE_PATH/gas-preprocessor.pl"
+
         echo "=== FFMpegSource after copy ==="
         ls -la "$$SOURCE_PATH"
         echo "=== pkg-config ==="
