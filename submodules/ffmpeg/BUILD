@@ -212,13 +212,14 @@ genrule(
 
         chmod +x "$$SOURCE_PATH/pkg-config"
         chmod +x "$$SOURCE_PATH/gas-preprocessor.pl"
+        chmod +x "$$SOURCE_PATH/ffmpeg-7.1.1/configure"
 
         echo "=== FFMpegSource after copy ==="
         ls -la "$$SOURCE_PATH"
         echo "=== pkg-config ==="
         ls -la "$$SOURCE_PATH/pkg-config" || true
-        echo "=== original pkg-config ==="
-        ls -la "submodules/ffmpeg/Sources/FFMpeg/pkg-config" || true
+        echo "=== configure ==="
+        ls -la "$$SOURCE_PATH/ffmpeg-7.1.1/configure" || true
 
         mkdir "$$SOURCE_PATH/libvpx"
         mkdir -p "$$SOURCE_PATH/libvpx/include/vpx"
