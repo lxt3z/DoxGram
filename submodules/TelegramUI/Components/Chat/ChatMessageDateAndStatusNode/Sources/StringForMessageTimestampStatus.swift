@@ -247,6 +247,8 @@ public func stringForMessageTimestampStatus(
         if let authorTitle = authorTitle, !authorTitle.isEmpty {
             dateText = "\(authorTitle), \(dateText)"
         }
+    }
+    
     if SGAyugramStorage.shared.isDeleted(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id) {
         let deletedLabel = strings.baseLanguageCode.hasPrefix("ru") ? " • удалено" : " • deleted"
         dateText = "\(dateText)\(deletedLabel)"
