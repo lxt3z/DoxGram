@@ -449,30 +449,6 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             ).start()
         case .tabBarSearchEnabled:
             SGSimpleSettings.shared.tabBarSearchEnabled = value
-        case .ghostDontSendTyping:
-            SGSimpleSettings.shared.ghostDontSendTyping = value
-        case .ghostDontSendOnline:
-            SGSimpleSettings.shared.ghostDontSendOnline = value
-        case .ghostDontSendRead:
-            SGSimpleSettings.shared.ghostDontSendRead = value
-        case .ghostDontSendVoiceListen:
-            SGSimpleSettings.shared.ghostDontSendVoiceListen = value
-        case .ghostDontReadStories:
-            SGSimpleSettings.shared.ghostDontReadStories = value
-        case .keepViewOnceMedia:
-            SGSimpleSettings.shared.keepViewOnceMedia = value
-        case .antiRecall:
-            SGSimpleSettings.shared.antiRecall = value
-        case .keepEditHistory:
-            SGSimpleSettings.shared.keepEditHistory = value
-        case .hideAds:
-            SGSimpleSettings.shared.hideAds = value
-        case .streamerMode:
-            SGSimpleSettings.shared.streamerMode = value
-        case .bypassCopyProtection:
-            SGSimpleSettings.shared.bypassCopyProtection = value
-        case .disableTelemetry:
-            SGSimpleSettings.shared.disableTelemetry = value
         case .wideTabBar:
             SGSimpleSettings.shared.wideTabBar = value
             askForRestart?()
