@@ -589,6 +589,7 @@ public final class AvatarNode: ASDisplayNode {
             cutoutRect: CGRect? = nil
         ) {
             var synchronousLoad = synchronousLoad
+            var overrideImage = overrideImage
             if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideAvatars {
                 if peer?.id.namespace == Namespaces.Peer.CloudUser || (SGSimpleSettings.shared.streamerHideGroupNames && (peer?.id.namespace == Namespaces.Peer.CloudGroup || peer?.id.namespace == Namespaces.Peer.CloudChannel)) {
                     overrideImage = .anonymousSavedMessagesIcon(isColored: false)
@@ -807,6 +808,7 @@ public final class AvatarNode: ASDisplayNode {
             cutoutRect: CGRect? = nil
         ) {
             var synchronousLoad = synchronousLoad
+            var overrideImage = overrideImage
             if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideAvatars {
                 if peer?.id.namespace == Namespaces.Peer.CloudUser || (SGSimpleSettings.shared.streamerHideGroupNames && (peer?.id.namespace == Namespaces.Peer.CloudGroup || peer?.id.namespace == Namespaces.Peer.CloudChannel)) {
                     overrideImage = .anonymousSavedMessagesIcon(isColored: false)
