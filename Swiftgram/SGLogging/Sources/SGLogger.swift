@@ -44,10 +44,12 @@ public class SGLogger {
             }
             let appGroupName = "group.\(baseAppBundleId)"
             let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
+                ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent("TelegramAppGroup")
             guard let appGroupUrl = maybeAppGroupUrl else {
                 print("Can't setup logger (2)!")
                 return SGLogger(rootPath: "", basePath: "")
             }
+            let _ = try? FileManager.default.createDirectory(at: appGroupUrl, withIntermediateDirectories: true, attributes: nil)
             let newRootPath = rootPathForBasePath(appGroupUrl.path)
             let newLogsPath = newRootPath + sgLogsPath
             let _ = try? FileManager.default.createDirectory(atPath: newLogsPath, withIntermediateDirectories: true, attributes: nil)

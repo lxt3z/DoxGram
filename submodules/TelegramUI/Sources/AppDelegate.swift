@@ -426,6 +426,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         }
         self.window = window
         self.nativeWindow = window
+        self.window?.makeKeyAndVisible()
         // MARK: Swiftgram
         if sgHardReset(present: self.mainWindow?.presentNative, beforePresent: { self.window?.makeKeyAndVisible() }) {
             return true
@@ -659,9 +660,14 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             isICloudEnabled: buildConfig.isICloudEnabled
         )
         
-        guard let appGroupUrl = maybeAppGroupUrl else {
-            self.mainWindow?.presentNative(UIAlertController(title: nil, message: "Error 2", preferredStyle: .alert))
-            return true
+        let appGroupUrl: URL
+        if let containerUrl = maybeAppGroupUrl {
+            appGroupUrl = containerUrl
+        } else {
+            let appSupportUrl = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let fallbackGroupUrl = appSupportUrl.appendingPathComponent("TelegramAppGroup")
+            let _ = try? FileManager.default.createDirectory(at: fallbackGroupUrl, withIntermediateDirectories: true, attributes: nil)
+            appGroupUrl = fallbackGroupUrl
         }
         
         var isDebugConfiguration = false
@@ -689,6 +695,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         } else {
             rootPath = rootPathForBasePath(appGroupUrl.path)
         }
+        let _ = try? FileManager.default.createDirectory(atPath: rootPath, withIntermediateDirectories: true, attributes: nil)
         if !isUITest {
         performAppGroupUpgrades(appGroupPath: appGroupUrl.path, rootPath: rootPath)
         }

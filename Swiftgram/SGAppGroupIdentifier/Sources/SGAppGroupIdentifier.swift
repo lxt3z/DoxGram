@@ -1,6 +1,6 @@
 import Foundation
 
-public let FALLBACK_BASE_BUNDLE_ID: String = "es.entervalov.aerogram"
+public let FALLBACK_BASE_BUNDLE_ID: String = "app.doxgram.ios"
 
 public func sgBaseBundleIdentifier() -> String {
     let baseBundleId: String
