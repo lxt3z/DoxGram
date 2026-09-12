@@ -846,7 +846,11 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             case .ayugramExportLogs:
                 if let url = SGAyugramLogger.getLogFileUrl(), FileManager.default.fileExists(atPath: url.path) {
                     let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-                    presentControllerImpl?(activityVC, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+                    if let window = context.sharedContext.mainWindow?.viewController?.view {
+                        activityVC.popoverPresentationController?.sourceView = window
+                        activityVC.popoverPresentationController?.sourceRect = CGRect(origin: CGPoint(x: window.bounds.width / 2.0, y: window.bounds.height / 2.0), size: CGSize(width: 1.0, height: 1.0))
+                    }
+                    context.sharedContext.applicationBindings.presentNativeController(activityVC)
                 } else {
                     let presentationData = context.sharedContext.currentPresentationData.with { $0 }
                     let overlay = UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Логи пока пусты" : "Logs are empty", timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
