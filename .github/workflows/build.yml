@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: macos-26
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v2
@@ -85,16 +87,34 @@ jobs:
           OUTPUT_PATH="build/artifacts"
           rm -rf "$OUTPUT_PATH"
           mkdir -p "$OUTPUT_PATH"
-          for f in bazel-out/applebin_ios-ios_arm*-opt-ST-*/bin/Telegram/Telegram.ipa; do
-            cp "$f" $OUTPUT_PATH/
-          done
+
+          if [ -f "bazel-bin/Telegram/Swiftgram.ipa" ]; then
+            cp "bazel-bin/Telegram/Swiftgram.ipa" "$OUTPUT_PATH/Swiftgram.ipa"
+            cp "bazel-bin/Telegram/Swiftgram.ipa" "$OUTPUT_PATH/Telegram.ipa"
+          elif [ -f "bazel-bin/Telegram/Telegram.ipa" ]; then
+            cp "bazel-bin/Telegram/Telegram.ipa" "$OUTPUT_PATH/Swiftgram.ipa"
+            cp "bazel-bin/Telegram/Telegram.ipa" "$OUTPUT_PATH/Telegram.ipa"
+          else
+            IPA_PATH=$(find bazel-bin -name "*.ipa" | head -n 1)
+            if [ -n "$IPA_PATH" ]; then
+              cp "$IPA_PATH" "$OUTPUT_PATH/Swiftgram.ipa"
+              cp "$IPA_PATH" "$OUTPUT_PATH/Telegram.ipa"
+            else
+              echo "ERROR: No IPA found in bazel-bin"
+              find bazel-bin -maxdepth 3 -print
+              exit 1
+            fi
+          fi
 
           # collect dsym
           mkdir -p build/DSYMs
-          for f in bazel-out/applebin_ios-ios_arm*-opt-ST-*/bin/Telegram/*.dSYM; do
-            cp -R "$f" build/DSYMs/
+          for f in bazel-bin/Telegram/*.dSYM; do
+            if [ -d "$f" ]; then
+              cp -R "$f" build/DSYMs/
+            fi
           done
           zip -r "./$OUTPUT_PATH/Telegram.DSYMs.zip" build/DSYMs 1>/dev/null
+          cp "./$OUTPUT_PATH/Telegram.DSYMs.zip" "./$OUTPUT_PATH/Swiftgram.DSYMs.zip" 2>/dev/null || true
 
       - name: Create Release
         id: create_release
@@ -103,9 +123,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: build-${{ env.BUILD_NUMBER }}
-          release_name: Telegram ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
+          release_name: Swiftgram ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
           body: |
-            An unsigned build of Telegram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
+            An unsigned build of Swiftgram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
           draft: false
           prerelease: false
 
@@ -116,8 +136,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /Users/Shared/telegram-ios/build/artifacts/Telegram.ipa
-          asset_name: Telegram.ipa
+          asset_path: /Users/Shared/telegram-ios/build/artifacts/Swiftgram.ipa
+          asset_name: Swiftgram.ipa
           asset_content_type: application/zip
 
       - name: Upload Release DSYM
@@ -127,6 +147,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /Users/Shared/telegram-ios/build/artifacts/Telegram.DSYMs.zip
-          asset_name: Telegram.DSYMs.zip
+          asset_path: /Users/Shared/telegram-ios/build/artifacts/Swiftgram.DSYMs.zip
+          asset_name: Swiftgram.DSYMs.zip
           asset_content_type: application/zip
