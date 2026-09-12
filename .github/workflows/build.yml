@@ -25,8 +25,18 @@ jobs:
         run: |
           set -x
           sudo mkdir -p /Users/Shared
+          sudo chown -R $(whoami):staff /Users/Shared
           cp -R $GITHUB_WORKSPACE /Users/Shared/
           mv /Users/Shared/$(basename $GITHUB_WORKSPACE) /Users/Shared/telegram-ios
+
+      - name: Cache Bazel Disk Cache
+        uses: actions/cache@v4
+        with:
+          path: /Users/Shared/telegram-bazel-cache
+          key: bazel-disk-cache-${{ runner.os }}-${{ hashFiles('versions.json', 'WORKSPACE') }}-${{ github.run_id }}
+          restore-keys: |
+            bazel-disk-cache-${{ runner.os }}-${{ hashFiles('versions.json', 'WORKSPACE') }}-
+            bazel-disk-cache-${{ runner.os }}-
 
       - name: Build the App
         run: |
@@ -37,6 +47,8 @@ jobs:
 
           # use canonical bazel root
           BAZEL_USER_ROOT="/private/var/tmp/_bazel_containerhost"
+          CACHE_DIR="/Users/Shared/telegram-bazel-cache"
+          mkdir -p "$CACHE_DIR"
 
           cd $SOURCE_DIR
 
@@ -52,11 +64,22 @@ jobs:
           python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
           python3 -u build-system/Make/Make.py \
             --bazelUserRoot="$BAZEL_USER_ROOT" \
+            --cacheDir="$CACHE_DIR" \
             build \
             --configurationPath="build-system/appstore-configuration.json" \
             --codesigningInformationPath=build-system/fake-codesigning \
             --configuration=release_arm64 \
             --buildNumber="$BUILD_NUMBER"
+
+          # Prune disk cache if it exceeds ~8GB to stay safely within GitHub's 10GB limit
+          if [ -d "$CACHE_DIR" ]; then
+            CACHE_SIZE_MB=$(du -sm "$CACHE_DIR" 2>/dev/null | cut -f1)
+            echo "Bazel disk cache size: ${CACHE_SIZE_MB}MB"
+            if [ -n "$CACHE_SIZE_MB" ] && [ "$CACHE_SIZE_MB" -gt 8000 ]; then
+              echo "Pruning disk cache to stay within GitHub limit..."
+              find "$CACHE_DIR" -type f -print0 | xargs -0 ls -lt | tail -n +5000 | awk '{print $NF}' | xargs rm -f 2>/dev/null || true
+            fi
+          fi
 
           # collect ipa
           OUTPUT_PATH="build/artifacts"
