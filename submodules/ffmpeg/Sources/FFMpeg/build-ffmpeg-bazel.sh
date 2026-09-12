@@ -89,12 +89,15 @@ done
 
 if [ "$COMPILE" ]
 then
-	if [ ! `which pkg-config` ]; then
-		echo 'pkg-config not found'
+	if [ ! -x "$PKG_CONFIG" ]; then
+		echo "pkg-config not found at: $PKG_CONFIG"
+		echo "SOURCE_DIR=$SOURCE_DIR"
+		ls -la "$SOURCE_DIR"
 		exit 1
 	else
 		echo "PATH=$PATH"
-		echo "pkg-config=$(which pkg-config)"
+		echo "PKG_CONFIG=$PKG_CONFIG"
+		echo "pkg-config=$PKG_CONFIG"
 	fi
 	IS_LINUX=false
 	for A in $ARCHS; do
