@@ -210,13 +210,11 @@ genrule(
 
         cp -R "submodules/ffmpeg/Sources/FFMpeg" "$$SOURCE_PATH"
 
-        # Fix executable permissions for all build scripts
-        find "$$SOURCE_PATH" -type f \( \
-            -name "*.sh" -o \
-            -name "*.pl" -o \
-            -name "configure" -o \
-            -name "pkg-config" \
-        \) -exec chmod 755 {} \;
+        # Restore executable permissions for FFmpeg build scripts.
+        find "$$SOURCE_PATH" -type f -name "*.sh" -exec chmod 755 {} +
+        find "$$SOURCE_PATH" -type f -name "*.pl" -exec chmod 755 {} +
+        find "$$SOURCE_PATH" -type f -name "configure" -exec chmod 755 {} +
+        find "$$SOURCE_PATH" -type f -name "pkg-config" -exec chmod 755 {} +
 
         echo "=== FFmpeg build scripts permissions fixed ==="
 
