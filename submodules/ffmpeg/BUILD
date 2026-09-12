@@ -210,16 +210,15 @@ genrule(
 
         cp -R "submodules/ffmpeg/Sources/FFMpeg" "$$SOURCE_PATH"
 
-        chmod +x "$$SOURCE_PATH/pkg-config"
-        chmod +x "$$SOURCE_PATH/gas-preprocessor.pl"
-        chmod +x "$$SOURCE_PATH/ffmpeg-7.1.1/configure"
+        # Fix executable permissions for all build scripts
+        find "$$SOURCE_PATH" -type f \( \
+            -name "*.sh" -o \
+            -name "*.pl" -o \
+            -name "configure" -o \
+            -name "pkg-config" \
+        \) -exec chmod 755 {} \;
 
-        echo "=== FFMpegSource after copy ==="
-        ls -la "$$SOURCE_PATH"
-        echo "=== pkg-config ==="
-        ls -la "$$SOURCE_PATH/pkg-config" || true
-        echo "=== configure ==="
-        ls -la "$$SOURCE_PATH/ffmpeg-7.1.1/configure" || true
+        echo "=== FFmpeg build scripts permissions fixed ==="
 
         mkdir "$$SOURCE_PATH/libvpx"
         mkdir -p "$$SOURCE_PATH/libvpx/include/vpx"
