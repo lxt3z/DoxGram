@@ -97,14 +97,13 @@ then
 	else
 		echo "PATH=$PATH"
 		echo "PKG_CONFIG=$PKG_CONFIG"
-		echo "pkg-config=$PKG_CONFIG"
 	fi
 	IS_LINUX=false
 	for A in $ARCHS; do
 		case "$A" in linux_*) IS_LINUX=true ;; esac
 	done
-	if [ "$IS_LINUX" = "false" ] && [ ! `which "$GAS_PREPROCESSOR_PATH"` ]; then
-		echo '$GAS_PREPROCESSOR_PATH not found.'
+	if [ "$IS_LINUX" = "false" ] && [ ! -x "$GAS_PREPROCESSOR_PATH" ]; then
+		echo "gas-preprocessor.pl not found at: $GAS_PREPROCESSOR_PATH"
 		exit 1
 	fi
 
