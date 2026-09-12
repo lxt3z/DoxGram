@@ -210,6 +210,13 @@ genrule(
 
         cp -R "submodules/ffmpeg/Sources/FFMpeg" "$$SOURCE_PATH"
 
+        echo "=== FFMpegSource after copy ==="
+        ls -la "$$SOURCE_PATH"
+        echo "=== pkg-config ==="
+        ls -la "$$SOURCE_PATH/pkg-config" || true
+        echo "=== original pkg-config ==="
+        ls -la "submodules/ffmpeg/Sources/FFMpeg/pkg-config" || true
+
         mkdir "$$SOURCE_PATH/libvpx"
         mkdir -p "$$SOURCE_PATH/libvpx/include/vpx"
         mkdir -p "$$SOURCE_PATH/libvpx/lib"
