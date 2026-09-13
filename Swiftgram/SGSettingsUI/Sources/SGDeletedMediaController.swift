@@ -36,7 +36,7 @@ private func formatDate(_ timestamp: Int32) -> String {
 
 public func sgDeletedMediaController(context: AccountContext, peerId: Int64? = nil) -> ViewController {
     let updatePromise = ValuePromise(true, ignoreRepeated: false)
-    var presentControllerImpl: ((ViewController, Any?) -> Void)?
+    var presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
 
     let arguments = SGItemListArguments<String, String, String, String, String>(
         context: context,
@@ -148,7 +148,7 @@ public func sgDeletedMediaController(context: AccountContext, peerId: Int64? = n
         if !mediaItems.isEmpty {
             rightButton = ItemListNavigationButton(
                 content: .text(isRu ? "Очистить" : "Clear"),
-                style: .destructive,
+                style: .regular,
                 enabled: true,
                 action: {
                     let confirmSheet = ActionSheetController(presentationData: presentationData)
