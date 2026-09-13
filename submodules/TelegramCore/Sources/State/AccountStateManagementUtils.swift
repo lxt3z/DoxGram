@@ -4159,6 +4159,42 @@ func replayFinalState(
     
     var isPremiumUpdated = false
     
+    func saveMessageMediaToAyugramStorage(msg: Message, mediaBox: MediaBox) {
+        let peerId = msg.id.peerId.toInt64()
+        for media in msg.effectiveMedia {
+            if let image = media as? TelegramMediaImage, let rep = image.representations.last {
+                let path = mediaBox.storePathsForId(rep.resource.id).complete
+                if FileManager.default.fileExists(atPath: path) {
+                    SGAyugramStorage.shared.saveDeletedMedia(
+                        peerId: peerId,
+                        messageId: msg.id.id,
+                        sourcePath: path,
+                        fileName: "photo_\(msg.id.id).jpg",
+                        mediaType: "photo",
+                        timestamp: msg.timestamp,
+                        caption: msg.text
+                    )
+                }
+            } else if let file = media as? TelegramMediaFile {
+                let path = mediaBox.storePathsForId(file.resource.id).complete
+                if FileManager.default.fileExists(atPath: path) {
+                    let ext = file.fileName?.components(separatedBy: ".").last ?? (file.isVideo ? "mp4" : (file.isVoice ? "m4a" : "dat"))
+                    let name = file.fileName ?? "file_\(msg.id.id).\(ext)"
+                    let type = file.isVideo ? "video" : (file.isVoice ? "voice" : "file")
+                    SGAyugramStorage.shared.saveDeletedMedia(
+                        peerId: peerId,
+                        messageId: msg.id.id,
+                        sourcePath: path,
+                        fileName: name,
+                        mediaType: type,
+                        timestamp: msg.timestamp,
+                        caption: msg.text
+                    )
+                }
+            }
+        }
+    }
+
     for operation in optimizedOperations(finalState.state.operations) {
         switch operation {
             case let .AddMessages(messages, location):
@@ -4441,41 +4477,6 @@ func replayFinalState(
                     }
                 }
             case let .DeleteMessagesWithGlobalIds(ids):
-                func saveMessageMediaToAyugramStorage(msg: Message, mediaBox: MediaBox) {
-                    let peerId = msg.id.peerId.toInt64()
-                    for media in msg.effectiveMedia {
-                        if let image = media as? TelegramMediaImage, let rep = image.representations.last {
-                            let path = mediaBox.storePathsForId(rep.resource.id).complete
-                            if FileManager.default.fileExists(atPath: path) {
-                                SGAyugramStorage.shared.saveDeletedMedia(
-                                    peerId: peerId,
-                                    messageId: msg.id.id,
-                                    sourcePath: path,
-                                    fileName: "photo_\(msg.id.id).jpg",
-                                    mediaType: "photo",
-                                    timestamp: msg.timestamp,
-                                    caption: msg.text
-                                )
-                            }
-                        } else if let file = media as? TelegramMediaFile {
-                            let path = mediaBox.storePathsForId(file.resource.id).complete
-                            if FileManager.default.fileExists(atPath: path) {
-                                let ext = file.fileName?.components(separatedBy: ".").last ?? (file.isVideo ? "mp4" : (file.isVoice ? "m4a" : "dat"))
-                                let name = file.fileName ?? "file_\(msg.id.id).\(ext)"
-                                let type = file.isVideo ? "video" : (file.isVoice ? "voice" : "file")
-                                SGAyugramStorage.shared.saveDeletedMedia(
-                                    peerId: peerId,
-                                    messageId: msg.id.id,
-                                    sourcePath: path,
-                                    fileName: name,
-                                    mediaType: type,
-                                    timestamp: msg.timestamp,
-                                    caption: msg.text
-                                )
-                            }
-                        }
-                    }
-                }
                 if SGSimpleSettings.shared.antiRecall {
                     var idsToDelete: [Int32] = []
                     for globalId in ids {
