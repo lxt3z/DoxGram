@@ -229,10 +229,10 @@
 "PayWall.InputToolbar.Description" = "Применяйте и очищайте форматирование, переносите абзацы как Pro.";
 
 "PayWall.AppIcons.Title" = "Уникальные иконки приложения";
-"PayWall.AppIcons.Notice" = "Настройка внешнего вида Swiftgram на главном экране.";
+"PayWall.AppIcons.Notice" = "Настройка внешнего вида DoxGram на главном экране.";
 
-"PayWall.About.Title" = "О Swiftgram Pro";
-"PayWall.About.Notice" = "Бесплатная версия Swiftgram предлагает десятки функций и улучшений по сравнению с приложением Telegram. Новые функции и синхронизация Swiftgram с ежемесячными обновлениями Telegram — это огромные усилия, требующие много времени и дорогой техники.\n\nSwiftgram — это приложение с открытым исходным кодом, которое уважает вашу конфиденциальность и не беспокоит вас рекламой. Подписываясь на Swiftgram Pro, вы получаете доступ к эксклюзивным функциям и поддерживаете независимого разработчика.";
+"PayWall.About.Title" = "О DoxGram Pro";
+"PayWall.About.Notice" = "Все функции DoxGram Pro доступны бесплатно. Наслаждайтесь расширенными возможностями приложения!";
 /* DO NOT TRANSLATE */
 "PayWall.About.Signature" = "@Kylmakalle";
 /* DO NOT TRANSLATE */
@@ -246,10 +246,10 @@
 "PayWall.Privacy" = "Политика конфиденциальности";
 "PayWall.TermsURL" = "https://swiftgram.app/terms";
 "PayWall.PrivacyURL" = "https://swiftgram.app/privacy";
-"PayWall.Notice.Markdown" = "Подписываясь на Swiftgram Pro, вы соглашаетесь с [Условиями использования Swiftgram](%1$@) и [Политикой конфиденциальности](%2$@).";
-"PayWall.Notice.Raw" = "Подписываясь на Swiftgram Pro, вы соглашаетесь с Условиями использования и Политикой конфиденциальности Swiftgram.";
+"PayWall.Notice.Markdown" = "В DoxGram Pro все функции доступны бесплатно.";
+"PayWall.Notice.Raw" = "В DoxGram Pro все функции доступны бесплатно.";
 
-"PayWall.Button.OpenPro" = "Pro функции";
+"PayWall.Button.OpenPro" = "Открыть DoxGram Pro";
 "PayWall.Button.Purchasing" = "Покупка...";
 "PayWall.Button.Restoring" = "Восстановление покупок...";
 "PayWall.Button.Validating" = "Проверка покупки...";

@@ -41,7 +41,7 @@ public func sgPayWallController(statusSignal: Signal<Int64, NoError>, replacemen
 }
 
 private let innerShadowWidth: CGFloat = 15.0
-private let accentColorHex: String = "F1552E"
+private let accentColorHex: String = "9A46FF"
 
 
 
@@ -51,9 +51,8 @@ struct BackgroundView: View {
         ZStack {
             LinearGradient(
                 gradient: Gradient(stops: [
-                    .init(color: Color(hex: "A053F8").opacity(0.8), location: 0.0), // purple gradient
-                    .init(color: Color.clear, location: 0.20),
-                    
+                    .init(color: Color(hex: "9A46FF").opacity(0.85), location: 0.0), // vibrant purple gradient
+                    .init(color: Color.clear, location: 0.25),
                 ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -61,8 +60,8 @@ struct BackgroundView: View {
             .edgesIgnoringSafeArea(.all)
             LinearGradient(
                 gradient: Gradient(stops: [
-                    .init(color: Color(hex: "CC4303").opacity(0.6), location: 0.0), // orange gradient
-                    .init(color: Color.clear, location: 0.15),
+                    .init(color: Color(hex: "6A1B9A").opacity(0.75), location: 0.0), // deep purple gradient
+                    .init(color: Color.clear, location: 0.20),
                 ]),
                 startPoint: .topTrailing,
                 endPoint: .bottomLeading
@@ -75,9 +74,8 @@ struct BackgroundView: View {
                     .stroke(Color.clear, lineWidth: 0)
                     .background(
                         ZStack {
-                            innerShadow(x: -2, y: -2, blur: 4, color: Color(hex: "FF8C56")) // orange shadow
-                            innerShadow(x: 2, y: 2, blur: 4, color: Color(hex: "A053F8")) // purple shadow
-                            // innerShadow(x: 0, y: 0, blur: 4, color: Color.white.opacity(0.3))
+                            innerShadow(x: -2, y: -2, blur: 4, color: Color(hex: "B388FF")) // light purple shadow
+                            innerShadow(x: 2, y: 2, blur: 4, color: Color(hex: "9A46FF")) // purple shadow
                         }
                     )
             )
@@ -341,7 +339,7 @@ struct SGPayWallView: View {
     
     // State management
     @State private var product: SGIAPManager.SGProduct?
-    @State private var currentStatus: Int64 = 1
+    @State private var currentStatus: Int64 = 2
     @State private var state: PayWallState = .ready
     @State private var showErrorAlert: Bool = false
     @State private var showConfetti: Bool = false
@@ -383,7 +381,7 @@ struct SGPayWallView: View {
                         
                         // Title and Subtitle
                         VStack(spacing: 8) {
-                            Text("Swiftgram Pro")
+                            Text("DoxGram Pro")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
                             
@@ -398,19 +396,7 @@ struct SGPayWallView: View {
                             featuresSection
                             
                             aboutSection
-                            
-                            VStack(spacing: 8) {
-                                HStack {
-                                    legalSection
-                                    Spacer()
-                                }
-                                
-                                HStack {
-                                    restorePurchasesButton
-                                    Spacer()
-                                }
-                            }
-                    }
+                        }
                         
                         
                         // Spacer for purchase buttons
@@ -530,23 +516,6 @@ struct SGPayWallView: View {
                         .foregroundColor(.white)
                         .cornerRadius(12)
                 }
-                .disabled((state != .ready || !canPurchase) && !(currentStatus > 1))
-                .opacity(((state != .ready || !canPurchase) && !(currentStatus > 1)) ? 0.5 : 1.0)
-                
-                if let proSupportUrl = proSupportUrl {
-                    HStack(alignment: .center, spacing: 4) {
-                        Text("PayWall.ProSupport.Title".i18n(lang))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Button(action: {
-                            openUrl(proSupportUrl, false)
-                        }) {
-                            Text("PayWall.ProSupport.Contact".i18n(lang))
-                                .font(.caption)
-                                .foregroundColor(Color(hex: accentColorHex))
-                        }
-                    }
-                }
             }
             .padding([.horizontal, .top])
             .padding(.bottom, sgBottomSafeAreaInset(containerViewLayout) + 2.0)
@@ -556,65 +525,19 @@ struct SGPayWallView: View {
         .shadow(radius: 8, y: -4)
     }
     
-    private var legalSection: some View {
-        Group {
-            if #available(iOS 15.0, *) {
-                Text(LocalizedStringKey("PayWall.Notice.Markdown".i18n(lang, args: "PayWall.TermsURL".i18n(lang), "PayWall.PrivacyURL".i18n(lang))))
-                    .font(.caption)
-                    .tint(Color(hex: accentColorHex))
-                    .foregroundColor(.secondary)
-                    .environment(\.openURL, OpenURLAction { url in
-                        openUrl(url.absoluteString, false)
-                        return .handled
-                    })
-            } else {
-                Text("PayWall.Notice.Raw".i18n(lang))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                HStack(alignment: .top, spacing: 8) {
-                    Button(action: {
-                        openUrl("PayWall.PrivacyURL".i18n(lang), true)
-                    }) {
-                        Text("PayWall.Privacy".i18n(lang))
-                            .font(.caption)
-                            .foregroundColor(Color(hex: accentColorHex))
-                    }
-                    Button(action: {
-                        openUrl("PayWall.TermsURL".i18n(lang), true)
-                    }) {
-                        Text("PayWall.Terms".i18n(lang))
-                            .font(.caption)
-                            .foregroundColor(Color(hex: accentColorHex))
-                    }
-                }
-            }
-        }
-    }
-    
-    
     private var aboutSection: some View {
         VStack(spacing: 8) {
             HStack {
-                Text("PayWall.About.Title".i18n(lang))
+                Text(lang.hasPrefix("ru") ? "О DoxGram Pro" : "About DoxGram Pro")
                     .font(.headline)
                     .fontWeight(.medium)
                 Spacer()
             }
             
             HStack {
-                Text("PayWall.About.Notice".i18n(lang))
+                Text(lang.hasPrefix("ru") ? "Все функции DoxGram Pro доступны бесплатно. Наслаждайтесь расширенными возможностями!" : "All DoxGram Pro features are available for free. Enjoy the enhanced capabilities!")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                Spacer()
-            }
-            HStack {
-                Button(action: {
-                    openUrl("PayWall.About.SignatureURL".i18n(lang), false)
-                }) {
-                    Text("PayWall.About.Signature".i18n(lang))
-                        .font(.caption)
-                        .foregroundColor(Color(hex: accentColorHex))
-                }
                 Spacer()
             }
         }
@@ -637,35 +560,11 @@ struct SGPayWallView: View {
     }
         
     private var buttonTitle: String {
-        if currentStatus > 1 {
-            return "PayWall.Button.OpenPro".i18n(lang)
-        } else {
-            if state == .purchasing {
-                return "PayWall.Button.Purchasing".i18n(lang)
-            } else if state == .restoring {
-                return "PayWall.Button.Restoring".i18n(lang)
-            } else if state == .validating {
-                return "PayWall.Button.Validating".i18n(lang)
-            } else if let product = product {
-                if !SGIAP.canMakePayments || paymentsEnabled == false {
-                    return "PayWall.Button.PaymentsUnavailable".i18n(lang)
-                } else if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" && !canBuyInBeta {
-                    return "PayWall.Button.BuyInAppStore".i18n(lang)
-                } else {
-                    return "PayWall.Button.Subscribe".i18n(lang, args: product.price)
-                }
-            } else {
-                return "PayWall.Button.ContactingAppStore".i18n(lang)
-            }
-        }
+        return lang.hasPrefix("ru") ? "Открыть настройки DoxGram Pro" : "Open DoxGram Pro Settings"
     }
     
     private var canPurchase: Bool {
-        if !SGIAP.canMakePayments || paymentsEnabled == false {
-            return false
-        } else {
-            return product != nil
-        }
+        return true
     }
     
     private func showDetailsForFeature(_ featureId: SGProFeatureId) {
@@ -685,17 +584,7 @@ struct SGPayWallView: View {
     }
     
     private func handlePurchase() {
-        if currentStatus > 1 {
-            wrapperController?.replace(with: replacementController)
-        } else {
-            if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" && !canBuyInBeta {
-                openAppStorePage()
-            } else {
-                guard let product = product else { return }
-                state = .purchasing
-                SGIAP.buyProduct(product.skProduct)
-            }
-        }
+        wrapperController?.replace(with: replacementController)
     }
     
     private func handleRestorePurchases() {

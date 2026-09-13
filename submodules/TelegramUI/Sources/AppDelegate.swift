@@ -3522,74 +3522,10 @@ extension AppDelegate {
     func fetchSGStatus(primaryContext: AccountContext) async {
         // TODO(swiftgram): Stuck on getting shouldKeepConnection
         // Perhaps, we can drop on some timeout?
-//        let currentShouldKeepConnection = await (primaryContext.account.network.shouldKeepConnection.get() |> take(1) |> deliverOnMainQueue).awaitable()
-        guard !primaryContext.account.testingEnvironment else {
-            return
-        }
-        let currentShouldKeepConnection = false
-        let userId = primaryContext.account.peerId.id._internalGetInt64Value()
-//        SGLogger.shared.log("SGIAP", "User id \(userId) currently keeps connection: \(currentShouldKeepConnection)")
-        if !currentShouldKeepConnection {
-            SGLogger.shared.log("SGIAP", "Asking user id \(userId) to keep connection: true")
-            primaryContext.account.network.shouldKeepConnection.set(.single(true))
-        }
-        // MARK: Swiftgram
-        let sgIqtpQueryString = makeIqtpQuery("s")
-        //
-        let iqtpResponse = try? await sgIqtpQuery(engine: primaryContext.engine, query: sgIqtpQueryString).awaitable()
-        guard let iqtpResponse = iqtpResponse else {
-            SGLogger.shared.log("SGIAP", "IQTP response is nil!")
-//            if !currentShouldKeepConnection {
-//                SGLogger.shared.log("SGIAP", "Setting user id \(userId) keep connection back to false")
-//                primaryContext.account.network.shouldKeepConnection.set(.single(false))
-//            }
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .SGIAPHelperValidationErrorNotification, object: nil, userInfo: ["error": "PayWall.ValidationError.TryAgain"])
-            }
-            return
-        }
-        SGLogger.shared.log("SGIAP", "Got IQTP response: \(iqtpResponse)")
         let _ = try? await updateSGStatusInteractively(accountManager: primaryContext.sharedContext.accountManager, { value in
             var value = value
-
-            let newStatus: Int64
-            if let status = Int64(iqtpResponse.value) {
-                newStatus = status
-            } else {
-                SGLogger.shared.log("SGIAP", "Can't parse IQTP response into status!")
-                newStatus = value.status // unparseable
-            }
-            
-            let userId = primaryContext.account.peerId.id._internalGetInt64Value()
-            if value.status != newStatus {
-                SGLogger.shared.log("SGIAP", "Updating \(userId) status \(value.status) -> \(newStatus)")
-                if newStatus > 1 {
-                    let stringUserId = String(userId)
-                    if SGSimpleSettings.shared.primaryUserId != stringUserId {
-                        SGLogger.shared.log("SGIAP", "Setting new primary user id: \(userId)")
-                        SGSimpleSettings.shared.primaryUserId = stringUserId
-                    }
-                } else {
-                    SGLogger.shared.log("SGIAP", "Status expired")
-                    DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: .SGIAPHelperValidationErrorNotification, object: nil, userInfo: ["error": "PayWall.ValidationError.Expired"])
-                    }
-                }
-                value.status = newStatus
-            } else {
-                SGLogger.shared.log("SGIAP", "Status \(value.status) for \(userId) hasn't changed")
-                if newStatus < 2 {
-                    DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: .SGIAPHelperValidationErrorNotification, object: nil, userInfo: ["error": "PayWall.ValidationError.TryAgain"])
-                    }
-                }
-            }
+            value.status = 2
             return value
         }).awaitable()
-
-//        if !currentShouldKeepConnection {
-//            SGLogger.shared.log("SGIAP", "Setting user id \(userId) keep connection back to false")
-//            primaryContext.account.network.shouldKeepConnection.set(.single(false))
-//        }
     }
 }
