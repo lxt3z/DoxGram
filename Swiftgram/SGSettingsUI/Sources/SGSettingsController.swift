@@ -31,6 +31,7 @@ private enum SGControllerSection: Int32, SGItemListSection {
     case ayugramMedia
     case ayugramStreamer
     case ayugramPrivacy
+    case ayugramAntiCensorship
     case ayugramDebug
     case trending
     case content
@@ -132,6 +133,8 @@ private enum SGBoolSetting: String {
     case ayugramDebugger
     case keepViewOnceMedia
     case ghostDontSendVoiceListen
+    case tcpFragmentation
+    case ipv6Priority
 }
 
 private enum SGOneFromManySetting: String {
@@ -223,6 +226,13 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .bypassCopyProtection, value: SGSimpleSettings.shared.bypassCopyProtection, text: i18n("Settings.Ayugram.BypassCopyProtection", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramPrivacy, text: i18n("Settings.Ayugram.BypassCopyProtection.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .disableTelemetry, value: SGSimpleSettings.shared.disableTelemetry, text: i18n("Settings.Ayugram.DisableTelemetry", lang), enabled: true))
+
+    // AyuGram: Anti-Censorship & Acceleration
+    entries.append(.header(id: id.count, section: .ayugramAntiCensorship, text: i18n("Settings.Ayugram.AntiCensorshipHeader", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramAntiCensorship, settingName: .tcpFragmentation, value: SGSimpleSettings.shared.tcpFragmentation, text: i18n("Settings.TcpFragmentation", lang), enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramAntiCensorship, text: i18n("Settings.TcpFragmentation.Notice", lang)))
+    entries.append(.toggle(id: id.count, section: .ayugramAntiCensorship, settingName: .ipv6Priority, value: SGSimpleSettings.shared.ipv6Priority, text: i18n("Settings.Ipv6Priority", lang), enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramAntiCensorship, text: i18n("Settings.Ipv6Priority.Notice", lang)))
 
     // AyuGram: Debug & Logs
     entries.append(.header(id: id.count, section: .ayugramDebug, text: i18n("Settings.Ayugram.DebugHeader", lang), badge: nil))
@@ -642,6 +652,10 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             SGSimpleSettings.shared.streamerAutoScreenCapture = value
         case .ayugramDebugger:
             SGSimpleSettings.shared.ayugramDebugger = value
+        case .tcpFragmentation:
+            SGSimpleSettings.shared.tcpFragmentation = value
+        case .ipv6Priority:
+            SGSimpleSettings.shared.ipv6Priority = value
         }
     }, updateSliderValue: { setting, value in
         switch (setting) {

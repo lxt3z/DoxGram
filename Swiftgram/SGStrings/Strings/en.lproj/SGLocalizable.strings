@@ -315,4 +315,8 @@
 "Settings.Ayugram.EditHistoryTitle" = "Edit History";
 "Settings.Ayugram.OriginalMessage" = "Original message";
 "Settings.Ayugram.DeletedBadge" = "deleted";
-
+"Settings.Ayugram.AntiCensorshipHeader" = "ANTI-CENSORSHIP & ACCELERATION";
+"Settings.TcpFragmentation" = "TCP Fragmentation (GoodbyeDPI)";
+"Settings.TcpFragmentation.Notice" = "Splits the initial TCP handshake packets into fragments to bypass deep packet inspection (TSPU / DPI) and throttling without using third-party proxies or VPN.";
+"Settings.Ipv6Priority" = "IPv6 Priority & Network Framework";
+"Settings.Ipv6Priority.Notice" = "Prioritizes IPv6 datacenter connections via Apple Network.framework, providing faster throughput and bypassing IPv4 throttling on mobile operators.";

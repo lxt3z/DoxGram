@@ -310,4 +310,8 @@
 "Settings.Ayugram.EditHistoryTitle" = "История изменений";
 "Settings.Ayugram.OriginalMessage" = "Исходное сообщение";
 "Settings.Ayugram.DeletedBadge" = "удалено";
-
+"Settings.Ayugram.AntiCensorshipHeader" = "ОБХОД ЗАМЕДЛЕНИЙ И УСКОРЕНИЕ";
+"Settings.TcpFragmentation" = "Фрагментация TCP (GoodbyeDPI)";
+"Settings.TcpFragmentation.Notice" = "Дробит начальные TCP-пакеты рукопожатия, обманывая ТСПУ и DPI провайдеров на уровне сокетов напрямую без сторонних прокси и VPN.";
+"Settings.Ipv6Priority" = "Приоритет IPv6 + Network.framework";
+"Settings.Ipv6Priority.Notice" = "Приоритетно подключается к дата-центрам по IPv6 через Apple Network.framework, ускоряя загрузку на мобильных сетях и обходя блокировки IPv4.";

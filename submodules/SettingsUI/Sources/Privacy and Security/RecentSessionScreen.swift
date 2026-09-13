@@ -422,7 +422,11 @@ private final class RecentSessionSheetContent: CombinedComponent {
             
             switch component.subject {
             case let .session(session):
-                titleString = session.deviceModel
+                var deviceModel = session.deviceModel
+                if deviceModel.isEmpty || deviceModel.lowercased() == "null" {
+                    deviceModel = session.isCurrent ? "iPhone" : "Unknown Device"
+                }
+                titleString = deviceModel
                 if session.isCurrent {
                     subtitleText = .plain(NSAttributedString(string: strings.Presence_online, font: Font.regular(15.0), textColor: theme.actionSheet.controlAccentColor))
                 } else {
@@ -434,7 +438,11 @@ private final class RecentSessionSheetContent: CombinedComponent {
                 var appVersion = session.appVersion
                 appVersion = appVersion.replacingOccurrences(of: "APPSTORE", with: "").replacingOccurrences(of: "BETA", with: "Beta").trimmingTrailingSpaces()
                 applicationTitle = strings.AuthSessions_View_Application
-                applicationString = "\(session.appName) \(appVersion)"
+                var appName = session.appName
+                if session.isCurrent || appName.isEmpty || appName.lowercased() == "null" {
+                    appName = "DoxGram"
+                }
+                applicationString = "\(appName) \(appVersion)".trimmingTrailingSpaces()
                 ipString = session.ip // MARK: Swiftgram
                 dateString = nil
                 locationString = session.country

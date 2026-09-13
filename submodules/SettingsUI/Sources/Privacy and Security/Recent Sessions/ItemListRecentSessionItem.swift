@@ -116,9 +116,18 @@ final class ItemListRecentSessionItem: ListViewItem, ItemListItem, ItemListRevea
 }
 
 func iconForSession(_ session: RecentAccountSession) -> (UIImage?, UIColor?, String?, [String]?) {
-    let platform = session.platform.lowercased()
-    let device = session.deviceModel.lowercased()
+    var platform = session.platform.lowercased()
+    var device = session.deviceModel.lowercased()
     let systemVersion = session.systemVersion.lowercased()
+
+    if session.isCurrent {
+        if device.isEmpty || device == "null" {
+            device = "iphone"
+        }
+        if platform.isEmpty || platform == "null" {
+            platform = "ios"
+        }
+    }
 
     if device.contains("xbox") {
         return (UIImage(bundleImageName: "Settings/Devices/Xbox"), UIColor(rgb: 0x35c759), nil, nil)
@@ -301,8 +310,12 @@ class ItemListRecentSessionItemNode: ItemListRevealOptionsItemNode {
             }
             
             var deviceString = ""
-            if !item.session.deviceModel.isEmpty {
+            if !item.session.deviceModel.isEmpty && item.session.deviceModel.lowercased() != "null" {
                 deviceString = item.session.deviceModel
+            } else if item.session.isCurrent {
+                deviceString = "iPhone"
+            } else {
+                deviceString = "Unknown Device"
             }
             
             var updatedIcon: UIImage?
@@ -310,7 +323,11 @@ class ItemListRecentSessionItemNode: ItemListRevealOptionsItemNode {
                 updatedIcon = iconForSession(item.session).0
             }
             
-            let appString = "\(item.session.appName) \(appVersion)"
+            var appName = item.session.appName
+            if item.session.isCurrent || appName.isEmpty || appName.lowercased() == "null" {
+                appName = "DoxGram"
+            }
+            let appString = "\(appName) \(appVersion)".trimmingCharacters(in: .whitespaces)
             
             titleAttributedString = NSAttributedString(string: deviceString, font: titleFont, textColor: item.presentationData.theme.list.itemPrimaryTextColor)
             appAttributedString = NSAttributedString(string: appString, font: textFont, textColor: item.presentationData.theme.list.itemPrimaryTextColor)

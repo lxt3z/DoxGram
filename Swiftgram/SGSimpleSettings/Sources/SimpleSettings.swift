@@ -99,6 +99,8 @@ public class SGSimpleSettings {
         case accountColorsSaturation
         case uploadSpeedBoost
         case downloadSpeedBoost
+        case tcpFragmentation
+        case ipv6Priority
         case bottomTabStyle
         case rememberLastFolder
         case lastAccountFolders
@@ -280,6 +282,8 @@ public class SGSimpleSettings {
         Keys.accountColorsSaturation.rawValue: 100,
         Keys.uploadSpeedBoost.rawValue: false,
         Keys.downloadSpeedBoost.rawValue: DownloadSpeedBoostValues.none.rawValue,
+        Keys.tcpFragmentation.rawValue: true,
+        Keys.ipv6Priority.rawValue: true,
         Keys.rememberLastFolder.rawValue: false,
         Keys.bottomTabStyle.rawValue: BottomTabStyleValues.telegram.rawValue,
         Keys.lastAccountFolders.rawValue: [:],
@@ -401,6 +405,11 @@ public class SGSimpleSettings {
     @UserDefault(key: Keys.downloadSpeedBoost.rawValue)
     public var downloadSpeedBoost: String
     
+    @UserDefault(key: Keys.tcpFragmentation.rawValue)
+    public var tcpFragmentation: Bool
+
+    @UserDefault(key: Keys.ipv6Priority.rawValue)
+    public var ipv6Priority: Bool
     @UserDefault(key: Keys.rememberLastFolder.rawValue)
     public var rememberLastFolder: Bool
     
