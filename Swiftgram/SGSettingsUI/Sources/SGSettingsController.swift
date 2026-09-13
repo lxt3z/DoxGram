@@ -27,7 +27,11 @@ import UndoUI
 
 private enum SGControllerSection: Int32, SGItemListSection {
     case search
-    case ayugram
+    case ayugramGhost
+    case ayugramMedia
+    case ayugramStreamer
+    case ayugramPrivacy
+    case ayugramDebug
     case trending
     case content
     case tabs
@@ -152,6 +156,7 @@ private enum SGDisclosureLink: String {
     case languageSettings
     case ayugramExportLogs
     case ayugramClearLogs
+    case streamerSettings
 }
 
 private struct PeerNameColorScreenState: Equatable {
@@ -189,33 +194,39 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
         retentionText = lang.hasPrefix("ru") ? "Без ограничений" : "Unlimited"
     }
 
-    entries.append(.header(id: id.count, section: .ayugram, text: i18n("Settings.Ayugram.Header", lang), badge: nil))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .ghostDontSendTyping, value: SGSimpleSettings.shared.ghostDontSendTyping, text: i18n("Settings.Ayugram.GhostDontSendTyping", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .ghostDontSendOnline, value: SGSimpleSettings.shared.ghostDontSendOnline, text: i18n("Settings.Ayugram.GhostDontSendOnline", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .ghostDontSendRead, value: SGSimpleSettings.shared.ghostDontSendRead, text: i18n("Settings.Ayugram.GhostDontSendRead", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .ghostDontSendVoiceListen, value: SGSimpleSettings.shared.ghostDontSendVoiceListen, text: i18n("Settings.Ayugram.GhostDontSendVoiceListen", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .ghostDontReadStories, value: SGSimpleSettings.shared.ghostDontReadStories, text: i18n("Settings.Ayugram.GhostDontReadStories", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .keepViewOnceMedia, value: SGSimpleSettings.shared.keepViewOnceMedia, text: i18n("Settings.Ayugram.KeepViewOnceMedia", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .antiRecall, value: SGSimpleSettings.shared.antiRecall, text: i18n("Settings.Ayugram.AntiRecall", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .keepEditHistory, value: SGSimpleSettings.shared.keepEditHistory, text: i18n("Settings.Ayugram.KeepEditHistory", lang), enabled: true))
-    entries.append(.oneFromManySelector(id: id.count, section: .ayugram, settingName: .ayugramRetention, text: i18n("Settings.Ayugram.Retention", lang), value: retentionText, enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .hideAds, value: SGSimpleSettings.shared.hideAds, text: i18n("Settings.Ayugram.HideAds", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerMode, value: SGSimpleSettings.shared.streamerMode, text: i18n("Settings.Ayugram.StreamerMode", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerAutoScreenCapture, value: SGSimpleSettings.shared.streamerAutoScreenCapture, text: i18n("Settings.Ayugram.StreamerAutoScreenCapture", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerHideNames, value: SGSimpleSettings.shared.streamerHideNames, text: i18n("Settings.Ayugram.StreamerHideNames", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerHideAvatars, value: SGSimpleSettings.shared.streamerHideAvatars, text: i18n("Settings.Ayugram.StreamerHideAvatars", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerHideMessages, value: SGSimpleSettings.shared.streamerHideMessages, text: i18n("Settings.Ayugram.StreamerHideMessages", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerHideUsernames, value: SGSimpleSettings.shared.streamerHideUsernames, text: i18n("Settings.Ayugram.StreamerHideUsernames", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerHideStatuses, value: SGSimpleSettings.shared.streamerHideStatuses, text: i18n("Settings.Ayugram.StreamerHideStatuses", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerHideGroupNames, value: SGSimpleSettings.shared.streamerHideGroupNames, text: i18n("Settings.Ayugram.StreamerHideGroupNames", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .streamerHideNotifications, value: SGSimpleSettings.shared.streamerHideNotifications, text: i18n("Settings.Ayugram.StreamerHideNotifications", lang), enabled: true))
-    entries.append(.notice(id: id.count, section: .ayugram, text: i18n("Settings.Ayugram.StreamerMode.Notice", lang)))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .bypassCopyProtection, value: SGSimpleSettings.shared.bypassCopyProtection, text: i18n("Settings.Ayugram.BypassCopyProtection", lang), enabled: true))
-    entries.append(.notice(id: id.count, section: .ayugram, text: i18n("Settings.Ayugram.BypassCopyProtection.Notice", lang)))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .disableTelemetry, value: SGSimpleSettings.shared.disableTelemetry, text: i18n("Settings.Ayugram.DisableTelemetry", lang), enabled: true))
-    entries.append(.toggle(id: id.count, section: .ayugram, settingName: .ayugramDebugger, value: SGSimpleSettings.shared.ayugramDebugger, text: i18n("Settings.Ayugram.Debugger", lang), enabled: true))
-    entries.append(.disclosure(id: id.count, section: .ayugram, link: .ayugramExportLogs, text: i18n("Settings.Ayugram.ExportLogs", lang)))
-    entries.append(.disclosure(id: id.count, section: .ayugram, link: .ayugramClearLogs, text: i18n("Settings.Ayugram.ClearLogs", lang)))
+    // AyuGram: Ghost Mode
+    entries.append(.header(id: id.count, section: .ayugramGhost, text: i18n("Settings.Ayugram.GhostHeader", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramGhost, settingName: .ghostDontSendTyping, value: SGSimpleSettings.shared.ghostDontSendTyping, text: i18n("Settings.Ayugram.GhostDontSendTyping", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramGhost, settingName: .ghostDontSendOnline, value: SGSimpleSettings.shared.ghostDontSendOnline, text: i18n("Settings.Ayugram.GhostDontSendOnline", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramGhost, settingName: .ghostDontSendRead, value: SGSimpleSettings.shared.ghostDontSendRead, text: i18n("Settings.Ayugram.GhostDontSendRead", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramGhost, settingName: .ghostDontSendVoiceListen, value: SGSimpleSettings.shared.ghostDontSendVoiceListen, text: i18n("Settings.Ayugram.GhostDontSendVoiceListen", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramGhost, settingName: .ghostDontReadStories, value: SGSimpleSettings.shared.ghostDontReadStories, text: i18n("Settings.Ayugram.GhostDontReadStories", lang), enabled: true))
+
+    // AyuGram: Messages & Media
+    entries.append(.header(id: id.count, section: .ayugramMedia, text: i18n("Settings.Ayugram.MediaHeader", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramMedia, settingName: .keepViewOnceMedia, value: SGSimpleSettings.shared.keepViewOnceMedia, text: i18n("Settings.Ayugram.KeepViewOnceMedia", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramMedia, settingName: .antiRecall, value: SGSimpleSettings.shared.antiRecall, text: i18n("Settings.Ayugram.AntiRecall", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramMedia, settingName: .keepEditHistory, value: SGSimpleSettings.shared.keepEditHistory, text: i18n("Settings.Ayugram.KeepEditHistory", lang), enabled: true))
+    entries.append(.oneFromManySelector(id: id.count, section: .ayugramMedia, settingName: .ayugramRetention, text: i18n("Settings.Ayugram.Retention", lang), value: retentionText, enabled: true))
+
+    // AyuGram: Streamer Mode
+    entries.append(.header(id: id.count, section: .ayugramStreamer, text: i18n("Settings.Ayugram.StreamerHeader", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramStreamer, settingName: .streamerMode, value: SGSimpleSettings.shared.streamerMode, text: i18n("Settings.Ayugram.StreamerMode", lang), enabled: true))
+    entries.append(.disclosure(id: id.count, section: .ayugramStreamer, link: .streamerSettings, text: i18n("Settings.Ayugram.StreamerSettings", lang)))
+    entries.append(.notice(id: id.count, section: .ayugramStreamer, text: i18n("Settings.Ayugram.StreamerMode.Notice", lang)))
+
+    // AyuGram: Privacy & Protection
+    entries.append(.header(id: id.count, section: .ayugramPrivacy, text: i18n("Settings.Ayugram.PrivacyHeader", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .hideAds, value: SGSimpleSettings.shared.hideAds, text: i18n("Settings.Ayugram.HideAds", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .bypassCopyProtection, value: SGSimpleSettings.shared.bypassCopyProtection, text: i18n("Settings.Ayugram.BypassCopyProtection", lang), enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramPrivacy, text: i18n("Settings.Ayugram.BypassCopyProtection.Notice", lang)))
+    entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .disableTelemetry, value: SGSimpleSettings.shared.disableTelemetry, text: i18n("Settings.Ayugram.DisableTelemetry", lang), enabled: true))
+
+    // AyuGram: Debug & Logs
+    entries.append(.header(id: id.count, section: .ayugramDebug, text: i18n("Settings.Ayugram.DebugHeader", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramDebug, settingName: .ayugramDebugger, value: SGSimpleSettings.shared.ayugramDebugger, text: i18n("Settings.Ayugram.Debugger", lang), enabled: true))
+    entries.append(.disclosure(id: id.count, section: .ayugramDebug, link: .ayugramExportLogs, text: i18n("Settings.Ayugram.ExportLogs", lang)))
+    entries.append(.disclosure(id: id.count, section: .ayugramDebug, link: .ayugramClearLogs, text: i18n("Settings.Ayugram.ClearLogs", lang)))
     
     if SGSimpleSettings.shared.canUseNY {
         entries.append(.header(id: id.count, section: .trending, text: i18n("Settings.NY.Header", lang), badge: newStr))
@@ -837,6 +848,8 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
                 let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Логи очищены" : "Logs cleared", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
                 presentControllerImpl?(overlay, nil)
+            case .streamerSettings:
+                pushControllerImpl?(sgStreamerSettingsController(context: context))
         }
     }, searchInput: { searchQuery in
         updateState { state in

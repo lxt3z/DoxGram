@@ -279,6 +279,12 @@
 "Settings.NY.Notice" = "Available for a limited time only!";
 
 "Settings.Ayugram.Header" = "AYUGRAM";
+"Settings.Ayugram.GhostHeader" = "AYUGRAM: GHOST MODE";
+"Settings.Ayugram.MediaHeader" = "MESSAGES & MEDIA";
+"Settings.Ayugram.StreamerHeader" = "STREAMER MODE";
+"Settings.Ayugram.PrivacyHeader" = "PRIVACY & PROTECTION";
+"Settings.Ayugram.DebugHeader" = "DEBUGGING & LOGS";
+"Settings.Ayugram.StreamerSettings" = "Streamer Mode Privacy Settings";
 "Settings.Ayugram.GhostDontSendTyping" = "Don't send typing status";
 "Settings.Ayugram.GhostDontSendOnline" = "Don't send online status";
 "Settings.Ayugram.GhostDontSendRead" = "Don't mark messages as read";

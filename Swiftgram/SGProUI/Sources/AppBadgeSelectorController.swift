@@ -17,6 +17,8 @@ struct AppBadge: Identifiable, Hashable {
 
 func getAvailableAppBadges() -> [AppBadge] {
     var appBadges: [AppBadge] = [
+        .init(displayName: "DoxGram", assetName: "DoxGramAppBadge"),
+        .init(displayName: "AyuGram", assetName: "AyuGramAppBadge"),
         .init(displayName: "Default", assetName: "Components/AppBadge"),
         .init(displayName: "Sky", assetName: "SkyAppBadge"),
         .init(displayName: "Night", assetName: "NightAppBadge"),

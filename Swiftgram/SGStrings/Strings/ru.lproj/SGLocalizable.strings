@@ -274,6 +274,12 @@
 "Settings.NY.Notice" = "Доступны только на ограниченное время!";
 
 "Settings.Ayugram.Header" = "AYUGRAM";
+"Settings.Ayugram.GhostHeader" = "AYUGRAM: ПРИЗРАЧНЫЙ РЕЖИМ";
+"Settings.Ayugram.MediaHeader" = "СООБЩЕНИЯ И МЕДИА";
+"Settings.Ayugram.StreamerHeader" = "РЕЖИМ СТРИМЕРА";
+"Settings.Ayugram.PrivacyHeader" = "КОНФИДЕНЦИАЛЬНОСТЬ И ЗАЩИТА";
+"Settings.Ayugram.DebugHeader" = "ОТЛАДКА И ЛОГИ";
+"Settings.Ayugram.StreamerSettings" = "Настройки скрытия в режиме стримера";
 "Settings.Ayugram.GhostDontSendTyping" = "Не отправлять статус печати";
 "Settings.Ayugram.GhostDontSendOnline" = "Не отправлять статус «В сети»";
 "Settings.Ayugram.GhostDontSendRead" = "Не отмечать сообщения прочитанными";
