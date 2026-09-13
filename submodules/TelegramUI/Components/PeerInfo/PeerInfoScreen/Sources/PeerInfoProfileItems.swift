@@ -1076,7 +1076,7 @@ func infoItems(
                 id: sgItemId,
                 label: .text(labelText),
                 text: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Удалённые медиа" : "Deleted Media",
-                icon: PresentationResourcesSettings.gallery,
+                icon: PresentationResourcesSettings.photos,
                 action: {
                     if let controller = interaction.getController() {
                         controller.push(sgDeletedMediaController(context: context, peerId: currentPeerId))
