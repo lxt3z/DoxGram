@@ -85,7 +85,7 @@ final class NetworkFrameworkTcpConnectionInterface: NSObject, MTTcpConnectionInt
             tcpOptions.keepaliveIdle = 5
             tcpOptions.keepaliveCount = 2
             tcpOptions.keepaliveInterval = 5
-            tcpOptions.enableFastOpen = true
+            tcpOptions.enableFastOpen = false
             
             let parameters = NWParameters(tls: nil, tcp: tcpOptions)
             let connection = NWConnection(host: host, port: port, using: parameters)

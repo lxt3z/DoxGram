@@ -510,21 +510,21 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
             let forceLocalDNS: Bool = SGSimpleSettings.shared.localDNSForProxyHost
             let context = MTContext(serialization: serialization, encryptionProvider: arguments.encryptionProvider, apiEnvironment: apiEnvironment, isTestingEnvironment: testingEnvironment, useTempAuthKeys: useTempAuthKeys, forceLocalDNS: forceLocalDNS)
             
-            let useNetworkFramework: Bool
-            if SGSimpleSettings.shared.ipv6Priority {
-                useNetworkFramework = true
-            } else if let networkSettings = networkSettings, let customValue = networkSettings.useNetworkFramework {
-                useNetworkFramework = customValue
-            } else if arguments.useBetaFeatures {
-                useNetworkFramework = true
-            } else {
-                useNetworkFramework = false
-            }
+            if let networkSettings = networkSettings {
+                let useNetworkFramework: Bool
+                if let customValue = networkSettings.useNetworkFramework {
+                    useNetworkFramework = customValue
+                } else if arguments.useBetaFeatures {
+                    useNetworkFramework = true
+                } else {
+                    useNetworkFramework = false
+                }
 
-            if useNetworkFramework {
-                if #available(iOS 12.0, macOS 14.0, *) {
-                    context.makeTcpConnectionInterface = { delegate, delegateQueue in
-                        return NetworkFrameworkTcpConnectionInterface(delegate: delegate, delegateQueue: delegateQueue)
+                if useNetworkFramework {
+                    if #available(iOS 12.0, macOS 14.0, *) {
+                        context.makeTcpConnectionInterface = { delegate, delegateQueue in
+                            return NetworkFrameworkTcpConnectionInterface(delegate: delegate, delegateQueue: delegateQueue)
+                        }
                     }
                 }
             }
@@ -536,14 +536,6 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
                     1: ["149.154.175.10"],
                     2: ["149.154.167.40"],
                     3: ["149.154.175.117"]
-                ]
-            } else if SGSimpleSettings.shared.ipv6Priority {
-                seedAddressList = [
-                    1: ["2001:b28:f23d:f001::a", "149.154.175.50"],
-                    2: ["2001:67c:4e8:f002::a", "149.154.167.50", "95.161.76.100"],
-                    3: ["2001:b28:f23d:f003::a", "149.154.175.100"],
-                    4: ["2001:67c:4e8:f004::a", "149.154.167.91"],
-                    5: ["2001:b28:f23f:f005::a", "149.154.171.5"]
                 ]
             } else {
                 seedAddressList = [

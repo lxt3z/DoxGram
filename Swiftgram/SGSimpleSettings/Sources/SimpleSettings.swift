@@ -47,6 +47,13 @@ public class SGSimpleSettings {
             }
             UserDefaults.standard.set(true, forKey: chatListLinesMigrationKey)
         }
+
+        let antiCensorshipMigrationKey = "migrated_anti_censorship_defaults_v1"
+        if !UserDefaults.standard.bool(forKey: antiCensorshipMigrationKey) {
+            UserDefaults.standard.set(false, forKey: Keys.tcpFragmentation.rawValue)
+            UserDefaults.standard.set(false, forKey: Keys.ipv6Priority.rawValue)
+            UserDefaults.standard.set(true, forKey: antiCensorshipMigrationKey)
+        }
     }
     
     private func preCacheValues() {
@@ -282,8 +289,8 @@ public class SGSimpleSettings {
         Keys.accountColorsSaturation.rawValue: 100,
         Keys.uploadSpeedBoost.rawValue: false,
         Keys.downloadSpeedBoost.rawValue: DownloadSpeedBoostValues.none.rawValue,
-        Keys.tcpFragmentation.rawValue: true,
-        Keys.ipv6Priority.rawValue: true,
+        Keys.tcpFragmentation.rawValue: false,
+        Keys.ipv6Priority.rawValue: false,
         Keys.rememberLastFolder.rawValue: false,
         Keys.bottomTabStyle.rawValue: BottomTabStyleValues.telegram.rawValue,
         Keys.lastAccountFolders.rawValue: [:],

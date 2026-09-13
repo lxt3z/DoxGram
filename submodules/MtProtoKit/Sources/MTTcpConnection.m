@@ -1174,6 +1174,7 @@ static inline bool isTcpFragmentationEnabled(void) {
         if (!_closed)
         {
             _closed = true;
+            _didSendFirstDataPacket = false;
             
             [_socket disconnect];
             [_socket resetDelegate];
@@ -1370,29 +1371,18 @@ static inline bool isTcpFragmentationEnabled(void) {
                             
                             offset += partLength;
                         }
-                        if (isTcpFragmentationEnabled() && !self->_didSendFirstDataPacket && partitionedCompleteData.length > 24) {
-                            self->_didSendFirstDataPacket = true;
+                        if (isTcpFragmentationEnabled() && !_didSendFirstDataPacket && partitionedCompleteData.length > 24) {
+                            _didSendFirstDataPacket = true;
                             NSUInteger splitSize = 5;
                             NSData *part1 = [partitionedCompleteData subdataWithRange:NSMakeRange(0, splitSize)];
                             NSData *part2 = [partitionedCompleteData subdataWithRange:NSMakeRange(splitSize, partitionedCompleteData.length - splitSize)];
                             [_socket writeData:part1];
                             [_socket writeData:part2];
                         } else {
-                            self->_didSendFirstDataPacket = true;
                             [_socket writeData:partitionedCompleteData];
                         }
                     } else {
-                        if (isTcpFragmentationEnabled() && !self->_didSendFirstDataPacket && completeData.length > 24) {
-                            self->_didSendFirstDataPacket = true;
-                            NSUInteger splitSize = 16;
-                            NSData *part1 = [completeData subdataWithRange:NSMakeRange(0, splitSize)];
-                            NSData *part2 = [completeData subdataWithRange:NSMakeRange(splitSize, completeData.length - splitSize)];
-                            [_socket writeData:part1];
-                            [_socket writeData:part2];
-                        } else {
-                            self->_didSendFirstDataPacket = true;
-                            [_socket writeData:completeData];
-                        }
+                        [_socket writeData:completeData];
                     }
                 }
                 
