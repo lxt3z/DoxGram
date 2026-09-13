@@ -548,7 +548,13 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
             }
             
             for (id, ips) in seedAddressList {
-                context.setSeedAddressSetForDatacenterWithId(id, seedAddressSet: MTDatacenterAddressSet(addressList: ips.map { MTDatacenterAddress(ip: $0, port: 443, preferForMedia: false, restrictToTcp: false, cdn: false, preferForProxy: false, secret: nil) }))
+                var addressList: [MTDatacenterAddress] = []
+                for ip in ips {
+                    addressList.append(MTDatacenterAddress(ip: ip, port: 443, preferForMedia: false, restrictToTcp: false, cdn: false, preferForProxy: false, secret: nil))
+                    addressList.append(MTDatacenterAddress(ip: ip, port: 80, preferForMedia: false, restrictToTcp: false, cdn: false, preferForProxy: false, secret: nil))
+                    addressList.append(MTDatacenterAddress(ip: ip, port: 5222, preferForMedia: false, restrictToTcp: false, cdn: false, preferForProxy: false, secret: nil))
+                }
+                context.setSeedAddressSetForDatacenterWithId(id, seedAddressSet: MTDatacenterAddressSet(addressList: addressList))
             }
             
             context.keychain = keychain
