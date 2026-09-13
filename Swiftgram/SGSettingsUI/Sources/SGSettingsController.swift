@@ -157,6 +157,7 @@ private enum SGDisclosureLink: String {
     case ayugramExportLogs
     case ayugramClearLogs
     case streamerSettings
+    case deletedMediaVault
 }
 
 private struct PeerNameColorScreenState: Equatable {
@@ -208,6 +209,7 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.toggle(id: id.count, section: .ayugramMedia, settingName: .antiRecall, value: SGSimpleSettings.shared.antiRecall, text: i18n("Settings.Ayugram.AntiRecall", lang), enabled: true))
     entries.append(.toggle(id: id.count, section: .ayugramMedia, settingName: .keepEditHistory, value: SGSimpleSettings.shared.keepEditHistory, text: i18n("Settings.Ayugram.KeepEditHistory", lang), enabled: true))
     entries.append(.oneFromManySelector(id: id.count, section: .ayugramMedia, settingName: .ayugramRetention, text: i18n("Settings.Ayugram.Retention", lang), value: retentionText, enabled: true))
+    entries.append(.disclosure(id: id.count, section: .ayugramMedia, link: .deletedMediaVault, text: i18n("Settings.Ayugram.DeletedMediaVault", lang)))
 
     // AyuGram: Streamer Mode
     entries.append(.header(id: id.count, section: .ayugramStreamer, text: i18n("Settings.Ayugram.StreamerHeader", lang), badge: nil))
@@ -850,6 +852,8 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
                 presentControllerImpl?(overlay, nil)
             case .streamerSettings:
                 pushControllerImpl?(sgStreamerSettingsController(context: context))
+            case .deletedMediaVault:
+                pushControllerImpl?(sgDeletedMediaController(context: context, peerId: nil))
         }
     }, searchInput: { searchQuery in
         updateState { state in

@@ -1066,6 +1066,26 @@ func infoItems(
         }))
         sgItemId += 1
     }
+
+    if let peer = data.peer {
+        let currentPeerId = peer.id.toInt64()
+        let count = SGAyugramStorage.shared.getDeletedMediaCount(peerId: currentPeerId)
+        if count > 0 || SGSimpleSettings.shared.antiRecall || SGSimpleSettings.shared.keepViewOnceMedia {
+            let labelText = count > 0 ? "\(count)" : ""
+            items[.swiftgram]!.append(PeerInfoScreenDisclosureItem(
+                id: sgItemId,
+                label: .text(labelText),
+                text: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Удалённые медиа" : "Deleted Media",
+                icon: PresentationResourcesSettings.gallery,
+                action: {
+                    if let controller = interaction.getController() {
+                        controller.push(sgDeletedMediaController(context: context, peerId: currentPeerId))
+                    }
+                }
+            ))
+            sgItemId += 1
+        }
+    }
     
     
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []

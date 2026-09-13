@@ -285,6 +285,7 @@
 "Settings.Ayugram.PrivacyHeader" = "PRIVACY & PROTECTION";
 "Settings.Ayugram.DebugHeader" = "DEBUGGING & LOGS";
 "Settings.Ayugram.StreamerSettings" = "Streamer Mode Privacy Settings";
+"Settings.Ayugram.DeletedMediaVault" = "Deleted Media Vault";
 "Settings.Ayugram.GhostDontSendTyping" = "Don't send typing status";
 "Settings.Ayugram.GhostDontSendOnline" = "Don't send online status";
 "Settings.Ayugram.GhostDontSendRead" = "Don't mark messages as read";

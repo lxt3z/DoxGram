@@ -377,15 +377,7 @@ func settingsItems(showProfileId: Bool, data: PeerInfoScreenData?, context: Acco
         }
     }
     
-    items[.support]!.append(PeerInfoScreenDisclosureItem(id: 0, text: presentationData.strings.Settings_Support, icon: PresentationResourcesSettings.support, action: {
-        interaction.openSettings(.support)
-    }))
-    items[.support]!.append(PeerInfoScreenDisclosureItem(id: 1, text: presentationData.strings.Settings_FAQ, icon: PresentationResourcesSettings.faq, action: {
-        interaction.openSettings(.faq)
-    }))
-    items[.support]!.append(PeerInfoScreenDisclosureItem(id: 2, text: presentationData.strings.Settings_Tips, icon: PresentationResourcesSettings.tips, action: {
-        interaction.openSettings(.tips)
-    }))
+
     
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
     for section in SettingsSection.allCases {

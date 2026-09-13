@@ -280,6 +280,7 @@
 "Settings.Ayugram.PrivacyHeader" = "КОНФИДЕНЦИАЛЬНОСТЬ И ЗАЩИТА";
 "Settings.Ayugram.DebugHeader" = "ОТЛАДКА И ЛОГИ";
 "Settings.Ayugram.StreamerSettings" = "Настройки скрытия в режиме стримера";
+"Settings.Ayugram.DeletedMediaVault" = "Хранилище удалённых медиа";
 "Settings.Ayugram.GhostDontSendTyping" = "Не отправлять статус печати";
 "Settings.Ayugram.GhostDontSendOnline" = "Не отправлять статус «В сети»";
 "Settings.Ayugram.GhostDontSendRead" = "Не отмечать сообщения прочитанными";

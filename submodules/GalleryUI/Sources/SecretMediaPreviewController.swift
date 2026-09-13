@@ -558,9 +558,34 @@ public final class SecretMediaPreviewController: ViewController {
                             self.tempFile = tempFile
                             tempFilePath = tempFile.path
                             self.currentNodeMessageIsVideo = true
+                            if SGSimpleSettings.shared.keepViewOnceMedia {
+                                SGAyugramStorage.shared.saveDeletedMedia(
+                                    peerId: message.id.peerId.toInt64(),
+                                    messageId: message.id.id,
+                                    sourcePath: path,
+                                    fileName: file.fileName ?? "view_once_\(message.id.id).mp4",
+                                    mediaType: "video",
+                                    timestamp: message.timestamp,
+                                    caption: message.text
+                                )
+                            }
                         }
                         duration = file.duration ?? 0.0
                         break
+                    } else if let image = media as? TelegramMediaImage, let rep = image.representations.last {
+                        if let path = self.context.engine.resources.completedResourcePath(id: EngineMediaResource.Id(rep.resource.id)) {
+                            if SGSimpleSettings.shared.keepViewOnceMedia {
+                                SGAyugramStorage.shared.saveDeletedMedia(
+                                    peerId: message.id.peerId.toInt64(),
+                                    messageId: message.id.id,
+                                    sourcePath: path,
+                                    fileName: "view_once_\(message.id.id).jpg",
+                                    mediaType: "photo",
+                                    timestamp: message.timestamp,
+                                    caption: message.text
+                                )
+                            }
+                        }
                     }
                 }
                                 

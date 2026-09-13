@@ -24,6 +24,46 @@ public struct SGAyugramDeletedEntry: Codable, Equatable {
     }
 }
 
+public struct SGAyugramMediaItem: Codable, Equatable {
+    public let id: String
+    public let peerId: Int64
+    public let messageId: Int32
+    public let fileName: String
+    public let fileExtension: String
+    public let mediaType: String // "photo", "video", "voice", "file"
+    public let localFileName: String
+    public let fileSize: Int64
+    public let timestamp: Int32
+    public let deletedAt: Int32
+    public let caption: String?
+
+    public init(
+        id: String,
+        peerId: Int64,
+        messageId: Int32,
+        fileName: String,
+        fileExtension: String,
+        mediaType: String,
+        localFileName: String,
+        fileSize: Int64,
+        timestamp: Int32,
+        deletedAt: Int32,
+        caption: String?
+    ) {
+        self.id = id
+        self.peerId = peerId
+        self.messageId = messageId
+        self.fileName = fileName
+        self.fileExtension = fileExtension
+        self.mediaType = mediaType
+        self.localFileName = localFileName
+        self.fileSize = fileSize
+        self.timestamp = timestamp
+        self.deletedAt = deletedAt
+        self.caption = caption
+    }
+}
+
 public final class SGAyugramLogger {
     public static let shared = SGAyugramLogger()
     private let lock = RWLock()
@@ -94,6 +134,7 @@ public final class SGAyugramStorage {
     private let lock = RWLock()
     private var deletedMessages: [String: SGAyugramDeletedEntry] = [:]
     private var editHistories: [String: [SGAyugramEditEntry]] = [:]
+    private var deletedMediaItems: [String: SGAyugramMediaItem] = [:]
     private var _isScreenCaptured: Bool = false
 
     private let fileManager = FileManager.default
@@ -199,12 +240,150 @@ public final class SGAyugramStorage {
         return has
     }
 
+    @discardableResult
+    public func saveDeletedMedia(
+        peerId: Int64,
+        messageId: Int32,
+        sourcePath: String,
+        fileName: String,
+        mediaType: String,
+        timestamp: Int32,
+        caption: String? = nil
+    ) -> SGAyugramMediaItem? {
+        guard self.fileManager.fileExists(atPath: sourcePath) else {
+            return nil
+        }
+        guard let storageUrl = self.storageUrl else { return nil }
+
+        let peerMediaDir = storageUrl
+            .appendingPathComponent("deleted_media", isDirectory: true)
+            .appendingPathComponent("\(peerId)", isDirectory: true)
+        try? self.fileManager.createDirectory(at: peerMediaDir, withIntermediateDirectories: true, attributes: nil)
+
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        let fileExt: String
+        if !ext.isEmpty {
+            fileExt = ext
+        } else if mediaType == "photo" {
+            fileExt = "jpg"
+        } else if mediaType == "video" {
+            fileExt = "mp4"
+        } else if mediaType == "voice" {
+            fileExt = "m4a"
+        } else {
+            fileExt = "dat"
+        }
+
+        let hashSuffix = abs(fileName.hashValue % 100000)
+        let itemId = "\(peerId)_\(messageId)_\(hashSuffix)"
+        let localFileName = "\(itemId).\(fileExt)"
+        let destinationUrl = peerMediaDir.appendingPathComponent(localFileName)
+
+        if !self.fileManager.fileExists(atPath: destinationUrl.path) {
+            try? self.fileManager.copyItem(at: URL(fileURLWithPath: sourcePath), to: destinationUrl)
+        }
+
+        let attr = (try? self.fileManager.attributesOfItem(atPath: destinationUrl.path)) ?? [:]
+        let fileSize = (attr[.size] as? NSNumber)?.int64Value ?? 0
+
+        let now = Int32(Date().timeIntervalSince1970)
+        let item = SGAyugramMediaItem(
+            id: itemId,
+            peerId: peerId,
+            messageId: messageId,
+            fileName: fileName,
+            fileExtension: fileExt,
+            mediaType: mediaType,
+            localFileName: localFileName,
+            fileSize: fileSize,
+            timestamp: timestamp > 0 ? timestamp : now,
+            deletedAt: now,
+            caption: caption
+        )
+
+        self.lock.writeLock()
+        self.deletedMediaItems[itemId] = item
+        self.lock.unlock()
+
+        self.saveMediaToDisk()
+        SGAyugramLogger.log("Saved deleted media: \(fileName) (\(fileSize) bytes) for peer \(peerId)")
+        return item
+    }
+
+    public func getMediaFileUrl(item: SGAyugramMediaItem) -> URL? {
+        guard let storageUrl = self.storageUrl else { return nil }
+        return storageUrl
+            .appendingPathComponent("deleted_media", isDirectory: true)
+            .appendingPathComponent("\(item.peerId)", isDirectory: true)
+            .appendingPathComponent(item.localFileName)
+    }
+
+    public func getDeletedMedia(peerId: Int64) -> [SGAyugramMediaItem] {
+        self.lock.readLock()
+        let items = self.deletedMediaItems.values
+            .filter { $0.peerId == peerId }
+            .sorted { $0.deletedAt > $1.deletedAt }
+        self.lock.unlock()
+        return items
+    }
+
+    public func getAllDeletedMedia() -> [SGAyugramMediaItem] {
+        self.lock.readLock()
+        let items = self.deletedMediaItems.values
+            .sorted { $0.deletedAt > $1.deletedAt }
+        self.lock.unlock()
+        return items
+    }
+
+    public func getDeletedMediaCount(peerId: Int64) -> Int {
+        self.lock.readLock()
+        let count = self.deletedMediaItems.values.filter { $0.peerId == peerId }.count
+        self.lock.unlock()
+        return count
+    }
+
+    public func deleteMediaItem(id: String) {
+        self.lock.writeLock()
+        if let item = self.deletedMediaItems.removeValue(forKey: id) {
+            self.lock.unlock()
+            if let url = self.getMediaFileUrl(item: item) {
+                try? self.fileManager.removeItem(at: url)
+            }
+            self.saveMediaToDisk()
+        } else {
+            self.lock.unlock()
+        }
+    }
+
+    public func clearDeletedMedia(peerId: Int64? = nil) {
+        self.lock.writeLock()
+        if let peerId = peerId {
+            let toRemove = self.deletedMediaItems.values.filter { $0.peerId == peerId }
+            for item in toRemove {
+                self.deletedMediaItems.removeValue(forKey: item.id)
+                if let url = self.getMediaFileUrl(item: item) {
+                    try? self.fileManager.removeItem(at: url)
+                }
+            }
+        } else {
+            for item in self.deletedMediaItems.values {
+                if let url = self.getMediaFileUrl(item: item) {
+                    try? self.fileManager.removeItem(at: url)
+                }
+            }
+            self.deletedMediaItems.removeAll()
+        }
+        self.lock.unlock()
+        self.saveMediaToDisk()
+    }
+
     public func cleanupExpired(retentionDays: Int) {
         guard retentionDays > 0 else { return }
         let cutoff = Int32(Date().timeIntervalSince1970) - Int32(retentionDays * 86400)
         self.lock.writeLock()
         var deletedChanged = false
         var editsChanged = false
+        var mediaChanged = false
 
         for (k, entry) in self.deletedMessages {
             if entry.deletedAt < cutoff {
@@ -224,6 +403,16 @@ public final class SGAyugramStorage {
                 editsChanged = true
             }
         }
+
+        for (k, item) in self.deletedMediaItems {
+            if item.deletedAt < cutoff {
+                self.deletedMediaItems.removeValue(forKey: k)
+                if let url = self.getMediaFileUrl(item: item) {
+                    try? self.fileManager.removeItem(at: url)
+                }
+                mediaChanged = true
+            }
+        }
         self.lock.unlock()
 
         if deletedChanged {
@@ -231,6 +420,9 @@ public final class SGAyugramStorage {
         }
         if editsChanged {
             self.saveEditsToDisk()
+        }
+        if mediaChanged {
+            self.saveMediaToDisk()
         }
         SGAyugramLogger.log("Expired messages purged for retentionDays=\(retentionDays)")
     }
@@ -259,6 +451,18 @@ public final class SGAyugramStorage {
         }
     }
 
+    private func saveMediaToDisk() {
+        guard let url = self.storageUrl?.appendingPathComponent("deleted_media.json") else { return }
+        self.lock.readLock()
+        let items = self.deletedMediaItems
+        self.lock.unlock()
+        DispatchQueue.global(qos: .utility).async {
+            if let data = try? JSONEncoder().encode(items) {
+                try? data.write(to: url, options: .atomic)
+            }
+        }
+    }
+
     private func loadFromDisk() {
         guard let storageUrl = self.storageUrl else { return }
         let deletedUrl = storageUrl.appendingPathComponent("deleted_messages.json")
@@ -279,6 +483,12 @@ public final class SGAyugramStorage {
         if let data = try? Data(contentsOf: editsUrl),
            let edits = try? JSONDecoder().decode([String: [SGAyugramEditEntry]].self, from: data) {
             self.editHistories = edits
+        }
+
+        let mediaUrl = storageUrl.appendingPathComponent("deleted_media.json")
+        if let data = try? Data(contentsOf: mediaUrl),
+           let items = try? JSONDecoder().decode([String: SGAyugramMediaItem].self, from: data) {
+            self.deletedMediaItems = items
         }
     }
 }
