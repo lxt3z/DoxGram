@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SGSimpleSettings
 import TelegramCore
 import Display
 import SwiftSignalKit
@@ -188,7 +189,8 @@ func handleTextLinkActionImpl(context: AccountContext, peerId: EnginePeer.Id?, n
                         }),
                         ActionSheetButtonItem(title: presentationData.strings.ShareMenu_CopyShareLink, color: .accent, action: { [weak actionSheet] in
                             actionSheet?.dismissAnimated()
-                            UIPasteboard.general.string = url
+                            let copyUrl = SGSimpleSettings.shared.cleanUrlTrackers ? SGUrlSanitizer.sanitize(urlString: url) : url
+                            UIPasteboard.general.string = copyUrl
                             
                             let content: UndoOverlayContent
                             if url.hasPrefix("tel:") {

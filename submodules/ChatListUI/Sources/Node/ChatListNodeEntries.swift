@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SGSimpleSettings
 import TelegramCore
 import TelegramPresentationData
 import MergeLists
@@ -684,6 +685,9 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
             continue loop
         }
         if let peerId = peerId, state.pendingRemovalItemIds.contains(ChatListNodeState.ItemId(peerId: peerId, threadId: threadId)) {
+            continue loop
+        }
+        if let peerId = peerId, !SGHiddenChatsManager.shared.areHiddenChatsRevealed && SGHiddenChatsManager.shared.isChatHidden(peerId: peerId.toInt64()) {
             continue loop
         }
         var updatedMessages = entry.messages

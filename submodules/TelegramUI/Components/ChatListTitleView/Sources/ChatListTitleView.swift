@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 import UIKit
 import AsyncDisplayKit
 import Display
@@ -19,7 +19,7 @@ public struct NetworkStatusTitle: Equatable {
         case premium
         case emoji(PeerEmojiStatus)
     }
-    
+
     public var text: String
     public var activity: Bool
     public var hasProxy: Bool
@@ -27,7 +27,7 @@ public struct NetworkStatusTitle: Equatable {
     public var isPasscodeSet: Bool
     public var isManuallyLocked: Bool
     public var peerStatus: Status?
-    
+
     public init(
         text: String,
         activity: Bool,
@@ -59,14 +59,14 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
     private var titleCredibilityIconView: ComponentHostView<Empty>?
     private let animationCache: AnimationCache
     private let animationRenderer: MultiAnimationRenderer
-    
+
     public var requestUpdate: ((ContainedViewLayoutTransition) -> Void)?
     public var openStatusSetup: ((UIView) -> Void)?
-    
+
     private var validLayout: CGSize?
-    
+
     public var manualLayout: Bool = false
-    
+
     private var _title: NetworkStatusTitle = NetworkStatusTitle(text: "", activity: false, hasProxy: false, connectsViaProxy: false, isPasscodeSet: false, isManuallyLocked: false, peerStatus: nil)
     public var title: NetworkStatusTitle {
         get {
@@ -76,23 +76,23 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
             self.setTitle(newValue, animated: false)
         }
     }
-    
+
     public func setTitle(_ title: NetworkStatusTitle, animated: Bool) {
         let oldValue = self._title
         self._title = title
-        
+
         if self._title != oldValue {
             self.titleNode.attributedText = NSAttributedString(string: self.title.text, font: titleFont, textColor: self.theme.rootController.navigationBar.primaryTextColor)
             self.buttonView.accessibilityLabel = self.title.text
             self.activityIndicator.isHidden = !self.title.activity
-           
+
             self.proxyButton.isHidden = !self.title.hasProxy
             if self.title.connectsViaProxy {
                 self.proxyNode.status = self.title.activity ? .connecting : .connected
             } else {
                 self.proxyNode.status = .available
             }
-            
+
             let proxyIsHidden = !self.title.hasProxy
             let previousProxyIsHidden = self.proxyNode.isHidden
             if proxyIsHidden != previousProxyIsHidden {
@@ -109,7 +109,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                 }
             }
             self.proxyNode.isHidden = !self.title.hasProxy
-            
+
             self.buttonView.isHidden = !self.title.isPasscodeSet
             if self.title.isPasscodeSet && !self.title.activity {
                 if self.lockView.isHidden && animated {
@@ -130,9 +130,9 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                 self.lockView.isHidden = true
             }
             self.lockView.updateTheme(self.theme)
-            
+
             let animateStatusTransition = !oldValue.text.isEmpty && oldValue.peerStatus != title.peerStatus
-            
+
             if let peerStatus = title.peerStatus {
                 let statusContent: EmojiStatusComponent.Content
                 var statusParticleColor: UIColor?
@@ -145,7 +145,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                         statusParticleColor = UIColor(rgb: UInt32(bitPattern: color))
                     }
                 }
-                
+
                 var titleCredibilityIconTransition: ComponentTransition
                 if animateStatusTransition {
                     titleCredibilityIconTransition = ComponentTransition(animation: .curve(duration: 0.2, curve: .easeInOut))
@@ -161,7 +161,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                     self.titleCredibilityIconView = titleCredibilityIconView
                     self.addSubview(titleCredibilityIconView)
                 }
-                
+
                 let _ = titleCredibilityIconView.update(
                     transition: titleCredibilityIconTransition,
                     component: AnyComponent(EmojiStatusComponent(
@@ -184,7 +184,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
             } else {
                 if let titleCredibilityIconView = self.titleCredibilityIconView {
                     self.titleCredibilityIconView = nil
-                    
+
                     if animateStatusTransition {
                         titleCredibilityIconView.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, removeOnCompletion: false, completion: { [weak titleCredibilityIconView] _ in
                             titleCredibilityIconView?.removeFromSuperview()
@@ -195,32 +195,33 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                     }
                 }
             }
-            
+
             if !self.manualLayout {
                 self.setNeedsLayout()
             }
         }
     }
-    
+
     public var toggleIsLocked: (() -> Void)?
     public var openProxySettings: (() -> Void)?
-    
+    public var toggleHiddenChats: (() -> Void)?
+
     private var isPasscodeSet = false
     private var isManuallyLocked = false
-    
+
     public var theme: PresentationTheme {
         didSet {
             if self.theme !== oldValue {
                 self.titleNode.attributedText = NSAttributedString(string: self.title.text, font: titleFont, textColor: self.theme.rootController.navigationBar.primaryTextColor)
-                
+
                 self.lockView.updateTheme(self.theme)
-                
+
                 self.activityIndicator.type = .custom(self.theme.rootController.navigationBar.primaryTextColor, 22.0, 1.5, false)
                 self.proxyNode.theme = self.theme
             }
         }
     }
-    
+
     public var strings: PresentationStrings {
         didSet {
             if self.strings !== oldValue {
@@ -228,54 +229,54 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
             }
         }
     }
-    
+
     public init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, animationCache: AnimationCache, animationRenderer: MultiAnimationRenderer) {
         self.context = context
         self.theme = theme
         self.strings = strings
-        
+
         self.animationCache = animationCache
         self.animationRenderer = animationRenderer
-        
+
         self.titleNode = ImmediateTextNode()
         self.titleNode.displaysAsynchronously = false
         self.titleNode.maximumNumberOfLines = 1
         self.titleNode.truncationType = .end
         self.titleNode.isOpaque = false
         self.titleNode.isUserInteractionEnabled = false
-        
+
         self.activityIndicator = ActivityIndicator(type: .custom(theme.rootController.navigationBar.primaryTextColor, 22.0, 1.5, false), speed: .slow)
         let activityIndicatorSize = self.activityIndicator.measure(CGSize(width: 100.0, height: 100.0))
         self.activityIndicator.frame = CGRect(origin: CGPoint(), size: activityIndicatorSize)
-        
+
         self.lockView = ChatListTitleLockView(frame: CGRect(origin: CGPoint(), size: CGSize(width: 2.0, height: 2.0)))
         self.lockView.isHidden = true
         self.lockView.isUserInteractionEnabled = false
-        
+
         self.proxyNode = ChatTitleProxyNode(theme: self.theme)
         self.proxyNode.isHidden = true
-        
+
         self.buttonView = HighlightTrackingButton()
         self.buttonView.isAccessibilityElement = true
         self.buttonView.accessibilityTraits = .header
-        
+
         self.proxyButton = HighlightTrackingButton()
         self.proxyButton.isHidden = true
         self.proxyButton.isAccessibilityElement = true
         self.proxyButton.accessibilityLabel = self.strings.VoiceOver_Navigation_ProxySettings
         self.proxyButton.accessibilityTraits = .button
-        
+
         super.init(frame: CGRect())
-        
+
         self.isAccessibilityElement = false
-        
+
         self.addSubnode(self.activityIndicator)
         self.addSubnode(self.titleNode)
         self.addSubnode(self.proxyNode)
         self.addSubview(self.lockView)
         self.addSubview(self.buttonView)
         self.addSubview(self.proxyButton)
-        
+
         self.buttonView.highligthedChanged = { [weak self] highlighted in
             if let strongSelf = self {
                 if highlighted && !strongSelf.lockView.isHidden && strongSelf.activityIndicator.isHidden {
@@ -295,9 +296,12 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                 }
             }
         }
-        
+
         self.buttonView.addTarget(self, action: #selector(self.buttonPressed), for: .touchUpInside)
-        
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(self.titleLongPressed(_:)))
+        longPressGesture.minimumPressDuration = 0.5
+        self.buttonView.addGestureRecognizer(longPressGesture)
+
         self.proxyButton.highligthedChanged = { [weak self] highlighted in
             if let strongSelf = self {
                 if highlighted {
@@ -311,40 +315,40 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                 }
             }
         }
-        
+
         self.proxyButton.addTarget(self, action: #selector(self.proxyButtonPressed), for: .touchUpInside)
     }
-    
+
     required public init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     override public func layoutSubviews() {
         super.layoutSubviews()
-        
+
         if !self.manualLayout, let size = self.validLayout {
             let _ = self.updateLayout(availableSize: size, transition: .immediate)
         }
     }
-    
+
     public func openEmojiStatusSetup() {
         guard let titleCredibilityIconView = self.titleCredibilityIconView else {
             return
         }
         self.openStatusSetup?(titleCredibilityIconView)
     }
-    
+
     public func updateLayout(availableSize: CGSize, transition: ContainedViewLayoutTransition) -> CGSize {
         let _ = self.updateLayoutInternal(size: availableSize, transition: transition)
         return availableSize
     }
-    
+
     public func updateLayoutInternal(size: CGSize, transition: ContainedViewLayoutTransition) -> CGRect {
         self.validLayout = size
-        
+
         var indicatorPadding: CGFloat = 0.0
         let indicatorSize = self.activityIndicator.bounds.size
-        
+
         if !self.activityIndicator.isHidden {
             indicatorPadding = indicatorSize.width + 6.0
         }
@@ -357,41 +361,41 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
         if !self.lockView.isHidden {
             maxTitleWidth -= 10.0
         }
-        
+
         let titleSize = self.titleNode.updateLayout(CGSize(width: max(1.0, maxTitleWidth), height: size.height))
-        
+
         let combinedHeight = titleSize.height
-        
+
         let combinedWidth = titleSize.width
-        
+
         var titleContentRect = CGRect(origin: CGPoint(x: indicatorPadding + floor((size.width - combinedWidth - indicatorPadding) / 2.0), y: floor((size.height - combinedHeight) / 2.0)), size: titleSize)
-        
+
         titleContentRect.origin.x = min(titleContentRect.origin.x, size.width - proxyPadding - titleContentRect.width)
-        
+
         let titleFrame = titleContentRect
         var titleTransition = transition
         if self.titleNode.frame.size != titleFrame.size {
             titleTransition = .immediate
         }
         titleTransition.updateFrame(node: self.titleNode, frame: titleFrame)
-        
+
         let proxyFrame = CGRect(origin: CGPoint(x: size.width - 9.0 - self.proxyNode.bounds.width, y: floor((size.height - self.proxyNode.bounds.height) / 2.0)), size: self.proxyNode.bounds.size)
         self.proxyNode.frame = proxyFrame
-        
+
         self.proxyButton.frame = proxyFrame.insetBy(dx: -2.0, dy: -2.0)
-        
+
         let buttonX = max(0.0, titleFrame.minX - 10.0)
         self.buttonView.frame = CGRect(origin: CGPoint(x: buttonX, y: 0.0), size: CGSize(width: min(titleFrame.maxX + 28.0, size.width) - buttonX, height: size.height))
-        
+
         let lockFrame = CGRect(x: titleFrame.minX - 6.0 - 12.0, y: titleFrame.minY + 2.0, width: 2.0, height: 2.0)
         transition.updateFrame(view: self.lockView, frame: lockFrame)
         if let lockSnapshotView = self.lockSnapshotView {
             transition.updateFrame(view: lockSnapshotView, frame: lockFrame)
         }
-        
+
         let activityIndicatorFrame = CGRect(origin: CGPoint(x: titleFrame.minX - indicatorSize.width - 4.0, y: titleFrame.minY - 1.0), size: indicatorSize)
         transition.updateFrame(node: self.activityIndicator, frame: activityIndicatorFrame)
-        
+
         if let peerStatus = self.title.peerStatus {
             let statusContent: EmojiStatusComponent.Content
             switch peerStatus {
@@ -400,7 +404,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
             case let .emoji(emoji):
                 statusContent = .animation(content: .customEmoji(fileId: emoji.fileId), size: CGSize(width: 22.0, height: 22.0), placeholderColor: self.theme.list.mediaPlaceholderColor, themeColor: self.theme.list.itemAccentColor, loopMode: .count(2))
             }
-            
+
             var titleCredibilityIconTransition = ComponentTransition(transition)
             let titleCredibilityIconView: ComponentHostView<Empty>
             if let current = self.titleCredibilityIconView {
@@ -411,7 +415,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                 self.titleCredibilityIconView = titleCredibilityIconView
                 self.addSubview(titleCredibilityIconView)
             }
-            
+
             let titleIconSize = titleCredibilityIconView.update(
                 transition: titleCredibilityIconTransition,
                 component: AnyComponent(EmojiStatusComponent(
@@ -435,7 +439,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
         } else {
             if let titleCredibilityIconView = self.titleCredibilityIconView {
                 self.titleCredibilityIconView = nil
-                
+
                 if transition.isAnimated {
                     titleCredibilityIconView.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, removeOnCompletion: false, completion: { [weak titleCredibilityIconView] _ in
                         titleCredibilityIconView?.removeFromSuperview()
@@ -446,7 +450,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                 }
             }
         }
-        
+
         var resultFrame = titleFrame
         if !self.lockView.isHidden {
             resultFrame = resultFrame.union(lockFrame)
@@ -454,36 +458,42 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
         if let titleCredibilityIconView = self.titleCredibilityIconView {
             resultFrame = resultFrame.union(titleCredibilityIconView.frame)
         }
-        
+
         return resultFrame
     }
-    
+
     @objc private func buttonPressed() {
         self.toggleIsLocked?()
     }
-    
+
+    @objc private func titleLongPressed(_ gesture: UILongPressGestureRecognizer) {
+        if gesture.state == .began {
+            self.toggleHiddenChats?()
+        }
+    }
+
     @objc private func proxyButtonPressed() {
         self.openProxySettings?()
     }
-    
+
     public func makeTransitionMirrorNode() -> ASDisplayNode {
         let snapshotView = self.snapshotView(afterScreenUpdates: false)
-        
+
         return ASDisplayNode(viewBlock: {
             return snapshotView ?? UIView()
         }, didLoad: nil)
     }
-    
+
     public func animateLayoutTransition() {
     }
-    
+
     public var proxyButtonFrame: CGRect? {
         if !self.proxyNode.isHidden {
             return proxyNode.frame
         }
         return nil
     }
-    
+
     public var lockViewFrame: CGRect? {
         if !self.lockView.isHidden && !self.lockView.frame.isEmpty {
             return self.lockView.frame
@@ -491,7 +501,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
             return nil
         }
     }
-    
+
     override public func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         if let titleCredibilityIconView = self.titleCredibilityIconView, !titleCredibilityIconView.isHidden, titleCredibilityIconView.alpha != 0.0 {
             if titleCredibilityIconView.bounds.insetBy(dx: -8.0, dy: -8.0).contains(self.convert(point, to: titleCredibilityIconView)) {
@@ -500,7 +510,7 @@ public final class ChatListTitleView: UIView, NavigationBarTitleView, Navigation
                 }
             }
         }
-        
+
         if !self.proxyButton.isHidden {
             if let result = self.proxyButton.hitTest(point.offsetBy(dx: -self.proxyButton.frame.minX, dy: -self.proxyButton.frame.minY), with: event) {
                 return result;

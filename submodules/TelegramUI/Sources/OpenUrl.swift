@@ -1,5 +1,6 @@
-import SGDebugUI
+﻿import SGDebugUI
 import SGSettingsUI
+import SGSimpleSettings
 import UndoUI
 //
 import ContactListUI
@@ -43,11 +44,11 @@ public func isOAuthUrl(_ url: URL) -> Bool {
     guard let query = url.query, let params = QueryParameters(query), ["oauth", "resolve"].contains(url.host) else {
         return false
     }
-    
+
     let domain = params["domain"]
     let startApp = params["startapp"]
     let token = params["token"]
-    
+
     var valid = false
     if url.host == "resolve" {
         if domain == "oauth", let _ = startApp {
@@ -58,7 +59,7 @@ public func isOAuthUrl(_ url: URL) -> Bool {
             valid = true
         }
     }
-    
+
     return valid
 }
 
@@ -66,7 +67,7 @@ public func parseSecureIdUrl(_ url: URL) -> ParsedSecureIdUrl? {
     guard let query = url.query, let params = QueryParameters(query), ["passport", "resolve"].contains(url.host) else {
         return nil
     }
-    
+
     let domain = params["domain"]
     let botId = params["bot_id"].flatMap(Int64.init)
     let scope = params["scope"]
@@ -80,7 +81,7 @@ public func parseSecureIdUrl(_ url: URL) -> ParsedSecureIdUrl? {
     if let nonceValue = params["nonce"], let data = nonceValue.data(using: .utf8) {
         opaqueNonce = data
     }
-    
+
     let valid: Bool
     if url.host == "resolve" {
         if domain == "telegrampassport" {
@@ -91,7 +92,7 @@ public func parseSecureIdUrl(_ url: URL) -> ParsedSecureIdUrl? {
     } else {
         valid = true
     }
-    
+
     if valid {
         if let botId = botId, let scope = scope, let publicKey = publicKey, let callbackUrl = callbackUrl {
             if scope.hasPrefix("{") && scope.hasSuffix("}") {
@@ -102,11 +103,11 @@ public func parseSecureIdUrl(_ url: URL) -> ParsedSecureIdUrl? {
             } else if opaquePayload.isEmpty {
                 return nil
             }
-            
+
             return ParsedSecureIdUrl(peerId: EnginePeer.Id(namespace: Namespaces.Peer.CloudUser, id: EnginePeer.Id.Id._internalFromInt64Value(botId)), scope: scope, publicKey: publicKey, callbackUrl: callbackUrl, opaquePayload: opaquePayload, opaqueNonce: opaqueNonce)
         }
     }
-    
+
     return nil
 }
 
@@ -253,7 +254,7 @@ private func handleInternetUrl(
     if urlScheme == "tonsite" {
         isInternetUrl = true
     }
-    
+
     if isInternetUrl {
         if let host = parsedUrl.host, telegramMeHosts.contains(host) {
             handleInternalUrl(parsedUrl.absoluteString)
@@ -268,19 +269,19 @@ private func handleInternetUrl(
                 let accountSettings = accountSettingsEntry?.get(AccountWebBrowserSettings.self) ?? AccountWebBrowserSettings.defaultSettings
                 return (localSettings, accountSettings)
             }
-            
+
             let _ = (settings
             |> deliverOnMainQueue).startStandalone(next: { settings in
                 let localSettings = settings.0
                 let accountSettings = settings.1
-                
+
                 var isTonSite = false
                 if let host = parsedUrl.host, host.lowercased().hasSuffix(".ton") {
                     isTonSite = true
                 } else if let scheme = parsedUrl.scheme, scheme.lowercased().hasPrefix("tonsite") {
                     isTonSite = true
                 }
-                
+
                 var isExceptedDomain = false
                 let host = ".\((parsedUrl.host ?? "").lowercased())"
                 let exceptions = accountSettings.openExternalBrowser ? accountSettings.inAppExceptions : accountSettings.externalExceptions
@@ -290,7 +291,7 @@ private func handleInternetUrl(
                         break
                     }
                 }
-                
+
                 let shouldOpenInApp: Bool
                 if isTonSite {
                     shouldOpenInApp = true
@@ -299,7 +300,7 @@ private func handleInternetUrl(
                 } else {
                     shouldOpenInApp = !isExceptedDomain
                 }
-                
+
                 if shouldOpenInApp {
                     let controller = BrowserScreen(context: context, subject: .webPage(url: parsedUrl.absoluteString))
                     navigationController?.pushViewController(controller)
@@ -335,21 +336,21 @@ private func handleInternetUrl(
 private struct QueryParameters {
     private let map: [String: [String?]]
     let items: [URLQueryItem]
-    
+
     init?(_ query: String) {
         guard let components = URLComponents(string: "/?" + query) else {
             return nil
         }
         let queryItems = components.queryItems ?? []
         self.items = queryItems
-        
+
         var map: [String: [String?]] = [:]
         for item in queryItems {
             map[item.name, default: []].append(item.value)
         }
         self.map = map
     }
-    
+
     subscript(_ name: String) -> String? {
         return self.map[name]?.first ?? nil
     }
@@ -372,7 +373,40 @@ private func makeTelegramUrl(_ path: String, queryItems: [URLQueryItem] = []) ->
     return appendQueryItems(to: "https://t.me\(path)", items: queryItems)
 }
 
-func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, url: String, forceExternal: Bool, presentationData: PresentationData, navigationController: NavigationController?, dismissInput: @escaping () -> Void) {
+func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, url: String, forceExternal: Bool, presentationData: PresentationData, navigationController: NavigationController?, dismissInput: @escaping () -> Void, skipSecurityCheck: Bool = false) {
+    var url = url
+    let lowercasedUrl = url.lowercased()
+    let isSpecialScheme = lowercasedUrl.hasPrefix("tel:") || lowercasedUrl.hasPrefix("calshow:") || lowercasedUrl.hasPrefix("mailto:")
+
+    if !isSpecialScheme {
+        if SGSimpleSettings.shared.cleanUrlTrackers {
+            url = SGUrlSanitizer.sanitize(urlString: url)
+        }
+
+        if !skipSecurityCheck && (SGSimpleSettings.shared.warnOnIpLoggers || SGSimpleSettings.shared.warnOnAllExternalLinks) {
+            let checkResult = SGUrlSanitizer.checkSuspicious(urlString: url, warnOnAllExternal: SGSimpleSettings.shared.warnOnAllExternalLinks)
+            if checkResult.isSuspicious {
+                let alertTitle = checkResult.isIpGrabber ? "ðŸ›¡ï¸ Ð—Ð°Ñ‰Ð¸Ñ‚Ð° IP: Ð“Ñ€Ð°Ð±Ð±ÐµÑ€" : "ðŸ›¡ï¸ ÐŸÐ¾Ð´Ð¾Ð·Ñ€Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð°Ñ ÑÑÑ‹Ð»ÐºÐ°"
+                let alertText = "ÐŸÐµÑ€ÐµÑ…Ð¾Ð´ Ð¿Ð¾ ÑÑ‚Ð¾Ð¹ ÑÑÑ‹Ð»ÐºÐµ Ð¼Ð¾Ð¶ÐµÑ‚ Ñ€Ð°ÑÐºÑ€Ñ‹Ñ‚ÑŒ Ð²Ð°Ñˆ Ñ€ÐµÐ°Ð»ÑŒÐ½Ñ‹Ð¹ IP-Ð°Ð´Ñ€ÐµÑ Ð¸ Ð¼ÐµÑÑ‚Ð¾Ð¿Ð¾Ð»Ð¾Ð¶ÐµÐ½Ð¸Ðµ:\n\n\(url)\n\nÐ’Ñ‹ ÑƒÐ²ÐµÑ€ÐµÐ½Ñ‹, Ñ‡Ñ‚Ð¾ Ñ…Ð¾Ñ‚Ð¸Ñ‚Ðµ Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð¸Ñ‚ÑŒ?"
+
+                let targetUrl = url
+                let alertController = textAlertController(
+                    context: context,
+                    title: alertTitle,
+                    text: alertText,
+                    actions: [
+                        TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
+                        TextAlertAction(type: .defaultAction, title: "ÐŸÐµÑ€ÐµÐ¹Ñ‚Ð¸", action: {
+                            openExternalUrlImpl(context: context, urlContext: urlContext, url: targetUrl, forceExternal: forceExternal, presentationData: presentationData, navigationController: navigationController, dismissInput: dismissInput, skipSecurityCheck: true)
+                        })
+                    ]
+                )
+                context.sharedContext.presentGlobalController(alertController, nil)
+                return
+            }
+        }
+    }
+
     if forceExternal || url.lowercased().hasPrefix("tel:") || url.lowercased().hasPrefix("calshow:") {
         if url.lowercased().hasPrefix("tel:+888") {
             context.sharedContext.presentGlobalController(textAlertController(context: context, title: nil, text: presentationData.strings.Conversation_CantPhoneCallAnonymousNumberError, actions: [
@@ -384,18 +418,18 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
         context.sharedContext.applicationBindings.openUrl(url)
         return
     }
-    
+
     guard let canonicalUrl = canonicalExternalUrl(from: url) else {
         return
     }
-    
+
     if canonicalUrl.scheme == "mailto" {
         context.sharedContext.applicationBindings.openUrl(url)
         return
     }
-    
+
     var parsedUrl = canonicalUrl
-    
+
     if let host = parsedUrl.host?.lowercased() {
         if host == "itunes.apple.com" {
             if context.sharedContext.applicationBindings.canOpenUrl(parsedUrl.absoluteString) {
@@ -415,7 +449,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
             }
         }
     }
-    
+
     let handleResolvedUrl = makeResolvedUrlHandler(
         context: context,
         presentationData: presentationData,
@@ -426,7 +460,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
         context: context,
         resolvedHandler: handleResolvedUrl
     )
-    
+
     let continueHandling: () -> Void = {
         if let scheme = parsedUrl.scheme, (scheme == "tg" || scheme == context.sharedContext.applicationBindings.appSpecificScheme) {
             if parsedUrl.host == "tonsite" {
@@ -435,7 +469,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                 }
             }
         }
-        
+
         if let scheme = parsedUrl.scheme, (scheme == "tg" || scheme == context.sharedContext.applicationBindings.appSpecificScheme) {
             var convertedUrl: String?
             let host = parsedUrl.host?.lowercased() ?? ""
@@ -489,7 +523,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                     let pass = params["pass"]
                     let secret = params["secret"]
                     let secretHost = params["host"]
-                    
+
                     if let server, !server.isEmpty, let port, let _ = Int32(port) {
                         var queryItems: [URLQueryItem] = [
                             URLQueryItem(name: "proxy", value: server),
@@ -523,10 +557,10 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                             return
                         }
                         let controller = SecureIdAuthController(context: context, mode: .form(peerId: secureId.peerId, scope: secureId.scope, publicKey: secureId.publicKey, callbackUrl: secureId.callbackUrl, opaquePayload: secureId.opaquePayload, opaqueNonce: secureId.opaqueNonce))
-                        
+
                         if let navigationController = navigationController {
                             context.sharedContext.applicationBindings.dismissNativeController()
-                            
+
                             navigationController.view.window?.endEditing(true)
                             context.sharedContext.applicationBindings.getWindowHost()?.present(controller, on: .root, blockInteraction: false, completion: {})
                         }
@@ -612,7 +646,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                     let channelId = params["channel"].flatMap(Int64.init)
                     let postId = params["post"].flatMap(Int32.init)
                     let threadId = params["thread"].flatMap(Int64.init)
-                    
+
                     if let channelId {
                         if let postId {
                             if let threadId {
@@ -698,7 +732,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                 default:
                     break
                 }
-                
+
                 if host == "resolve" {
                     var phone: String?
                     var domain: String?
@@ -721,7 +755,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                     var referrer: String?
                     var albumId: Int64?
                     var collectionId: Int64?
-                    
+
                     for queryItem in params.items {
                         if let value = queryItem.value {
                             switch queryItem.name {
@@ -785,7 +819,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                             }
                         }
                     }
-                    
+
                     if let phone = phone {
                         var queryItems: [URLQueryItem] = []
                         if let text {
@@ -819,7 +853,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                         } else if let collectionId {
                             path += "/c/\(collectionId)"
                         }
-                        
+
                         var queryItems: [URLQueryItem] = []
                         if let startApp {
                             queryItems.append(URLQueryItem(name: "startapp", value: startApp.isEmpty ? "" : startApp))
@@ -843,7 +877,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                         } else if let attach {
                             queryItems.append(URLQueryItem(name: "attach", value: attach))
                         }
-                        
+
                         if let startAttach {
                             queryItems.append(URLQueryItem(name: "startattach", value: startAttach.isEmpty ? nil : startAttach))
                             if let choose {
@@ -862,7 +896,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                         if direct {
                             queryItems.append(URLQueryItem(name: "direct", value: nil))
                         }
-                        
+
                         convertedUrl = makeTelegramUrl(path, queryItems: queryItems)
                     }
                 }
@@ -938,10 +972,10 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                 case "restore_purchases":
                     let statusController = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
                     context.sharedContext.presentGlobalController(statusController, nil)
-                    
+
                     context.inAppPurchaseManager?.restorePurchases(completion: { [weak statusController] result in
                         statusController?.dismiss()
-                        
+
                         let text: String?
                         switch result {
                         case let .succeed(serverProvided):
@@ -1052,7 +1086,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                     break
                 }
             }
-            
+
             if let convertedUrl {
                 handleInternalUrl(convertedUrl)
             } else if let path = parsedUrl.host {
@@ -1060,7 +1094,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
             }
             return
         }
-        
+
         handleInternetUrl(
             parsedUrl: parsedUrl,
             originalUrl: url,
@@ -1070,7 +1104,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
             handleInternalUrl: handleInternalUrl
         )
     }
-    
+
     if let scheme = parsedUrl.scheme, internetSchemes.contains(scheme) {
         if let host = parsedUrl.host, telegramMeHosts.contains(host) {
             continueHandling()

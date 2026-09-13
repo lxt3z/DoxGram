@@ -320,3 +320,17 @@
 "Settings.TcpFragmentation.Notice" = "Splits the initial TCP handshake packets into fragments to bypass deep packet inspection (TSPU / DPI) and throttling without using third-party proxies or VPN.";
 "Settings.Ipv6Priority" = "IPv6 Priority & Network Framework";
 "Settings.Ipv6Priority.Notice" = "Prioritizes IPv6 datacenter connections via Apple Network.framework, providing faster throughput and bypassing IPv4 throttling on mobile operators.";
+
+"Settings.AntiDeanon.Header" = "ANTI-DEANON & IP PROTECTION";
+"Settings.AntiDeanon.CleanTrackers" = "Clean Tracking Links";
+"Settings.AntiDeanon.CleanTrackers.Notice" = "Automatically strips tracking parameters (utm_, fbclid, yclid, igshid, etc.) and unpacks redirect wrappers when opening or copying links.";
+"Settings.AntiDeanon.WarnIpLoggers" = "IP Grabber Warning";
+"Settings.AntiDeanon.WarnIpLoggers.Notice" = "Warns before opening suspected IP loggers (IPLogger, Grabify) and shorteners capable of capturing your IP address.";
+"Settings.AntiDeanon.WarnAllExternal" = "Warn on All External Links";
+"Settings.AntiDeanon.WarnAllExternal.Notice" = "Ask for confirmation before opening any external link outside of Telegram.";
+
+"Settings.HiddenChats.Header" = "HIDDEN CHATS";
+"Settings.HiddenChats.Enabled" = "Enable Hidden Chats";
+"Settings.HiddenChats.Enabled.Notice" = "Hide dialogs via chat context menu («Hide Chat»). To reveal or hide them, long press the «DoxGram» title or enter your secret PIN code in search.";
+"Settings.HiddenChats.Biometrics" = "Face ID / Passcode";
+"Settings.HiddenChats.Biometrics.Notice" = "Require Face ID, Touch ID, or device passcode to reveal hidden dialogs.";

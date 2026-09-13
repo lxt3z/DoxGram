@@ -32,6 +32,8 @@ private enum SGControllerSection: Int32, SGItemListSection {
     case ayugramStreamer
     case ayugramPrivacy
     case ayugramAntiCensorship
+    case ayugramAntiDeanon
+    case ayugramHiddenChats
     case ayugramDebug
     case trending
     case content
@@ -135,6 +137,11 @@ private enum SGBoolSetting: String {
     case ghostDontSendVoiceListen
     case tcpFragmentation
     case ipv6Priority
+    case cleanUrlTrackers
+    case warnOnIpLoggers
+    case warnOnAllExternalLinks
+    case hiddenChatsEnabled
+    case hiddenChatsBiometrics
 }
 
 private enum SGOneFromManySetting: String {
@@ -233,6 +240,22 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.notice(id: id.count, section: .ayugramAntiCensorship, text: i18n("Settings.TcpFragmentation.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .ayugramAntiCensorship, settingName: .ipv6Priority, value: SGSimpleSettings.shared.ipv6Priority, text: i18n("Settings.Ipv6Priority", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramAntiCensorship, text: i18n("Settings.Ipv6Priority.Notice", lang)))
+
+    // DoxGram: Anti-Deanon & IP Protection
+    entries.append(.header(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.Header", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramAntiDeanon, settingName: .cleanUrlTrackers, value: SGSimpleSettings.shared.cleanUrlTrackers, text: i18n("Settings.AntiDeanon.CleanTrackers", lang), enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.CleanTrackers.Notice", lang)))
+    entries.append(.toggle(id: id.count, section: .ayugramAntiDeanon, settingName: .warnOnIpLoggers, value: SGSimpleSettings.shared.warnOnIpLoggers, text: i18n("Settings.AntiDeanon.WarnIpLoggers", lang), enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.WarnIpLoggers.Notice", lang)))
+    entries.append(.toggle(id: id.count, section: .ayugramAntiDeanon, settingName: .warnOnAllExternalLinks, value: SGSimpleSettings.shared.warnOnAllExternalLinks, text: i18n("Settings.AntiDeanon.WarnAllExternal", lang), enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.WarnAllExternal.Notice", lang)))
+
+    // DoxGram: Hidden Chats
+    entries.append(.header(id: id.count, section: .ayugramHiddenChats, text: i18n("Settings.HiddenChats.Header", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramHiddenChats, settingName: .hiddenChatsEnabled, value: SGSimpleSettings.shared.hiddenChatsEnabled, text: i18n("Settings.HiddenChats.Enabled", lang), enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramHiddenChats, text: i18n("Settings.HiddenChats.Enabled.Notice", lang)))
+    entries.append(.toggle(id: id.count, section: .ayugramHiddenChats, settingName: .hiddenChatsBiometrics, value: SGSimpleSettings.shared.hiddenChatsBiometrics, text: i18n("Settings.HiddenChats.Biometrics", lang), enabled: SGSimpleSettings.shared.hiddenChatsEnabled))
+    entries.append(.notice(id: id.count, section: .ayugramHiddenChats, text: i18n("Settings.HiddenChats.Biometrics.Notice", lang)))
 
     // AyuGram: Debug & Logs
     entries.append(.header(id: id.count, section: .ayugramDebug, text: i18n("Settings.Ayugram.DebugHeader", lang), badge: nil))
@@ -656,6 +679,17 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             SGSimpleSettings.shared.tcpFragmentation = value
         case .ipv6Priority:
             SGSimpleSettings.shared.ipv6Priority = value
+        case .cleanUrlTrackers:
+            SGSimpleSettings.shared.cleanUrlTrackers = value
+        case .warnOnIpLoggers:
+            SGSimpleSettings.shared.warnOnIpLoggers = value
+        case .warnOnAllExternalLinks:
+            SGSimpleSettings.shared.warnOnAllExternalLinks = value
+        case .hiddenChatsEnabled:
+            SGSimpleSettings.shared.hiddenChatsEnabled = value
+            simplePromise.set(true)
+        case .hiddenChatsBiometrics:
+            SGSimpleSettings.shared.hiddenChatsBiometrics = value
         }
     }, updateSliderValue: { setting, value in
         switch (setting) {

@@ -315,3 +315,17 @@
 "Settings.TcpFragmentation.Notice" = "Дробит начальные TCP-пакеты рукопожатия, обманывая ТСПУ и DPI провайдеров на уровне сокетов напрямую без сторонних прокси и VPN.";
 "Settings.Ipv6Priority" = "Приоритет IPv6 + Network.framework";
 "Settings.Ipv6Priority.Notice" = "Приоритетно подключается к дата-центрам по IPv6 через Apple Network.framework, ускоряя загрузку на мобильных сетях и обходя блокировки IPv4.";
+
+"Settings.AntiDeanon.Header" = "АНТИ-ДЕАНОН И ЗАЩИТА IP";
+"Settings.AntiDeanon.CleanTrackers" = "Очистка трекеров из ссылок";
+"Settings.AntiDeanon.CleanTrackers.Notice" = "Автоматически удаляет метки слежки (utm_, fbclid, yclid, igshid и др.) и раскрывает прямые ссылки при открытии и копировании.";
+"Settings.AntiDeanon.WarnIpLoggers" = "Защита от IP-грабберов";
+"Settings.AntiDeanon.WarnIpLoggers.Notice" = "Предупреждает об открытии ссылок-логгеров IP (IPLogger, Grabify) и сокращателей ссылок, способных раскрыть ваш реальный IP.";
+"Settings.AntiDeanon.WarnAllExternal" = "Предупреждать обо всех внешних ссылках";
+"Settings.AntiDeanon.WarnAllExternal.Notice" = "Запрашивать подтверждение перед открытием любых ссылок вне Telegram.";
+
+"Settings.HiddenChats.Header" = "СКРЫТЫЕ ЧАТЫ";
+"Settings.HiddenChats.Enabled" = "Включить скрытые чаты";
+"Settings.HiddenChats.Enabled.Notice" = "Скрывайте диалоги через меню чата («Скрыть чат»). Чтобы показать или спрятать их, зажмите заголовок «DoxGram» или введите секретный PIN-код в поиске.";
+"Settings.HiddenChats.Biometrics" = "Face ID / Код-пароль";
+"Settings.HiddenChats.Biometrics.Notice" = "Запрашивать Face ID, Touch ID или код-пароль устройства для показа скрытых чатов.";

@@ -207,6 +207,13 @@ public class SGSimpleSettings {
         case ayugramDebugger
         case keepViewOnceMedia
         case ghostDontSendVoiceListen
+        case cleanUrlTrackers
+        case warnOnIpLoggers
+        case warnOnAllExternalLinks
+        case hiddenChatsEnabled
+        case hiddenChatsBiometrics
+        case hiddenChatsPin
+        case hiddenChatsList
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
@@ -383,7 +390,14 @@ public class SGSimpleSettings {
         Keys.ayugramRetentionDays.rawValue: 0,
         Keys.ayugramDebugger.rawValue: true,
         Keys.keepViewOnceMedia.rawValue: true,
-        Keys.ghostDontSendVoiceListen.rawValue: true
+        Keys.ghostDontSendVoiceListen.rawValue: true,
+        Keys.cleanUrlTrackers.rawValue: true,
+        Keys.warnOnIpLoggers.rawValue: true,
+        Keys.warnOnAllExternalLinks.rawValue: false,
+        Keys.hiddenChatsEnabled.rawValue: true,
+        Keys.hiddenChatsBiometrics.rawValue: true,
+        Keys.hiddenChatsPin.rawValue: "7777",
+        Keys.hiddenChatsList.rawValue: [Int64]()
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -718,6 +732,33 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.ghostDontSendVoiceListen.rawValue)
     public var ghostDontSendVoiceListen: Bool
+
+    @UserDefault(key: Keys.cleanUrlTrackers.rawValue)
+    public var cleanUrlTrackers: Bool
+
+    @UserDefault(key: Keys.warnOnIpLoggers.rawValue)
+    public var warnOnIpLoggers: Bool
+
+    @UserDefault(key: Keys.warnOnAllExternalLinks.rawValue)
+    public var warnOnAllExternalLinks: Bool
+
+    @UserDefault(key: Keys.hiddenChatsEnabled.rawValue)
+    public var hiddenChatsEnabled: Bool
+
+    @UserDefault(key: Keys.hiddenChatsBiometrics.rawValue)
+    public var hiddenChatsBiometrics: Bool
+
+    @UserDefault(key: Keys.hiddenChatsPin.rawValue)
+    public var hiddenChatsPin: String
+
+    public var hiddenChatsList: [Int64] {
+        get {
+            return (UserDefaults.standard.array(forKey: Keys.hiddenChatsList.rawValue) as? [Int64]) ?? []
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Keys.hiddenChatsList.rawValue)
+        }
+    }
 }
 
 extension SGSimpleSettings {
