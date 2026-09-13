@@ -805,6 +805,8 @@ struct ctr_state {
     return self;
 }
 
+@end
+
 static inline bool isTcpFragmentationEnabled(void) {
     id val = [[NSUserDefaults standardUserDefaults] objectForKey:@"tcpFragmentation"];
     if (val == nil) {
