@@ -33,7 +33,8 @@ func managedConfigurationUpdates(accountManager: AccountManager<TelegramAccountM
                         }
                     }
                     network.context.performBatchUpdates {
-                        for (id, var list) in addressList {
+                        for (id, list) in addressList {
+                            var list = list
                             if SGSimpleSettings.shared.ipv6Priority {
                                 list.sort { a, b in
                                     let aIsIpv6 = a.ip?.contains(":") ?? false

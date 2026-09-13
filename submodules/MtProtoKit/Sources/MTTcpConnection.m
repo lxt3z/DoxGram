@@ -805,12 +805,15 @@ struct ctr_state {
     return self;
 }
 
-static bool isTcpFragmentationEnabled(void) {
+static inline bool isTcpFragmentationEnabled(void) {
     id val = [[NSUserDefaults standardUserDefaults] objectForKey:@"tcpFragmentation"];
     if (val == nil) {
         return true;
     }
-    return [val boolValue];
+    if ([val respondsToSelector:@selector(boolValue)]) {
+        return [(NSNumber *)val boolValue];
+    }
+    return true;
 }
 
 @interface MTTcpConnection () <MTTcpConnectionInterfaceDelegate>
