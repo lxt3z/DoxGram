@@ -28,6 +28,7 @@ DerivedData
 .DS_Store
 *.dSYM
 *.dSYM.zip
+*.ips
 *.ipa
 */xcuserdata/*
 buck-out/*
