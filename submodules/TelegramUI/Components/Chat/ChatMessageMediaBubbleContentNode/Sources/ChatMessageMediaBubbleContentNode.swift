@@ -4,6 +4,7 @@ import AsyncDisplayKit
 import Display
 import SwiftSignalKit
 import TelegramCore
+import SGSimpleSettings
 import TelegramUIPreferences
 import TelegramPresentationData
 import AccountContext
@@ -422,6 +423,24 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
                     isPinned: item.message.tags.contains(.pinned) && !item.associatedData.isInPinnedListMode && !isReplyThread,
                     dateText: dateText
                 )
+            }
+            
+            var isChannelAd = false
+            if SGSimpleSettings.shared.hideChannelAds {
+                if SGAdDetector.isAd(item.message) || SGAdDetector.isAd(item.topMessage) {
+                    isChannelAd = true
+                } else if case let .group(messages) = item.content {
+                    for msg in messages {
+                        if SGAdDetector.isAd(msg.0) {
+                            isChannelAd = true
+                            break
+                        }
+                    }
+                }
+            }
+            if isChannelAd {
+                automaticDownload = .none
+                automaticPlayback = false
             }
             
             let (unboundSize, initialWidth, refineLayout) = interactiveImageLayout(item.context, item.presentationData, item.presentationData.dateTimeFormat, item.message, item.associatedData, item.attributes, selectedMedia!, selectedMediaIndex, dateAndStatus, automaticDownload, item.associatedData.automaticDownloadPeerType, item.associatedData.automaticDownloadPeerId, sizeCalculation, layoutConstants, contentMode, item.controllerInteraction.presentationContext)

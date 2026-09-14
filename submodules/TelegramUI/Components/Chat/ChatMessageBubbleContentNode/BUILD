@@ -22,6 +22,7 @@ swift_library(
         "//submodules/TelegramUI/Components/Chat/ChatHistoryEntry",
         "//submodules/TelegramUI/Components/Chat/ChatMessageItem",
         "//submodules/TelegramUI/Components/Chat/ChatMessageItemCommon",
+        "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
     ],
     visibility = [
         "//visibility:public",

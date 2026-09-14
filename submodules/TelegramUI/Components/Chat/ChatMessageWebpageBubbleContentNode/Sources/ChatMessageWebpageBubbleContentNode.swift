@@ -4,6 +4,7 @@ import Display
 import AsyncDisplayKit
 import SwiftSignalKit
 import TelegramCore
+import SGSimpleSettings
 import TelegramUIPreferences
 import TextFormat
 import AccountContext
@@ -272,6 +273,10 @@ public final class ChatMessageWebpageBubbleContentNode: ChatMessageBubbleContent
                     } else {
                         automaticPlayback = item.context.engine.resources.completedResourcePath(id: EngineMediaResource.Id(file.resource.id)) != nil
                     }
+                }
+                
+                if SGSimpleSettings.shared.hideChannelAds && (SGAdDetector.isAd(item.message) || SGAdDetector.isAd(item.topMessage)) {
+                    automaticPlayback = false
                 }
                 
                 switch type {

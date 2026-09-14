@@ -79,7 +79,8 @@ public class SGSimpleSettings {
             { let _ = self.dismissedSGSuggestions },
             { let _ = self.customAppBadge },
             { let _ = self.tgWsProxyEnabled },
-            { let _ = self.hideProxyButton }
+            { let _ = self.hideProxyButton },
+            { let _ = self.hideChannelAds }
         ]
 
         tasks.forEach { task in
@@ -214,6 +215,7 @@ public class SGSimpleSettings {
         case tgWsProxyCustomWorker
         case tgWsProxyPort
         case hideProxyButton
+        case hideChannelAds
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
@@ -399,7 +401,8 @@ public class SGSimpleSettings {
         Keys.tgWsProxyEnabled.rawValue: false,
         Keys.tgWsProxyCustomWorker.rawValue: "",
         Keys.tgWsProxyPort.rawValue: 10855,
-        Keys.hideProxyButton.rawValue: false
+        Keys.hideProxyButton.rawValue: false,
+        Keys.hideChannelAds.rawValue: false
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -768,6 +771,9 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.hideProxyButton.rawValue)
     public var hideProxyButton: Bool
+
+    @UserDefault(key: Keys.hideChannelAds.rawValue)
+    public var hideChannelAds: Bool
 }
 
 extension SGSimpleSettings {

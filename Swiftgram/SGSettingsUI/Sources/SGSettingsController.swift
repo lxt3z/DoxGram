@@ -120,6 +120,7 @@ private enum SGBoolSetting: String {
     case antiRecall
     case keepEditHistory
     case hideAds
+    case hideChannelAds
     case streamerMode
     case bypassCopyProtection
     case disableTelemetry
@@ -228,6 +229,8 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     // AyuGram: Privacy & Protection
     entries.append(.header(id: id.count, section: .ayugramPrivacy, text: i18n("Settings.Ayugram.PrivacyHeader", lang), badge: nil))
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .hideAds, value: SGSimpleSettings.shared.hideAds, text: i18n("Settings.Ayugram.HideAds", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .hideChannelAds, value: SGSimpleSettings.shared.hideChannelAds, text: lang.hasPrefix("ru") ? "Скрывать рекламу в каналах" : "Hide Channel Ads", enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramPrivacy, text: lang.hasPrefix("ru") ? "Скрывает рекламу, подборки каналов и казино в каналах плашкой в стиле даты. По тапу на «Показать» сообщение раскрывается без автозагрузки медиа." : "Hides ads, channel collections, and casino posts in channels using a date-style badge. Tapping 'Show' reveals the post without auto-loading media."))
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .bypassCopyProtection, value: SGSimpleSettings.shared.bypassCopyProtection, text: i18n("Settings.Ayugram.BypassCopyProtection", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramPrivacy, text: i18n("Settings.Ayugram.BypassCopyProtection.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .disableTelemetry, value: SGSimpleSettings.shared.disableTelemetry, text: i18n("Settings.Ayugram.DisableTelemetry", lang), enabled: true))
@@ -643,6 +646,8 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             SGSimpleSettings.shared.keepEditHistory = value
         case .hideAds:
             SGSimpleSettings.shared.hideAds = value
+        case .hideChannelAds:
+            SGSimpleSettings.shared.hideChannelAds = value
         case .streamerMode:
             SGSimpleSettings.shared.streamerMode = value
             simplePromise.set(true)
