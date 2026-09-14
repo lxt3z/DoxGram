@@ -1,4 +1,4 @@
-﻿// MARK: Swiftgram
+// MARK: Swiftgram
 import SGSimpleSettings
 import LocalAuthentication
 
@@ -2408,7 +2408,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
         if SGHiddenChatsManager.shared.areHiddenChatsRevealed {
             SGHiddenChatsManager.shared.hideHiddenChats()
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            let text = isRussian ? "ðŸ”’ Ð¡ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ Ñ‡Ð°Ñ‚Ñ‹ ÑÐ¿Ñ€ÑÑ‚Ð°Ð½Ñ‹" : "ðŸ”’ Hidden chats locked"
+            let text = isRussian ? "🔒 Скрытые чаты спрятаны" : "🔒 Hidden chats locked"
             self.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false }), in: .current)
             return
         }
@@ -2416,7 +2416,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
         if SGSimpleSettings.shared.hiddenChatsBiometrics {
             let context = LAContext()
             var error: NSError?
-            let reason = isRussian ? "DoxGram: Ð”Ð¾ÑÑ‚ÑƒÐ¿ Ðº ÑÐºÑ€Ñ‹Ñ‚Ñ‹Ð¼ Ñ‡Ð°Ñ‚Ð°Ð¼" : "DoxGram: Unlock hidden chats"
+            let reason = isRussian ? "DoxGram: Доступ к скрытым чатам" : "DoxGram: Unlock hidden chats"
             if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
                 context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { [weak self] success, _ in
                     DispatchQueue.main.async {
@@ -2424,7 +2424,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                         if success {
                             SGHiddenChatsManager.shared.revealHiddenChats()
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            let text = isRussian ? "ðŸ”“ Ð¡ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ Ñ‡Ð°Ñ‚Ñ‹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ñ‹" : "ðŸ”“ Hidden chats unlocked"
+                            let text = isRussian ? "🔓 Скрытые чаты открыты" : "🔓 Hidden chats unlocked"
                             self.present(UndoOverlayController(presentationData: self.presentationData, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false }), in: .current)
                         }
                     }
@@ -2435,7 +2435,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
 
         SGHiddenChatsManager.shared.revealHiddenChats()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let text = isRussian ? "ðŸ”“ Ð¡ÐºÑ€Ñ‹Ñ‚Ñ‹Ðµ Ñ‡Ð°Ñ‚Ñ‹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ñ‹" : "ðŸ”“ Hidden chats unlocked"
+        let text = isRussian ? "🔓 Скрытые чаты открыты" : "🔓 Hidden chats unlocked"
         self.present(UndoOverlayController(presentationData: self.presentationData, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false }), in: .current)
     }
 

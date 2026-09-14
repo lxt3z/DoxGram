@@ -1,4 +1,4 @@
-﻿import SGAPIToken
+import SGAPIToken
 import SGAPIWebSettings
 import SGSimpleSettings
 import Foundation

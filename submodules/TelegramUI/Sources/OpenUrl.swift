@@ -1,4 +1,4 @@
-﻿import SGDebugUI
+import SGDebugUI
 import SGSettingsUI
 import SGSimpleSettings
 import UndoUI
@@ -386,8 +386,9 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
         if !skipSecurityCheck && (SGSimpleSettings.shared.warnOnIpLoggers || SGSimpleSettings.shared.warnOnAllExternalLinks) {
             let checkResult = SGUrlSanitizer.checkSuspicious(urlString: url, warnOnAllExternal: SGSimpleSettings.shared.warnOnAllExternalLinks)
             if checkResult.isSuspicious {
-                let alertTitle = checkResult.isIpGrabber ? "ðŸ›¡ï¸ Ð—Ð°Ñ‰Ð¸Ñ‚Ð° IP: Ð“Ñ€Ð°Ð±Ð±ÐµÑ€" : "ðŸ›¡ï¸ ÐŸÐ¾Ð´Ð¾Ð·Ñ€Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð°Ñ ÑÑÑ‹Ð»ÐºÐ°"
-                let alertText = "ÐŸÐµÑ€ÐµÑ…Ð¾Ð´ Ð¿Ð¾ ÑÑ‚Ð¾Ð¹ ÑÑÑ‹Ð»ÐºÐµ Ð¼Ð¾Ð¶ÐµÑ‚ Ñ€Ð°ÑÐºÑ€Ñ‹Ñ‚ÑŒ Ð²Ð°Ñˆ Ñ€ÐµÐ°Ð»ÑŒÐ½Ñ‹Ð¹ IP-Ð°Ð´Ñ€ÐµÑ Ð¸ Ð¼ÐµÑÑ‚Ð¾Ð¿Ð¾Ð»Ð¾Ð¶ÐµÐ½Ð¸Ðµ:\n\n\(url)\n\nÐ’Ñ‹ ÑƒÐ²ÐµÑ€ÐµÐ½Ñ‹, Ñ‡Ñ‚Ð¾ Ñ…Ð¾Ñ‚Ð¸Ñ‚Ðµ Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð¸Ñ‚ÑŒ?"
+                let isRussian = presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
+                let alertTitle = checkResult.isIpGrabber ? (isRussian ? "🛡️ Защита IP: Граббер" : "🛡️ IP Grabber Warning") : (isRussian ? "🛡️ Подозрительная ссылка" : "🛡️ Suspicious Link")
+                let alertText = isRussian ? "Переход по этой ссылке может раскрыть ваш реальный IP-адрес и местоположение:\n\n\(url)\n\nВы уверены, что хотите продолжить?" : "Opening this link may expose your real IP address and location:\n\n\(url)\n\nAre you sure you want to proceed?"
 
                 let targetUrl = url
                 let alertController = textAlertController(
@@ -396,7 +397,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                     text: alertText,
                     actions: [
                         TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
-                        TextAlertAction(type: .defaultAction, title: "ÐŸÐµÑ€ÐµÐ¹Ñ‚Ð¸", action: {
+                        TextAlertAction(type: .defaultAction, title: isRussian ? "Перейти" : "Open", action: {
                             openExternalUrlImpl(context: context, urlContext: urlContext, url: targetUrl, forceExternal: forceExternal, presentationData: presentationData, navigationController: navigationController, dismissInput: dismissInput, skipSecurityCheck: true)
                         })
                     ]
