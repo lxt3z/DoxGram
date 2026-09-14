@@ -6938,8 +6938,14 @@ private final class ChatListLocationContext {
         self.location = location
         self.parentController = parentController
 
-        let hasProxy = context.sharedContext.accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
-        |> map { sharedData -> (Bool, Bool) in
+        let hasProxy = combineLatest(
+            context.sharedContext.accountManager.sharedData(keys: [SharedDataKeys.proxySettings]),
+            sgSimpleSettingsBoolSignal(.hideProxyButton, defaultValue: false)
+        )
+        |> map { sharedData, hideProxyButton -> (Bool, Bool) in
+            if hideProxyButton {
+                return (false, false)
+            }
             if let settings = sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) {
                 return (!settings.servers.isEmpty, settings.enabled)
             } else {
@@ -7462,7 +7468,7 @@ private final class ChatListLocationContext {
                 titleContent = NetworkStatusTitle(text: defaultTitle, activity: false, hasProxy: isRoot && hasProxy, connectsViaProxy: connectsViaProxy, isPasscodeSet: isRoot && isPasscodeSet, isManuallyLocked: isRoot && isManuallyLocked, peerStatus: peerStatus)
             }
 
-            if titleContent.hasProxy {
+            if titleContent.hasProxy && !SGSimpleSettings.shared.hideProxyButton {
                 let proxyStatus: ChatTitleProxyStatus
                 if titleContent.connectsViaProxy {
                     proxyStatus = titleContent.activity ? .connecting : .connected

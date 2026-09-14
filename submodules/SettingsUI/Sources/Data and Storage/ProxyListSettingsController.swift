@@ -16,6 +16,8 @@ import ShareController
 import UrlEscaping
 
 private final class ProxySettingsControllerArguments {
+    let toggleTgWsProxy: (Bool) -> Void
+    let toggleHideProxyButton: (Bool) -> Void
     let toggleLocalDNS: (Bool) -> Void
     let toggleEnabled: (Bool) -> Void
     let addNewServer: () -> Void
@@ -25,8 +27,10 @@ private final class ProxySettingsControllerArguments {
     let setServerWithRevealedOptions: (ProxyServerSettings?, ProxyServerSettings?) -> Void
     let toggleUseForCalls: (Bool) -> Void
     let shareProxyList: () -> Void
-    
-    init(toggleLocalDNS: @escaping (Bool) -> Void, toggleEnabled: @escaping (Bool) -> Void, addNewServer: @escaping () -> Void, activateServer: @escaping (ProxyServerSettings) -> Void, editServer: @escaping (ProxyServerSettings) -> Void, removeServer: @escaping (ProxyServerSettings) -> Void, setServerWithRevealedOptions: @escaping (ProxyServerSettings?, ProxyServerSettings?) -> Void, toggleUseForCalls: @escaping (Bool) -> Void, shareProxyList: @escaping () -> Void) {
+
+    init(toggleTgWsProxy: @escaping (Bool) -> Void, toggleHideProxyButton: @escaping (Bool) -> Void, toggleLocalDNS: @escaping (Bool) -> Void, toggleEnabled: @escaping (Bool) -> Void, addNewServer: @escaping () -> Void, activateServer: @escaping (ProxyServerSettings) -> Void, editServer: @escaping (ProxyServerSettings) -> Void, removeServer: @escaping (ProxyServerSettings) -> Void, setServerWithRevealedOptions: @escaping (ProxyServerSettings?, ProxyServerSettings?) -> Void, toggleUseForCalls: @escaping (Bool) -> Void, shareProxyList: @escaping () -> Void) {
+        self.toggleTgWsProxy = toggleTgWsProxy
+        self.toggleHideProxyButton = toggleHideProxyButton
         self.toggleLocalDNS = toggleLocalDNS
         self.toggleEnabled = toggleEnabled
         self.addNewServer = addNewServer
@@ -68,7 +72,7 @@ public enum ProxySettingsEntryTag: ItemListItemTag, Equatable {
     case useProxy
     case shareList
     case useForCalls
-    
+
     public func isEqual(to other: ItemListItemTag) -> Bool {
         if let other = other as? ProxySettingsEntryTag, self == other {
             return true
@@ -79,21 +83,23 @@ public enum ProxySettingsEntryTag: ItemListItemTag, Equatable {
 }
 
 private enum ProxySettingsControllerEntry: ItemListNodeEntry {
+    case tgWsProxyToggle(PresentationTheme, String, Bool)
+    case tgWsProxyNotice(PresentationTheme, String)
     case enabled(PresentationTheme, String, Bool, Bool)
     case localDNSToggle(PresentationTheme, String, Bool)
     case localDNSNotice(PresentationTheme, String)
+    case hideProxyButtonToggle(PresentationTheme, String, Bool)
+    case hideProxyButtonNotice(PresentationTheme, String)
     case serversHeader(PresentationTheme, String)
     case addServer(PresentationTheme, String, Bool)
     case server(Int, PresentationTheme, PresentationStrings, ProxyServerSettings, Bool, DisplayProxyServerStatus, ProxySettingsServerItemEditing, Bool)
     case shareProxyList(PresentationTheme, String)
     case useForCalls(PresentationTheme, String, Bool)
     case useForCallsInfo(PresentationTheme, String)
-    
+
     var section: ItemListSectionId {
         switch self {
-            case .localDNSToggle, .localDNSNotice:
-                return ProxySettingsControllerSection.enabled.rawValue
-            case .enabled:
+            case .tgWsProxyToggle, .tgWsProxyNotice, .localDNSToggle, .localDNSNotice, .hideProxyButtonToggle, .hideProxyButtonNotice, .enabled:
                 return ProxySettingsControllerSection.enabled.rawValue
             case .serversHeader, .addServer, .server:
                 return ProxySettingsControllerSection.servers.rawValue
@@ -103,32 +109,52 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
                 return ProxySettingsControllerSection.calls.rawValue
         }
     }
-    
+
     var stableId: ProxySettingsControllerEntryId {
         switch self {
+            case .tgWsProxyToggle:
+                return .index(-4)
+            case .tgWsProxyNotice:
+                return .index(-3)
             case .enabled:
                 return .index(-2)
             case .localDNSToggle:
                 return .index(-1)
             case .localDNSNotice:
                 return .index(0)
-            case .serversHeader:
+            case .hideProxyButtonToggle:
                 return .index(1)
-            case .addServer:
+            case .hideProxyButtonNotice:
                 return .index(2)
+            case .serversHeader:
+                return .index(3)
+            case .addServer:
+                return .index(4)
             case let .server(_, _, _, settings, _, _, _, _):
                 return .server(settings.host, settings.port, settings.connection)
             case .shareProxyList:
-                return .index(3)
-            case .useForCalls:
-                return .index(4)
-            case .useForCallsInfo:
                 return .index(5)
+            case .useForCalls:
+                return .index(6)
+            case .useForCallsInfo:
+                return .index(7)
         }
     }
-    
+
     static func ==(lhs: ProxySettingsControllerEntry, rhs: ProxySettingsControllerEntry) -> Bool {
         switch lhs {
+            case let .tgWsProxyToggle(lhsTheme, lhsText, lhsValue):
+                if case let .tgWsProxyToggle(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
+                    return true
+                } else {
+                    return false
+                }
+            case let .tgWsProxyNotice(lhsTheme, lhsText):
+                if case let .tgWsProxyNotice(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText {
+                    return true
+                } else {
+                    return false
+                }
             case let .enabled(lhsTheme, lhsText, lhsValue, lhsCreatesNew):
                 if case let .enabled(rhsTheme, rhsText, rhsValue, rhsCreatesNew) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue, lhsCreatesNew == rhsCreatesNew {
                     return true
@@ -143,6 +169,18 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
                 }
             case let .localDNSNotice(lhsTheme, lhsText):
                 if case let .localDNSNotice(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText {
+                    return true
+                } else {
+                    return false
+                }
+            case let .hideProxyButtonToggle(lhsTheme, lhsText, lhsValue):
+                if case let .hideProxyButtonToggle(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
+                    return true
+                } else {
+                    return false
+                }
+            case let .hideProxyButtonNotice(lhsTheme, lhsText):
+                if case let .hideProxyButtonNotice(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText {
                     return true
                 } else {
                     return false
@@ -185,75 +223,57 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
                 }
         }
     }
-    
-    static func <(lhs: ProxySettingsControllerEntry, rhs: ProxySettingsControllerEntry) -> Bool {
-        switch lhs {
+
+    private var order: Int {
+        switch self {
+            case .tgWsProxyToggle:
+                return -4
+            case .tgWsProxyNotice:
+                return -3
             case .enabled:
-                switch rhs {
-                    case .enabled:
-                        return false
-                    default:
-                        return true
-                }
+                return -2
             case .localDNSToggle:
-                switch rhs {
-                    case .enabled, .localDNSToggle:
-                        return false
-                    default:
-                        return true
-                }
+                return -1
             case .localDNSNotice:
-                switch rhs {
-                    case .enabled, .localDNSToggle, .localDNSNotice:
-                        return false
-                    default:
-                        return true
-                }
+                return 0
+            case .hideProxyButtonToggle:
+                return 1
+            case .hideProxyButtonNotice:
+                return 2
             case .serversHeader:
-                switch rhs {
-                    case .enabled, .localDNSToggle, .localDNSNotice, .serversHeader:
-                        return false
-                    default:
-                        return true
-                }
+                return 3
             case .addServer:
-                switch rhs {
-                    case .enabled, .localDNSToggle, .localDNSNotice, .serversHeader, .addServer:
-                        return false
-                    default:
-                        return true
-                }
-            case let .server(lhsIndex, _, _, _, _, _, _, _):
-                switch rhs {
-                    case .enabled, .localDNSToggle, .localDNSNotice, .serversHeader, .addServer:
-                        return false
-                    case let .server(rhsIndex, _, _, _, _, _, _, _):
-                        return lhsIndex < rhsIndex
-                    default:
-                        return true
-                }
+                return 4
+            case let .server(index, _, _, _, _, _, _, _):
+                return 100 + index
             case .shareProxyList:
-                switch rhs {
-                    case .enabled, .localDNSToggle, .localDNSNotice, .serversHeader, .addServer, .server, .shareProxyList:
-                        return false
-                    default:
-                        return true
-            }
+                return 1000
             case .useForCalls:
-                switch rhs {
-                    case .enabled, .localDNSToggle, .localDNSNotice, .serversHeader, .addServer, .server, .shareProxyList, .useForCalls:
-                        return false
-                    default:
-                        return true
-                }
+                return 1001
             case .useForCallsInfo:
-                return false
+                return 1002
         }
     }
-    
+
+    static func <(lhs: ProxySettingsControllerEntry, rhs: ProxySettingsControllerEntry) -> Bool {
+        return lhs.order < rhs.order
+    }
+
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! ProxySettingsControllerArguments
         switch self {
+            case let .tgWsProxyToggle(_, text, value):
+                return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, enabled: true, sectionId: self.section, style: .blocks, updated: { value in
+                    arguments.toggleTgWsProxy(value)
+                })
+            case let .tgWsProxyNotice(_, text):
+                return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
+            case let .hideProxyButtonToggle(_, text, value):
+                return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, enabled: true, sectionId: self.section, style: .blocks, updated: { value in
+                    arguments.toggleHideProxyButton(value)
+                })
+            case let .hideProxyButtonNotice(_, text):
+                return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
             case let .enabled(_, text, value, createsNew):
                 return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, enableInteractiveChanges: !createsNew, enabled: true, sectionId: self.section, style: .blocks, updated: { value in
                     if createsNew {
@@ -301,10 +321,16 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
 private func proxySettingsControllerEntries(theme: PresentationTheme, strings: PresentationStrings, state: ProxySettingsControllerState, proxySettings: ProxySettings, statuses: [ProxyServerSettings: ProxyServerStatus], connectionStatus: ConnectionStatus) -> [ProxySettingsControllerEntry] {
     var entries: [ProxySettingsControllerEntry] = []
 
+    // MARK: DoxGram TG WS Proxy
+    entries.append(.tgWsProxyToggle(theme, i18n("Settings.WsProxy.Enabled", strings.baseLanguageCode), SGSimpleSettings.shared.tgWsProxyEnabled))
+    entries.append(.tgWsProxyNotice(theme, i18n("Settings.WsProxy.Enabled.Notice", strings.baseLanguageCode)))
+
     entries.append(.enabled(theme, strings.ChatSettings_ConnectionType_UseProxy, proxySettings.enabled, proxySettings.servers.isEmpty))
     // MARK: Swiftgram
     entries.append(.localDNSToggle(theme, i18n("ProxySettings.UseSystemDNS", strings.baseLanguageCode), SGSimpleSettings.shared.localDNSForProxyHost))
     entries.append(.localDNSNotice(theme, i18n("ProxySettings.UseSystemDNS.Notice", strings.baseLanguageCode)))
+    entries.append(.hideProxyButtonToggle(theme, i18n("Settings.WsProxy.HideButton", strings.baseLanguageCode), SGSimpleSettings.shared.hideProxyButton))
+    entries.append(.hideProxyButtonNotice(theme, i18n("Settings.WsProxy.HideButton.Notice", strings.baseLanguageCode)))
     entries.append(.serversHeader(theme, strings.SocksProxySetup_SavedProxies))
     entries.append(.addServer(theme, strings.SocksProxySetup_AddProxy, state.editing))
     var index = 0
@@ -356,12 +382,12 @@ private func proxySettingsControllerEntries(theme: PresentationTheme, strings: P
     if !existingServers.isEmpty {
         entries.append(.shareProxyList(theme, strings.SocksProxySetup_ShareProxyList))
     }
-    
+
     if let activeServer = proxySettings.activeServer, case .socks5 = activeServer.connection {
         entries.append(.useForCalls(theme, strings.SocksProxySetup_UseForCalls, proxySettings.useForCalls))
         entries.append(.useForCallsInfo(theme, strings.SocksProxySetup_UseForCallsHelp))
     }
-    
+
     return entries
 }
 
@@ -399,7 +425,7 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
             statePromise.set(value)
         }
     }
-    
+
     if focusOnItemTag == ProxySettingsEntryTag.edit {
         updateState { state in
             var state = state
@@ -407,10 +433,22 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
             return state
         }
     }
-    
+
     var shareProxyListImpl: (() -> Void)?
-    
-    let arguments = ProxySettingsControllerArguments(toggleLocalDNS: { value in
+
+    let arguments = ProxySettingsControllerArguments(toggleTgWsProxy: { value in
+        SGSimpleSettings.shared.tgWsProxyEnabled = value
+        if value {
+            SGTGWsProxy.shared.start()
+        } else {
+            SGTGWsProxy.shared.stop()
+        }
+        let _ = updateProxySettingsInteractively(accountManager: accountManager, { $0 }).start()
+        updateState { $0 }
+    }, toggleHideProxyButton: { value in
+        SGSimpleSettings.shared.hideProxyButton = value
+        updateState { $0 }
+    }, toggleLocalDNS: { value in
         SGSimpleSettings.shared.localDNSForProxyHost = value
         guard let context = context else {
             return
@@ -478,7 +516,7 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
     }, shareProxyList: {
        shareProxyListImpl?()
     })
-    
+
     let proxySettings = Promise<ProxySettings>()
     proxySettings.set(accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
     |> map { sharedData -> ProxySettings in
@@ -488,25 +526,25 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
             return ProxySettings.defaultSettings
         }
     })
-    
+
     let statusesContext = ProxyServersStatuses(network: network, servers: proxySettings.get()
     |> map { proxySettings -> [ProxyServerSettings] in
         return proxySettings.servers
     })
-    
+
     let signal = combineLatest(updatedPresentationData, statePromise.get(), proxySettings.get(), statusesContext.statuses(), network.connectionStatus)
     |> map { presentationData, state, proxySettings, statuses, connectionStatus -> (ItemListControllerState, (ItemListNodeState, Any)) in
         var presentationData = presentationData
         let updatedTheme = presentationData.theme.withModalBlocksBackground()
         presentationData = presentationData.withUpdated(theme: updatedTheme)
-        
+
         var leftNavigationButton: ItemListNavigationButton?
         if case .modal = mode {
             leftNavigationButton = ItemListNavigationButton(content: .icon(.close), style: .regular, enabled: true, action: {
                 dismissImpl?()
             })
         }
-        
+
         let rightNavigationButton: ItemListNavigationButton?
         if proxySettings.servers.isEmpty {
             rightNavigationButton = nil
@@ -527,13 +565,13 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
                 }
             })
         }
-        
+
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(presentationData.strings.SocksProxySetup_Title), leftNavigationButton: leftNavigationButton, rightNavigationButton: rightNavigationButton, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: proxySettingsControllerEntries(theme: presentationData.theme, strings: presentationData.strings, state: state, proxySettings: proxySettings, statuses: statuses, connectionStatus: connectionStatus), style: .blocks, ensureVisibleItemTag: focusOnItemTag)
-        
+
         return (controllerState, (listState, arguments))
     }
-    
+
     let controller = ItemListController(presentationData: ItemListPresentationData(presentationData), updatedPresentationData: updatedPresentationData |> map(ItemListPresentationData.init(_:)), state: signal, tabBarItem: nil)
     controller.navigationPresentation = .modal
     pushControllerImpl = { [weak controller] c in
@@ -594,7 +632,7 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
             return current
         })
     })
-    
+
     shareProxyListImpl = { [weak controller] in
         guard let context = context, let strongController = controller else {
             return
@@ -607,7 +645,7 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
                     if !result.isEmpty {
                         result += "\n\n"
                     }
-                    
+
                     var string: String
                     switch server.connection {
                     case let .mtp(secret):
@@ -620,14 +658,14 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
                             string += "&user=\((username as NSString).addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryValueAllowed) ?? "")&pass=\((password as NSString).addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryValueAllowed) ?? "")"
                         }
                     }
-                    
+
                     result += string
                 }
-                
+
                 presentExternalShare(context: context, text: result, parentController: strongController)
             })
     }
-    
+
     if let focusOnItemTag {
         var didFocusOnItem = false
         controller.afterTransactionCompleted = { [weak controller] in
@@ -645,6 +683,6 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
     presentControllerImpl = { [weak controller] c, a in
         controller?.present(c, in: .window(.root), with: a)
     }
-    
+
     return controller
 }

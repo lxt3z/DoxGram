@@ -329,3 +329,5 @@
 "Settings.WsProxy.Enabled" = "Включить TG WS Proxy";
 "Settings.WsProxy.Enabled.Notice" = "Маршрутизирует MTProto-трафик Telegram через защищённый WebSocket (WSS) серверов Cloudflare. Обходит DPI-замедления и блокировки без внешних VPN на полной скорости.";
 "Settings.WsProxy.WorkerDomain" = "Домен Cloudflare Worker";
+"Settings.WsProxy.HideButton" = "Скрыть иконку прокси в списке чатов";
+"Settings.WsProxy.HideButton.Notice" = "Скрывает значок щита (прокси) в верхней панели главного экрана со списком чатов.";

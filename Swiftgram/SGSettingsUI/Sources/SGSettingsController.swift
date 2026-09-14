@@ -141,6 +141,7 @@ private enum SGBoolSetting: String {
     case hiddenChatsEnabled
     case hiddenChatsBiometrics
     case tgWsProxyEnabled
+    case hideProxyButton
 }
 
 private enum SGOneFromManySetting: String {
@@ -248,6 +249,7 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.toggle(id: id.count, section: .ayugramWsProxy, settingName: .tgWsProxyEnabled, value: SGSimpleSettings.shared.tgWsProxyEnabled, text: i18n("Settings.WsProxy.Enabled", lang), enabled: true))
     let workerText = SGSimpleSettings.shared.tgWsProxyCustomWorker.isEmpty ? (lang.hasPrefix("ru") ? "Авто" : "Auto") : SGSimpleSettings.shared.tgWsProxyCustomWorker
     entries.append(.disclosure(id: id.count, section: .ayugramWsProxy, link: .tgWsProxyWorkerDomain, text: i18n("Settings.WsProxy.WorkerDomain", lang) + ": " + workerText))
+    entries.append(.toggle(id: id.count, section: .ayugramWsProxy, settingName: .hideProxyButton, value: SGSimpleSettings.shared.hideProxyButton, text: i18n("Settings.WsProxy.HideButton", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramWsProxy, text: i18n("Settings.WsProxy.Enabled.Notice", lang)))
 
     // DoxGram: Hidden Chats
@@ -695,6 +697,9 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             }
             simplePromise.set(true)
             let _ = updateProxySettingsInteractively(accountManager: context.sharedContext.accountManager, { $0 }).start()
+        case .hideProxyButton:
+            SGSimpleSettings.shared.hideProxyButton = value
+            simplePromise.set(true)
         }
     }, updateSliderValue: { setting, value in
         switch (setting) {
