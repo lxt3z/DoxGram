@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import SwiftUI
 import SGSwiftUI
 import SGStrings
@@ -19,6 +20,10 @@ func getAvailableAppBadges() -> [AppBadge] {
     var appBadges: [AppBadge] = [
         .init(displayName: "DoxGram", assetName: "DoxGramAppBadge"),
         .init(displayName: "AyuGram", assetName: "AyuGramAppBadge"),
+        .init(displayName: "1448", assetName: "Badge1448AppBadge"),
+        .init(displayName: "Makima", assetName: "MakimaAppBadge"),
+        .init(displayName: "1337", assetName: "LeetAppBadge"),
+        .init(displayName: "Viperr", assetName: "ViperrAppBadge"),
         .init(displayName: "Sigma", assetName: "SigmaAppBadge"),
         .init(displayName: "Clown", assetName: "ClownAppBadge"),
         .init(displayName: "Major", assetName: "MajorAppBadge"),
@@ -127,8 +132,9 @@ struct AppBadgeSettingsView: View {
 
 @available(iOS 14.0, *)
 public func sgAppBadgeSettingsController(context: AccountContext, presentationData: PresentationData? = nil) -> ViewController {
-    let theme = presentationData?.theme ?? (UITraitCollection.current.userInterfaceStyle == .dark ? defaultDarkColorPresentationTheme : defaultPresentationTheme)
-    let strings = presentationData?.strings ?? defaultPresentationStrings
+    let currentPresentationData = presentationData ?? context.sharedContext.currentPresentationData.with { $0 }
+    let theme = currentPresentationData.theme
+    let strings = currentPresentationData.strings
 
     let legacyController = LegacySwiftUIController(
         presentation: .navigation,
@@ -136,9 +142,10 @@ public func sgAppBadgeSettingsController(context: AccountContext, presentationDa
         strings: strings
     )
 
-    legacyController.statusBar.statusBarStyle = theme.rootController
-        .statusBarStyle.style
+    legacyController.statusBar.statusBarStyle = theme.rootController.statusBarStyle.style
     legacyController.title = "AppBadge.Title".i18n(strings.baseLanguageCode)
+    legacyController.navigationItem.backBarButtonItem = UIBarButtonItem(title: strings.Common_Back, style: .plain, target: nil, action: nil)
+    legacyController.setNavigationBarPresentationData(NavigationBarPresentationData(theme: NavigationBarTheme(rootControllerTheme: theme, style: .glass), strings: NavigationBarStrings(presentationStrings: strings)), animated: false)
     
     let swiftUIView = SGSwiftUIView<AppBadgeSettingsView>(
         legacyController: legacyController,
