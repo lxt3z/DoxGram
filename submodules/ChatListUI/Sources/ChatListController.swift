@@ -2384,10 +2384,6 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     public override func displayNodeDidLoad() {
         super.displayNodeDidLoad()
 
-        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(self.titleBarLongPressed(_:)))
-        longPressGesture.minimumPressDuration = 0.6
-        self.navigationBar?.view.addGestureRecognizer(longPressGesture)
-
         Queue.mainQueue().after(1.0) {
             self.context.prefetchManager?.prepareNextGreetingSticker()
         }
