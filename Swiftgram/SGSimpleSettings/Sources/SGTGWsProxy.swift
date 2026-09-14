@@ -244,36 +244,67 @@ private final class SGTGWsSession {
                 return
             }
 
-            // Extract DC if IPv4 address or domain name
+            // Extract DC if IPv4 address, IPv6, or domain name
             let atyp = data[3]
             if atyp == 0x01 && data.count >= 10 {
                 let b0 = data[4]
                 let b1 = data[5]
                 let b2 = data[6]
                 let b3 = data[7]
-                if b0 == 149 && b1 == 154 && b2 == 175 {
-                    self.targetDc = 1
-                } else if b0 == 149 && b1 == 154 && b2 == 167 {
-                    self.targetDc = (b3 >= 150) ? 4 : 2
-                } else if b0 == 149 && b1 == 154 && b2 == 171 {
-                    self.targetDc = 3
-                } else if b0 == 91 && b1 == 108 && (b2 == 56 || b2 == 57 || b2 == 58 || b2 == 59) {
-                    self.targetDc = 5
+                if b0 == 149 && b1 == 154 {
+                    if b2 == 175 {
+                        if b3 >= 100 && b3 <= 120 {
+                            self.targetDc = 3 // 149.154.175.100..117 is DC 3
+                        } else {
+                            self.targetDc = 1 // 149.154.175.50..53, 10 is DC 1
+                        }
+                    } else if b2 == 167 {
+                        if b3 == 91 || b3 >= 150 {
+                            self.targetDc = 4 // 149.154.167.91 and 150..220 are DC 4
+                        } else {
+                            self.targetDc = 2 // 149.154.167.40..51 are DC 2
+                        }
+                    } else if b2 == 171 {
+                        self.targetDc = 5 // 149.154.171.5 is DC 5
+                    } else if b2 == 165 || b2 == 166 {
+                        self.targetDc = 4 // DC 4
+                    } else if b2 == 160 || b2 == 164 {
+                        self.targetDc = 2 // DC 2
+                    }
                 } else if b0 == 91 && b1 == 108 {
-                    self.targetDc = 4
+                    if b2 >= 56 && b2 <= 59 {
+                        self.targetDc = 5 // 91.108.56.0/22 is DC 5
+                    } else {
+                        self.targetDc = 4 // 91.108.4.0/22..20 are DC 4
+                    }
+                } else if b0 == 95 && b1 == 161 && b2 == 76 {
+                    self.targetDc = 2 // 95.161.76.100 is DC 2
+                } else if b0 == 91 && b1 == 105 && b2 == 192 {
+                    self.targetDc = 2 // 91.105.192.100 is DC 2
+                }
+            } else if atyp == 0x04 && data.count >= 20 {
+                // IPv6: Telegram uses 2001:b28:f23d:f00X:: / 2001:67c:4e8:f00X::
+                for i in 4..<19 {
+                    if data[i] == 0xf0 {
+                        let next = data[i + 1]
+                        if next >= 1 && next <= 5 {
+                            self.targetDc = Int(next)
+                            break
+                        }
+                    }
                 }
             } else if atyp == 0x03 && data.count >= 5 {
                 let domainLength = Int(data[4])
                 if data.count >= 5 + domainLength {
                     let domainData = data.subdata(in: 5..<(5 + domainLength))
                     if let domainStr = String(data: domainData, encoding: .utf8)?.lowercased() {
-                        if domainStr.contains("venus") || domainStr.contains("dc1") {
+                        if domainStr.contains("pluto") || domainStr.contains("dc1") {
                             self.targetDc = 1
-                        } else if domainStr.contains("aurora") || domainStr.contains("dc2") {
+                        } else if domainStr.contains("venus") || domainStr.contains("dc2") {
                             self.targetDc = 2
-                        } else if domainStr.contains("vesta") || domainStr.contains("dc3") {
+                        } else if domainStr.contains("aurora") || domainStr.contains("dc3") {
                             self.targetDc = 3
-                        } else if domainStr.contains("pluto") || domainStr.contains("dc4") {
+                        } else if domainStr.contains("vesta") || domainStr.contains("dc4") {
                             self.targetDc = 4
                         } else if domainStr.contains("flora") || domainStr.contains("dc5") {
                             self.targetDc = 5
@@ -344,6 +375,7 @@ private final class SGTGWsSession {
 
         if #available(iOS 13.0, *) {
             let task = self.urlSession.webSocketTask(with: request)
+            task.maximumMessageSize = 64 * 1024 * 1024
             self.webSocketTask = task
             task.resume()
 
@@ -393,19 +425,29 @@ private final class SGTGWsSession {
                 }
                 if #available(iOS 13.0, *) {
                     self.webSocketTask?.send(.data(data)) { [weak self] sendError in
-                        if sendError != nil {
-                            if let self = self, self.hasReceivedWsData {
+                        guard let self = self, !self.isClosed else { return }
+                        if let sendError = sendError {
+                            if self.hasReceivedWsData {
+                                SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS send error: \(sendError)")
                                 self.close()
+                            }
+                        } else {
+                            if !isComplete && error == nil {
+                                self.readFromClient()
                             }
                         }
                     }
+                } else {
+                    self.close()
                 }
             }
             if isComplete || error != nil {
                 self.close()
                 return
             }
-            self.readFromClient()
+            if data == nil || data?.isEmpty == true {
+                self.readFromClient()
+            }
         }
     }
 
@@ -430,12 +472,16 @@ private final class SGTGWsSession {
 
                 if let data = dataToSend, !data.isEmpty {
                     self.connection.send(content: data, completion: .contentProcessed { [weak self] sendError in
+                        guard let self = self, !self.isClosed else { return }
                         if sendError != nil {
-                            self?.close()
+                            self.close()
+                        } else {
+                            self.readFromWebSocket()
                         }
                     })
+                } else {
+                    self.readFromWebSocket()
                 }
-                self.readFromWebSocket()
 
             case let .failure(error):
                 let isCustom = !SGSimpleSettings.shared.tgWsProxyCustomWorker.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

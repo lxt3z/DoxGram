@@ -33,7 +33,6 @@ private enum SGControllerSection: Int32, SGItemListSection {
     case ayugramPrivacy
     case ayugramAntiDeanon
     case ayugramWsProxy
-    case ayugramHiddenChats
     case ayugramDebug
     case trending
     case content
@@ -138,8 +137,6 @@ private enum SGBoolSetting: String {
     case warnOnIpLoggers
     case cleanUrlTrackers
     case warnOnAllExternalLinks
-    case hiddenChatsEnabled
-    case hiddenChatsBiometrics
     case tgWsProxyEnabled
     case hideProxyButton
 }
@@ -252,12 +249,6 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.toggle(id: id.count, section: .ayugramWsProxy, settingName: .hideProxyButton, value: SGSimpleSettings.shared.hideProxyButton, text: i18n("Settings.WsProxy.HideButton", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramWsProxy, text: i18n("Settings.WsProxy.Enabled.Notice", lang)))
 
-    // DoxGram: Hidden Chats
-    entries.append(.header(id: id.count, section: .ayugramHiddenChats, text: i18n("Settings.HiddenChats.Header", lang), badge: nil))
-    entries.append(.toggle(id: id.count, section: .ayugramHiddenChats, settingName: .hiddenChatsEnabled, value: SGSimpleSettings.shared.hiddenChatsEnabled, text: i18n("Settings.HiddenChats.Enabled", lang), enabled: true))
-    entries.append(.notice(id: id.count, section: .ayugramHiddenChats, text: i18n("Settings.HiddenChats.Enabled.Notice", lang)))
-    entries.append(.toggle(id: id.count, section: .ayugramHiddenChats, settingName: .hiddenChatsBiometrics, value: SGSimpleSettings.shared.hiddenChatsBiometrics, text: i18n("Settings.HiddenChats.Biometrics", lang), enabled: SGSimpleSettings.shared.hiddenChatsEnabled))
-    entries.append(.notice(id: id.count, section: .ayugramHiddenChats, text: i18n("Settings.HiddenChats.Biometrics.Notice", lang)))
 
     // AyuGram: Debug & Logs
     entries.append(.header(id: id.count, section: .ayugramDebug, text: i18n("Settings.Ayugram.DebugHeader", lang), badge: nil))
@@ -683,11 +674,6 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             SGSimpleSettings.shared.cleanUrlTrackers = value
         case .warnOnAllExternalLinks:
             SGSimpleSettings.shared.warnOnAllExternalLinks = value
-        case .hiddenChatsEnabled:
-            SGSimpleSettings.shared.hiddenChatsEnabled = value
-            simplePromise.set(true)
-        case .hiddenChatsBiometrics:
-            SGSimpleSettings.shared.hiddenChatsBiometrics = value
         case .tgWsProxyEnabled:
             SGSimpleSettings.shared.tgWsProxyEnabled = value
             if value {

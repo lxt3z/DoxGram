@@ -2393,60 +2393,10 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
         }
     }
 
-    @objc private func titleBarLongPressed(_ gesture: UILongPressGestureRecognizer) {
-        if gesture.state == .began {
-            self.triggerHiddenChatsUnlock()
-        }
-    }
-
-    @objc public func triggerHiddenChatsUnlock() {
-        guard SGSimpleSettings.shared.hiddenChatsEnabled else { return }
-
-        let presentationData = self.presentationData
-        let isRussian = presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
-
-        if SGHiddenChatsManager.shared.areHiddenChatsRevealed {
-            SGHiddenChatsManager.shared.hideHiddenChats()
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            let text = isRussian ? "🔒 Скрытые чаты спрятаны" : "🔒 Hidden chats locked"
-            self.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false }), in: .current)
-            return
-        }
-
-        if SGSimpleSettings.shared.hiddenChatsBiometrics {
-            let context = LAContext()
-            var error: NSError?
-            let reason = isRussian ? "DoxGram: Доступ к скрытым чатам" : "DoxGram: Unlock hidden chats"
-            if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
-                context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { [weak self] success, _ in
-                    DispatchQueue.main.async {
-                        guard let self else { return }
-                        if success {
-                            SGHiddenChatsManager.shared.revealHiddenChats()
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            let text = isRussian ? "🔓 Скрытые чаты открыты" : "🔓 Hidden chats unlocked"
-                            self.present(UndoOverlayController(presentationData: self.presentationData, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false }), in: .current)
-                        }
-                    }
-                }
-                return
-            }
-        }
-
-        SGHiddenChatsManager.shared.revealHiddenChats()
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let text = isRussian ? "🔓 Скрытые чаты открыты" : "🔓 Hidden chats unlocked"
-        self.present(UndoOverlayController(presentationData: self.presentationData, content: .info(title: nil, text: text, timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false }), in: .current)
-    }
-
     public static var sharedPreviousPowerSavingEnabled: Bool?
 
     override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-
-        self.findTitleView()?.toggleHiddenChats = { [weak self] in
-            self?.triggerHiddenChatsUnlock()
-        }
 
         if self.powerSavingMonitoringDisposable == nil {
             self.powerSavingMonitoringDisposable = (self.context.sharedContext.automaticMediaDownloadSettings

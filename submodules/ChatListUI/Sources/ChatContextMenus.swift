@@ -560,24 +560,6 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                         }
 
                         if case .chatList = source, peerGroup != nil {
-                            if SGSimpleSettings.shared.hiddenChatsEnabled && !isSavedMessages {
-                                let isHidden = SGHiddenChatsManager.shared.isChatHidden(peerId: peerId.toInt64())
-                                let isRussian = presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
-                                let hideText = isHidden ? (isRussian ? "Показать чат" : "Unhide Chat") : (isRussian ? "Скрыть чат" : "Hide Chat")
-                                items.append(.action(ContextMenuActionItem(
-                                    text: hideText,
-                                    icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Privacy"), color: theme.contextMenu.primaryColor) },
-                                    action: { [weak chatListController] _, f in
-                                        let newHidden = !isHidden
-                                        SGHiddenChatsManager.shared.setChatHidden(peerId: peerId.toInt64(), isHidden: newHidden)
-                                        f(.default)
-                                        if newHidden {
-                                            let noticeText = isRussian ? "Чат скрыт. Зажмите «DoxGram» для показа." : "Chat hidden. Long press «DoxGram» to reveal."
-                                            chatListController?.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: noticeText, timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false }), in: .current)
-                                        }
-                                    }
-                                )))
-                            }
                             appendDeleteOrUngroupItem()
                         } else if case let .search(search) = source {
                             switch search {

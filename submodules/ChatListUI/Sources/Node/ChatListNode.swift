@@ -315,7 +315,6 @@ public struct ChatListNodeState: Equatable {
     public var selectedPeerMap: [EnginePeer.Id: EnginePeer]
     public var selectedThreadIds: Set<Int64>
     public var archiveStoryState: StoryState?
-    public var hiddenChatsVersion: Int
 
     public init(
         presentationData: ChatListPresentationData,
@@ -331,8 +330,7 @@ public struct ChatListNodeState: Equatable {
         hiddenItemShouldBeTemporaryRevealed: Bool,
         hiddenPsaPeerId: EnginePeer.Id?,
         selectedThreadIds: Set<Int64>,
-        archiveStoryState: StoryState?,
-        hiddenChatsVersion: Int = 0
+        archiveStoryState: StoryState?
     ) {
         self.presentationData = presentationData
         self.editing = editing
@@ -348,7 +346,6 @@ public struct ChatListNodeState: Equatable {
         self.hiddenPsaPeerId = hiddenPsaPeerId
         self.selectedThreadIds = selectedThreadIds
         self.archiveStoryState = archiveStoryState
-        self.hiddenChatsVersion = hiddenChatsVersion
     }
 
     public static func ==(lhs: ChatListNodeState, rhs: ChatListNodeState) -> Bool {
@@ -392,9 +389,6 @@ public struct ChatListNodeState: Equatable {
             return false
         }
         if lhs.archiveStoryState != rhs.archiveStoryState {
-            return false
-        }
-        if lhs.hiddenChatsVersion != rhs.hiddenChatsVersion {
             return false
         }
         return true
@@ -3230,26 +3224,15 @@ public final class ChatListNode: ListViewImpl {
             return strongSelf.isSelectionGestureEnabled
         }
         self.view.addGestureRecognizer(selectionRecognizer)
-
-        NotificationCenter.default.addObserver(self, selector: #selector(self.hiddenChatsDidChange), name: SGHiddenChatsManager.stateDidChangeNotification, object: nil)
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self, name: SGHiddenChatsManager.stateDidChangeNotification, object: nil)
         self.chatListDisposable.dispose()
         self.activityStatusesDisposable?.dispose()
         self.updatedFilterDisposable.dispose()
         self.pollFilterUpdatesDisposable?.dispose()
         self.chatFilterUpdatesDisposable?.dispose()
         self.updateIsMainTabDisposable?.dispose()
-    }
-
-    @objc private func hiddenChatsDidChange() {
-        self.updateState { state in
-            var state = state
-            state.hiddenChatsVersion += 1
-            return state
-        }
     }
 
     func updateFilter(_ filter: ChatListFilter?) {

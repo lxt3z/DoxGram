@@ -711,12 +711,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
     }
     
     override public func searchTextUpdated(text: String) {
-        if SGHiddenChatsManager.shared.checkUnlockCode(text) {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            self.cancel?()
-            return
-        }
-
         let searchQuery: String? = !text.isEmpty ? text : nil
 
         if !text.hasPrefix("#") && self.paneContainerNode.currentPaneKey == .publicPosts {

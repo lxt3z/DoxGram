@@ -687,9 +687,6 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
         if let peerId = peerId, state.pendingRemovalItemIds.contains(ChatListNodeState.ItemId(peerId: peerId, threadId: threadId)) {
             continue loop
         }
-        if let peerId = peerId, !SGHiddenChatsManager.shared.areHiddenChatsRevealed && SGHiddenChatsManager.shared.isChatHidden(peerId: peerId.toInt64()) {
-            continue loop
-        }
         var updatedMessages = entry.messages
         var updatedCombinedReadState = entry.readCounters
         if let peerId = peerId, state.pendingClearHistoryPeerIds.contains(ChatListNodeState.ItemId(peerId: peerId, threadId: threadId)) {

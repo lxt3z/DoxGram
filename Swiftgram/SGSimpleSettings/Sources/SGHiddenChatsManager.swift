@@ -31,10 +31,7 @@ public final class SGHiddenChatsManager {
 
     /// Checks if a chat with given peerId is marked as hidden
     public func isChatHidden(peerId: Int64) -> Bool {
-        guard SGSimpleSettings.shared.hiddenChatsEnabled else {
-            return false
-        }
-        return SGSimpleSettings.shared.hiddenChatsList.contains(peerId)
+        return false
     }
 
     /// Mark or unmark a chat as hidden
