@@ -12,6 +12,9 @@ public class SGSimpleSettings {
         setDefaultValues()
         migrate()
         preCacheValues()
+        if self.tgWsProxyEnabled {
+            SGTGWsProxy.shared.start()
+        }
     }
     
     private func setDefaultValues() {
@@ -74,7 +77,8 @@ public class SGSimpleSettings {
             { let _ = self.hideRecordingButton },
             { let _ = self.inputToolbar },
             { let _ = self.dismissedSGSuggestions },
-            { let _ = self.customAppBadge }
+            { let _ = self.customAppBadge },
+            { let _ = self.tgWsProxyEnabled }
         ]
 
         tasks.forEach { task in
@@ -205,6 +209,9 @@ public class SGSimpleSettings {
         case hiddenChatsBiometrics
         case hiddenChatsPin
         case hiddenChatsList
+        case tgWsProxyEnabled
+        case tgWsProxyCustomWorker
+        case tgWsProxyPort
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
@@ -386,7 +393,10 @@ public class SGSimpleSettings {
         Keys.hiddenChatsEnabled.rawValue: true,
         Keys.hiddenChatsBiometrics.rawValue: true,
         Keys.hiddenChatsPin.rawValue: "7777",
-        Keys.hiddenChatsList.rawValue: [Int64]()
+        Keys.hiddenChatsList.rawValue: [Int64](),
+        Keys.tgWsProxyEnabled.rawValue: false,
+        Keys.tgWsProxyCustomWorker.rawValue: "",
+        Keys.tgWsProxyPort.rawValue: 10855
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -743,6 +753,15 @@ public class SGSimpleSettings {
             UserDefaults.standard.set(newValue, forKey: Keys.hiddenChatsList.rawValue)
         }
     }
+
+    @UserDefault(key: Keys.tgWsProxyEnabled.rawValue)
+    public var tgWsProxyEnabled: Bool
+
+    @UserDefault(key: Keys.tgWsProxyCustomWorker.rawValue)
+    public var tgWsProxyCustomWorker: String
+
+    @UserDefault(key: Keys.tgWsProxyPort.rawValue)
+    public var tgWsProxyPort: Int
 }
 
 extension SGSimpleSettings {

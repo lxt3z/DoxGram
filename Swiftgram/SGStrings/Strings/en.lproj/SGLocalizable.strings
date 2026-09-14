@@ -329,3 +329,8 @@
 "Settings.HiddenChats.Enabled.Notice" = "Hide dialogs via chat context menu («Hide Chat»). To reveal or hide them, long press the «DoxGram» title or enter your secret PIN code in search.";
 "Settings.HiddenChats.Biometrics" = "Face ID / Passcode";
 "Settings.HiddenChats.Biometrics.Notice" = "Require Face ID, Touch ID, or device passcode to reveal hidden dialogs.";
+
+"Settings.WsProxy.Header" = "TG WS PROXY (CLOUDFLARE BYPASS)";
+"Settings.WsProxy.Enabled" = "Enable TG WS Proxy";
+"Settings.WsProxy.Enabled.Notice" = "Tunnels Telegram MTProto traffic via WebSocket through Cloudflare edge servers. Bypasses DPI throttling and blocks without requiring an external VPN.";
+"Settings.WsProxy.WorkerDomain" = "Worker Domain";

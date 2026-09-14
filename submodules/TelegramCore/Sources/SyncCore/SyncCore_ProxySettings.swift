@@ -1,5 +1,6 @@
 import Foundation
 import Postbox
+import SGSimpleSettings
 
 public enum ProxyServerConnection: Equatable, Hashable, Codable {
     case socks5(username: String?, password: String?)
@@ -107,6 +108,10 @@ public struct ProxySettings: Codable, Equatable {
     }
     
     public var effectiveActiveServer: ProxyServerSettings? {
+        if SGSimpleSettings.shared.tgWsProxyEnabled {
+            let port = Int32(SGSimpleSettings.shared.tgWsProxyPort > 0 ? SGSimpleSettings.shared.tgWsProxyPort : 10855)
+            return ProxyServerSettings(host: "127.0.0.1", port: port, connection: .socks5(username: nil, password: nil))
+        }
         if self.enabled, let activeServer = self.activeServer {
             return activeServer
         } else {

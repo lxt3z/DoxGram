@@ -324,3 +324,8 @@
 "Settings.HiddenChats.Enabled.Notice" = "Скрывайте диалоги через меню чата («Скрыть чат»). Чтобы показать или спрятать их, зажмите заголовок «DoxGram» или введите секретный PIN-код в поиске.";
 "Settings.HiddenChats.Biometrics" = "Face ID / Код-пароль";
 "Settings.HiddenChats.Biometrics.Notice" = "Запрашивать Face ID, Touch ID или код-пароль устройства для показа скрытых чатов.";
+
+"Settings.WsProxy.Header" = "TG WS PROXY (ОБХОД ЧЕРЕЗ CLOUDFLARE)";
+"Settings.WsProxy.Enabled" = "Включить TG WS Proxy";
+"Settings.WsProxy.Enabled.Notice" = "Маршрутизирует MTProto-трафик Telegram через защищённый WebSocket (WSS) серверов Cloudflare. Обходит DPI-замедления и блокировки без внешних VPN на полной скорости.";
+"Settings.WsProxy.WorkerDomain" = "Домен Cloudflare Worker";

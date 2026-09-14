@@ -482,7 +482,8 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
             apiEnvironment.disableUpdates = supplementary
             apiEnvironment = apiEnvironment.withUpdatedLangPackCode(languageCode ?? "en")
             
-            if let effectiveActiveServer = proxySettings?.effectiveActiveServer {
+            let effectiveProxy: ProxyServerSettings? = proxySettings?.effectiveActiveServer ?? (SGSimpleSettings.shared.tgWsProxyEnabled ? ProxyServerSettings(host: "127.0.0.1", port: Int32(SGSimpleSettings.shared.tgWsProxyPort > 0 ? SGSimpleSettings.shared.tgWsProxyPort : 10855), connection: .socks5(username: nil, password: nil)) : nil)
+            if let effectiveActiveServer = effectiveProxy {
                 apiEnvironment = apiEnvironment.withUpdatedSocksProxySettings(effectiveActiveServer.mtProxySettings)
             }
             
@@ -507,7 +508,7 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
             }
             
             let useTempAuthKeys: Bool = true
-            let forceLocalDNS: Bool = SGSimpleSettings.shared.localDNSForProxyHost
+            let forceLocalDNS: Bool = SGSimpleSettings.shared.localDNSForProxyHost || SGSimpleSettings.shared.tgWsProxyEnabled
             let context = MTContext(serialization: serialization, encryptionProvider: arguments.encryptionProvider, apiEnvironment: apiEnvironment, isTestingEnvironment: testingEnvironment, useTempAuthKeys: useTempAuthKeys, forceLocalDNS: forceLocalDNS)
             
             if let networkSettings = networkSettings {

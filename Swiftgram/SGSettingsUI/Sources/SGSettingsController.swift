@@ -32,6 +32,7 @@ private enum SGControllerSection: Int32, SGItemListSection {
     case ayugramStreamer
     case ayugramPrivacy
     case ayugramAntiDeanon
+    case ayugramWsProxy
     case ayugramHiddenChats
     case ayugramDebug
     case trending
@@ -139,6 +140,7 @@ private enum SGBoolSetting: String {
     case warnOnAllExternalLinks
     case hiddenChatsEnabled
     case hiddenChatsBiometrics
+    case tgWsProxyEnabled
 }
 
 private enum SGOneFromManySetting: String {
@@ -165,6 +167,7 @@ private enum SGDisclosureLink: String {
     case ayugramClearLogs
     case streamerSettings
     case deletedMediaVault
+    case tgWsProxyWorkerDomain
 }
 
 private struct PeerNameColorScreenState: Equatable {
@@ -239,6 +242,13 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.CleanTrackers.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .ayugramAntiDeanon, settingName: .warnOnAllExternalLinks, value: SGSimpleSettings.shared.warnOnAllExternalLinks, text: i18n("Settings.AntiDeanon.WarnAllExternal", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.WarnAllExternal.Notice", lang)))
+
+    // DoxGram: TG WS Proxy (Bypass via Cloudflare WebSocket)
+    entries.append(.header(id: id.count, section: .ayugramWsProxy, text: i18n("Settings.WsProxy.Header", lang), badge: nil))
+    entries.append(.toggle(id: id.count, section: .ayugramWsProxy, settingName: .tgWsProxyEnabled, value: SGSimpleSettings.shared.tgWsProxyEnabled, text: i18n("Settings.WsProxy.Enabled", lang), enabled: true))
+    let workerText = SGSimpleSettings.shared.tgWsProxyCustomWorker.isEmpty ? (lang.hasPrefix("ru") ? "Авто" : "Auto") : SGSimpleSettings.shared.tgWsProxyCustomWorker
+    entries.append(.disclosure(id: id.count, section: .ayugramWsProxy, link: .tgWsProxyWorkerDomain, text: i18n("Settings.WsProxy.WorkerDomain", lang) + ": " + workerText))
+    entries.append(.notice(id: id.count, section: .ayugramWsProxy, text: i18n("Settings.WsProxy.Enabled.Notice", lang)))
 
     // DoxGram: Hidden Chats
     entries.append(.header(id: id.count, section: .ayugramHiddenChats, text: i18n("Settings.HiddenChats.Header", lang), badge: nil))
@@ -676,6 +686,15 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             simplePromise.set(true)
         case .hiddenChatsBiometrics:
             SGSimpleSettings.shared.hiddenChatsBiometrics = value
+        case .tgWsProxyEnabled:
+            SGSimpleSettings.shared.tgWsProxyEnabled = value
+            if value {
+                SGTGWsProxy.shared.start()
+            } else {
+                SGTGWsProxy.shared.stop()
+            }
+            simplePromise.set(true)
+            let _ = updateProxySettingsInteractively(accountManager: context.sharedContext.accountManager, { $0 }).start()
         }
     }, updateSliderValue: { setting, value in
         switch (setting) {
@@ -888,6 +907,31 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
                 pushControllerImpl?(sgStreamerSettingsController(context: context))
             case .deletedMediaVault:
                 pushControllerImpl?(sgDeletedMediaController(context: context, peerId: nil))
+            case .tgWsProxyWorkerDomain:
+                let isRu = presentationData.strings.baseLanguageCode.hasPrefix("ru")
+                let alert = UIAlertController(
+                    title: "Cloudflare Worker",
+                    message: isRu ? "Введите домен своего воркера (например: worker.example.com). Оставьте пустым для авто-выбора встроенных доменов." : "Enter your worker domain (e.g. worker.example.com). Leave empty for auto-selection.",
+                    preferredStyle: .alert
+                )
+                alert.addTextField { textField in
+                    textField.text = SGSimpleSettings.shared.tgWsProxyCustomWorker
+                    textField.placeholder = "worker.example.com"
+                    textField.clearButtonMode = .whileEditing
+                    textField.autocapitalizationType = .none
+                    textField.autocorrectionType = .no
+                }
+                alert.addAction(UIAlertAction(title: presentationData.strings.Common_Cancel, style: .cancel, handler: nil))
+                alert.addAction(UIAlertAction(title: presentationData.strings.Common_Done, style: .default, handler: { [weak alert] _ in
+                    let newDomain = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    SGSimpleSettings.shared.tgWsProxyCustomWorker = newDomain
+                    simplePromise.set(true)
+                    if SGSimpleSettings.shared.tgWsProxyEnabled {
+                        SGTGWsProxy.shared.stop()
+                        SGTGWsProxy.shared.start()
+                    }
+                }))
+                context.sharedContext.applicationBindings.presentNativeController(alert)
         }
     }, searchInput: { searchQuery in
         updateState { state in
