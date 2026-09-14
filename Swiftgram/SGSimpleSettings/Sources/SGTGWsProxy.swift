@@ -17,6 +17,11 @@ public final class SGTGWsProxy {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30.0
         config.timeoutIntervalForResource = 3600.0
+        config.httpMaximumConnectionsPerHost = 64
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.httpAdditionalHeaders = [
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+        ]
         return URLSession(configuration: config)
     }()
 
@@ -88,8 +93,11 @@ public final class SGTGWsProxy {
 
         do {
             let tcpOptions = NWProtocolTCP.Options()
+            tcpOptions.noDelay = true
             tcpOptions.enableKeepalive = true
             tcpOptions.keepaliveIdle = 10
+            tcpOptions.keepaliveInterval = 5
+            tcpOptions.keepaliveCount = 3
 
             let params = NWParameters(tls: nil, tcp: tcpOptions)
             params.allowLocalEndpointReuse = true
@@ -164,8 +172,14 @@ private final class SGTGWsSession {
     let onClose: (Int) -> Void
 
     private var webSocketTask: URLSessionWebSocketTask?
+    private var pingTimer: DispatchSourceTimer?
     private var targetDc: Int = 4
     private var isClosed: Bool = false
+    private var candidateDomains: [String] = []
+    private var currentDomainIndex: Int = 0
+    private var attemptCount: Int = 0
+    private var pendingClientData: [Data] = []
+    private var hasReceivedWsData: Bool = false
 
     init(id: Int, connection: NWConnection, urlSession: URLSession, queue: DispatchQueue, onClose: @escaping (Int) -> Void) {
         self.id = id
@@ -173,6 +187,10 @@ private final class SGTGWsSession {
         self.urlSession = urlSession
         self.queue = queue
         self.onClose = onClose
+
+        let domains = SGTGWsProxy.defaultDomains
+        let startIndex = abs(id) % domains.count
+        self.candidateDomains = (startIndex..<domains.count).map { domains[$0] } + (0..<startIndex).map { domains[$0] }
     }
 
     func start() {
@@ -275,6 +293,7 @@ private final class SGTGWsSession {
                 if sendError != nil {
                     self?.close()
                 } else {
+                    self?.readFromClient()
                     self?.connectWebSocket()
                 }
             })
@@ -282,6 +301,13 @@ private final class SGTGWsSession {
     }
 
     private func connectWebSocket() {
+        guard !self.isClosed else { return }
+        guard self.currentDomainIndex < self.candidateDomains.count else {
+            SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): all candidate domains exhausted")
+            self.close()
+            return
+        }
+
         let customWorker = SGSimpleSettings.shared.tgWsProxyCustomWorker.trimmingCharacters(in: .whitespacesAndNewlines)
         let wsUrlString: String
 
@@ -297,9 +323,8 @@ private final class SGTGWsSession {
                 wsUrlString = "wss://\(cleaned)/apiws"
             }
         } else {
-            let domains = SGTGWsProxy.defaultDomains
-            let selectedDomain = domains[abs(self.id) % domains.count]
-            wsUrlString = "wss://kws\(self.targetDc).\(selectedDomain)/apiws"
+            let domain = self.candidateDomains[self.currentDomainIndex]
+            wsUrlString = "wss://kws\(self.targetDc).\(domain)/apiws"
         }
 
         guard let url = URL(string: wsUrlString) else {
@@ -310,27 +335,69 @@ private final class SGTGWsSession {
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 15.0
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://web.telegram.org", forHTTPHeaderField: "Origin")
         request.setValue("binary", forHTTPHeaderField: "Sec-WebSocket-Protocol")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
-        let task = self.urlSession.webSocketTask(with: request)
-        self.webSocketTask = task
-        task.resume()
+        if #available(iOS 13.0, *) {
+            let task = self.urlSession.webSocketTask(with: request)
+            self.webSocketTask = task
+            task.resume()
 
-        self.startBridge()
+            for chunk in self.pendingClientData {
+                task.send(.data(chunk)) { _ in }
+            }
+
+            self.startPingTimer()
+            self.readFromWebSocket()
+        } else {
+            self.close()
+        }
     }
 
-    private func startBridge() {
-        self.readFromClient()
-        self.readFromWebSocket()
+    private func startPingTimer() {
+        self.stopPingTimer()
+        let timer = DispatchSource.makeTimerSource(queue: self.queue)
+        timer.schedule(deadline: .now() + 25.0, repeating: 25.0)
+        timer.setEventHandler { [weak self] in
+            guard let self = self, !self.isClosed else { return }
+            if #available(iOS 13.0, *) {
+                self.webSocketTask?.sendPing { [weak self] error in
+                    if let error = error {
+                        SGLogger.shared.log("SGTGWsProxy", "Session \(self?.id ?? 0): WS ping error: \(error)")
+                    }
+                }
+            }
+        }
+        timer.resume()
+        self.pingTimer = timer
+    }
+
+    private func stopPingTimer() {
+        self.pingTimer?.cancel()
+        self.pingTimer = nil
     }
 
     private func readFromClient() {
         self.connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self = self, !self.isClosed else { return }
             if let data = data, !data.isEmpty {
-                self.webSocketTask?.send(.data(data)) { [weak self] sendError in
-                    if sendError != nil {
-                        self?.close()
+                if !self.hasReceivedWsData {
+                    let totalBuffered = self.pendingClientData.reduce(0) { $0 + $1.count }
+                    if totalBuffered < 131072 {
+                        self.pendingClientData.append(data)
+                    }
+                }
+                if #available(iOS 13.0, *) {
+                    self.webSocketTask?.send(.data(data)) { [weak self] sendError in
+                        if sendError != nil {
+                            if let self = self, self.hasReceivedWsData {
+                                self.close()
+                            }
+                        }
                     }
                 }
             }
@@ -343,10 +410,14 @@ private final class SGTGWsSession {
     }
 
     private func readFromWebSocket() {
-        self.webSocketTask?.receive { [weak self] result in
+        guard #available(iOS 13.0, *), let task = self.webSocketTask else { return }
+        task.receive { [weak self] result in
             guard let self = self, !self.isClosed else { return }
             switch result {
             case let .success(message):
+                self.hasReceivedWsData = true
+                self.pendingClientData.removeAll(keepingCapacity: false)
+
                 let dataToSend: Data?
                 switch message {
                 case let .data(data):
@@ -365,8 +436,20 @@ private final class SGTGWsSession {
                     })
                 }
                 self.readFromWebSocket()
-            case .failure:
-                self.close()
+
+            case let .failure(error):
+                let isCustom = !SGSimpleSettings.shared.tgWsProxyCustomWorker.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                if !self.hasReceivedWsData && self.attemptCount < 3 && !isCustom {
+                    self.attemptCount += 1
+                    self.currentDomainIndex += 1
+                    SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS connect failed (\(error)), failing over to next domain (\(self.attemptCount)/3)...")
+                    self.stopPingTimer()
+                    self.webSocketTask?.cancel(with: .goingAway, reason: nil)
+                    self.webSocketTask = nil
+                    self.connectWebSocket()
+                } else {
+                    self.close()
+                }
             }
         }
     }
@@ -379,9 +462,12 @@ private final class SGTGWsSession {
         guard !self.isClosed else { return }
         self.isClosed = true
 
+        self.stopPingTimer()
         self.connection.cancel()
-        self.webSocketTask?.cancel(with: .goingAway, reason: nil)
-        self.webSocketTask = nil
+        if #available(iOS 13.0, *) {
+            self.webSocketTask?.cancel(with: .goingAway, reason: nil)
+            self.webSocketTask = nil
+        }
 
         self.onClose(self.id)
     }
