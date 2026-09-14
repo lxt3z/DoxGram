@@ -19,6 +19,11 @@ func getAvailableAppBadges() -> [AppBadge] {
     var appBadges: [AppBadge] = [
         .init(displayName: "DoxGram", assetName: "DoxGramAppBadge"),
         .init(displayName: "AyuGram", assetName: "AyuGramAppBadge"),
+        .init(displayName: "Sigma", assetName: "SigmaAppBadge"),
+        .init(displayName: "Clown", assetName: "ClownAppBadge"),
+        .init(displayName: "Major", assetName: "MajorAppBadge"),
+        .init(displayName: "1000-7", assetName: "GhoulAppBadge"),
+        .init(displayName: "Durov", assetName: "DurovAppBadge"),
         .init(displayName: "Default", assetName: "Components/AppBadge"),
         .init(displayName: "Sky", assetName: "SkyAppBadge"),
         .init(displayName: "Night", assetName: "NightAppBadge"),
@@ -76,11 +81,9 @@ struct AppBadgeSettingsView: View {
     private func onSelectBadge(_ badge: AppBadge) {
         self.selectedBadge = badge
         let image = UIImage(bundleImageName: selectedBadge.assetName) ?? UIImage(bundleImageName: "Components/AppBadge")
-        if self.context.sharedContext.immediateSGStatus.status > 1 {
-            DispatchQueue.main.async {
-                SGSimpleSettings.shared.customAppBadge = selectedBadge.assetName
-                self.context.sharedContext.mainWindow?.badgeView.image = image
-            }
+        DispatchQueue.main.async {
+            SGSimpleSettings.shared.customAppBadge = selectedBadge.assetName
+            self.context.sharedContext.mainWindow?.badgeView.image = image
         }
     }
     
