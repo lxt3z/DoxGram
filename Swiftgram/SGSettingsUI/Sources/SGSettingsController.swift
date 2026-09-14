@@ -913,6 +913,7 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             case .deletedMediaVault:
                 pushControllerImpl?(sgDeletedMediaController(context: context, peerId: nil))
             case .tgWsProxyWorkerDomain:
+                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
                 let isRu = presentationData.strings.baseLanguageCode.hasPrefix("ru")
                 let alert = UIAlertController(
                     title: "Cloudflare Worker",
