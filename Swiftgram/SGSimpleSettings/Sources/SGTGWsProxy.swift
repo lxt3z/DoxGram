@@ -266,16 +266,20 @@ private final class SGTGWsSession {
                         }
                     } else if b2 == 171 {
                         self.targetDc = 5 // 149.154.171.5 is DC 5
-                    } else if b2 == 165 || b2 == 166 {
+                    } else if b2 == 165 || b2 == 166 || (b2 >= 168 && b2 <= 170) {
                         self.targetDc = 4 // DC 4
-                    } else if b2 == 160 || b2 == 164 {
+                    } else if b2 >= 160 && b2 <= 164 {
                         self.targetDc = 2 // DC 2
+                    } else if b2 >= 172 && b2 <= 174 {
+                        self.targetDc = 1 // DC 1
                     }
                 } else if b0 == 91 && b1 == 108 {
                     if b2 >= 56 && b2 <= 59 {
-                        self.targetDc = 5 // 91.108.56.0/22 is DC 5
+                        self.targetDc = 5 // 91.108.56.0/22 is DC 5 (Singapore)
+                    } else if (b2 >= 4 && b2 <= 7) || (b2 >= 16 && b2 <= 19) {
+                        self.targetDc = 2 // 91.108.4.0/22 and 16.0/22 are DC 2 (Amsterdam)
                     } else {
-                        self.targetDc = 4 // 91.108.4.0/22..20 are DC 4
+                        self.targetDc = 4 // 91.108.8.0/22, 12.0/22, 20.0/22 are DC 4 (Amsterdam)
                     }
                 } else if b0 == 95 && b1 == 161 && b2 == 76 {
                     self.targetDc = 2 // 95.161.76.100 is DC 2
@@ -348,10 +352,20 @@ private final class SGTGWsSession {
                 .replacingOccurrences(of: "http://", with: "")
                 .replacingOccurrences(of: "wss://", with: "")
                 .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            if cleaned.contains("/") {
-                wsUrlString = "wss://\(cleaned)"
+            let defaultDcIps: [Int: String] = [
+                1: "149.154.175.50",
+                2: "149.154.167.51",
+                3: "149.154.175.100",
+                4: "149.154.167.91",
+                5: "149.154.171.5"
+            ]
+            let dst = defaultDcIps[self.targetDc] ?? "149.154.167.91"
+            if cleaned.contains("?") {
+                wsUrlString = "wss://\(cleaned)&dst=\(dst)&dc=\(self.targetDc)"
+            } else if cleaned.contains("/") {
+                wsUrlString = "wss://\(cleaned)?dst=\(dst)&dc=\(self.targetDc)"
             } else {
-                wsUrlString = "wss://\(cleaned)/apiws"
+                wsUrlString = "wss://\(cleaned)/apiws?dst=\(dst)&dc=\(self.targetDc)"
             }
         } else {
             let domain = self.candidateDomains[self.currentDomainIndex]
@@ -416,37 +430,36 @@ private final class SGTGWsSession {
     private func readFromClient() {
         self.connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self = self, !self.isClosed else { return }
-            if let data = data, !data.isEmpty {
-                if !self.hasReceivedWsData {
-                    let totalBuffered = self.pendingClientData.reduce(0) { $0 + $1.count }
-                    if totalBuffered < 131072 {
-                        self.pendingClientData.append(data)
-                    }
-                }
-                if #available(iOS 13.0, *) {
-                    self.webSocketTask?.send(.data(data)) { [weak self] sendError in
-                        guard let self = self, !self.isClosed else { return }
-                        if let sendError = sendError {
-                            if self.hasReceivedWsData {
-                                SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS send error: \(sendError)")
-                                self.close()
-                            }
-                        } else {
-                            if !isComplete && error == nil {
-                                self.readFromClient()
-                            }
-                        }
-                    }
-                } else {
-                    self.close()
-                }
-            }
             if isComplete || error != nil {
                 self.close()
                 return
             }
-            if data == nil || data?.isEmpty == true {
+            guard let data = data, !data.isEmpty else {
                 self.readFromClient()
+                return
+            }
+
+            if !self.hasReceivedWsData {
+                let totalBuffered = self.pendingClientData.reduce(0) { $0 + $1.count }
+                if totalBuffered < 131072 {
+                    self.pendingClientData.append(data)
+                }
+            }
+
+            if #available(iOS 13.0, *) {
+                self.webSocketTask?.send(.data(data)) { [weak self] sendError in
+                    guard let self = self, !self.isClosed else { return }
+                    if let sendError = sendError {
+                        if self.hasReceivedWsData {
+                            SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS send error: \(sendError)")
+                            self.close()
+                        }
+                    } else {
+                        self.readFromClient()
+                    }
+                }
+            } else {
+                self.close()
             }
         }
     }
