@@ -50,34 +50,36 @@ public final class SGUrlSanitizer {
     }
 
     /// Checks if the URL is an IP logger, suspicious shortener, or dangerous domain
-    public static func checkSuspicious(urlString: String, warnOnAllExternal: Bool = false) -> SuspiciousCheckResult {
+    public static func checkSuspicious(urlString: String, checkIpLoggers: Bool = true, warnOnAllExternal: Bool = false) -> SuspiciousCheckResult {
         guard let url = URL(string: urlString), let host = url.host?.lowercased() else {
             return SuspiciousCheckResult(isSuspicious: false, isIpGrabber: false, isShortener: false, domain: "", warningDescription: nil)
         }
 
-        // Match against known IP grabbers
-        for grabber in ipLoggerDomains {
-            if host == grabber || host.hasSuffix("." + grabber) {
-                return SuspiciousCheckResult(
-                    isSuspicious: true,
-                    isIpGrabber: true,
-                    isShortener: false,
-                    domain: host,
-                    warningDescription: "IP-logger / Grabber"
-                )
+        if checkIpLoggers {
+            // Match against known IP grabbers
+            for grabber in ipLoggerDomains {
+                if host == grabber || host.hasSuffix("." + grabber) {
+                    return SuspiciousCheckResult(
+                        isSuspicious: true,
+                        isIpGrabber: true,
+                        isShortener: false,
+                        domain: host,
+                        warningDescription: "IP-logger / Grabber"
+                    )
+                }
             }
-        }
 
-        // Match against shorteners
-        for shortener in shortenerDomains {
-            if host == shortener || host.hasSuffix("." + shortener) {
-                return SuspiciousCheckResult(
-                    isSuspicious: true,
-                    isIpGrabber: false,
-                    isShortener: true,
-                    domain: host,
-                    warningDescription: "URL Shortener"
-                )
+            // Match against shorteners
+            for shortener in shortenerDomains {
+                if host == shortener || host.hasSuffix("." + shortener) {
+                    return SuspiciousCheckResult(
+                        isSuspicious: true,
+                        isIpGrabber: false,
+                        isShortener: true,
+                        domain: host,
+                        warningDescription: "URL Shortener"
+                    )
+                }
             }
         }
 

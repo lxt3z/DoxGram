@@ -31,7 +31,6 @@ private enum SGControllerSection: Int32, SGItemListSection {
     case ayugramMedia
     case ayugramStreamer
     case ayugramPrivacy
-    case ayugramAntiCensorship
     case ayugramAntiDeanon
     case ayugramHiddenChats
     case ayugramDebug
@@ -135,10 +134,8 @@ private enum SGBoolSetting: String {
     case ayugramDebugger
     case keepViewOnceMedia
     case ghostDontSendVoiceListen
-    case tcpFragmentation
-    case ipv6Priority
-    case cleanUrlTrackers
     case warnOnIpLoggers
+    case cleanUrlTrackers
     case warnOnAllExternalLinks
     case hiddenChatsEnabled
     case hiddenChatsBiometrics
@@ -234,19 +231,12 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.notice(id: id.count, section: .ayugramPrivacy, text: i18n("Settings.Ayugram.BypassCopyProtection.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .disableTelemetry, value: SGSimpleSettings.shared.disableTelemetry, text: i18n("Settings.Ayugram.DisableTelemetry", lang), enabled: true))
 
-    // AyuGram: Anti-Censorship & Acceleration
-    entries.append(.header(id: id.count, section: .ayugramAntiCensorship, text: i18n("Settings.Ayugram.AntiCensorshipHeader", lang), badge: nil))
-    entries.append(.toggle(id: id.count, section: .ayugramAntiCensorship, settingName: .tcpFragmentation, value: SGSimpleSettings.shared.tcpFragmentation, text: i18n("Settings.TcpFragmentation", lang), enabled: true))
-    entries.append(.notice(id: id.count, section: .ayugramAntiCensorship, text: i18n("Settings.TcpFragmentation.Notice", lang)))
-    entries.append(.toggle(id: id.count, section: .ayugramAntiCensorship, settingName: .ipv6Priority, value: SGSimpleSettings.shared.ipv6Priority, text: i18n("Settings.Ipv6Priority", lang), enabled: true))
-    entries.append(.notice(id: id.count, section: .ayugramAntiCensorship, text: i18n("Settings.Ipv6Priority.Notice", lang)))
-
     // DoxGram: Anti-Deanon & IP Protection
     entries.append(.header(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.Header", lang), badge: nil))
-    entries.append(.toggle(id: id.count, section: .ayugramAntiDeanon, settingName: .cleanUrlTrackers, value: SGSimpleSettings.shared.cleanUrlTrackers, text: i18n("Settings.AntiDeanon.CleanTrackers", lang), enabled: true))
-    entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.CleanTrackers.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .ayugramAntiDeanon, settingName: .warnOnIpLoggers, value: SGSimpleSettings.shared.warnOnIpLoggers, text: i18n("Settings.AntiDeanon.WarnIpLoggers", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.WarnIpLoggers.Notice", lang)))
+    entries.append(.toggle(id: id.count, section: .ayugramAntiDeanon, settingName: .cleanUrlTrackers, value: SGSimpleSettings.shared.cleanUrlTrackers, text: i18n("Settings.AntiDeanon.CleanTrackers", lang), enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.CleanTrackers.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .ayugramAntiDeanon, settingName: .warnOnAllExternalLinks, value: SGSimpleSettings.shared.warnOnAllExternalLinks, text: i18n("Settings.AntiDeanon.WarnAllExternal", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramAntiDeanon, text: i18n("Settings.AntiDeanon.WarnAllExternal.Notice", lang)))
 
@@ -675,14 +665,10 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             SGSimpleSettings.shared.streamerAutoScreenCapture = value
         case .ayugramDebugger:
             SGSimpleSettings.shared.ayugramDebugger = value
-        case .tcpFragmentation:
-            SGSimpleSettings.shared.tcpFragmentation = value
-        case .ipv6Priority:
-            SGSimpleSettings.shared.ipv6Priority = value
-        case .cleanUrlTrackers:
-            SGSimpleSettings.shared.cleanUrlTrackers = value
         case .warnOnIpLoggers:
             SGSimpleSettings.shared.warnOnIpLoggers = value
+        case .cleanUrlTrackers:
+            SGSimpleSettings.shared.cleanUrlTrackers = value
         case .warnOnAllExternalLinks:
             SGSimpleSettings.shared.warnOnAllExternalLinks = value
         case .hiddenChatsEnabled:

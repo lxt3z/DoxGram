@@ -383,8 +383,11 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
             url = SGUrlSanitizer.sanitize(urlString: url)
         }
 
-        if !skipSecurityCheck && (SGSimpleSettings.shared.warnOnIpLoggers || SGSimpleSettings.shared.warnOnAllExternalLinks) {
-            let checkResult = SGUrlSanitizer.checkSuspicious(urlString: url, warnOnAllExternal: SGSimpleSettings.shared.warnOnAllExternalLinks)
+        let warnIpLoggers = SGSimpleSettings.shared.warnOnIpLoggers
+        let warnAll = SGSimpleSettings.shared.warnOnAllExternalLinks
+
+        if !skipSecurityCheck && (warnIpLoggers || warnAll) {
+            let checkResult = SGUrlSanitizer.checkSuspicious(urlString: url, checkIpLoggers: warnIpLoggers, warnOnAllExternal: warnAll)
             if checkResult.isSuspicious {
                 let isRussian = presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
                 let alertTitle = checkResult.isIpGrabber ? (isRussian ? "🛡️ Защита IP: Граббер" : "🛡️ IP Grabber Warning") : (isRussian ? "🛡️ Подозрительная ссылка" : "🛡️ Suspicious Link")

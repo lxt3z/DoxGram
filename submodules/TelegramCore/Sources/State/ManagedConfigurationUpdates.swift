@@ -3,7 +3,6 @@ import Postbox
 import SwiftSignalKit
 import TelegramApi
 import MtProtoKit
-import SGSimpleSettings
 
 
 func managedConfigurationUpdates(accountManager: AccountManager<TelegramAccountManagerTypes>, postbox: Postbox, network: Network) -> Signal<Void, NoError> {
@@ -34,17 +33,6 @@ func managedConfigurationUpdates(accountManager: AccountManager<TelegramAccountM
                     }
                     network.context.performBatchUpdates {
                         for (id, list) in addressList {
-                            var list = list
-                            if SGSimpleSettings.shared.ipv6Priority {
-                                list.sort { a, b in
-                                    let aIsIpv6 = a.ip?.contains(":") ?? false
-                                    let bIsIpv6 = b.ip?.contains(":") ?? false
-                                    if aIsIpv6 != bIsIpv6 {
-                                        return aIsIpv6
-                                    }
-                                    return false
-                                }
-                            }
                             network.context.updateAddressSetForDatacenter(withId: id, addressSet: MTDatacenterAddressSet(addressList: list), forceUpdateSchemes: false)
                         }
                     }

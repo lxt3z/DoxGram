@@ -807,17 +807,6 @@ struct ctr_state {
 
 @end
 
-static inline bool isTcpFragmentationEnabled(void) {
-    id val = [[NSUserDefaults standardUserDefaults] objectForKey:@"tcpFragmentation"];
-    if (val == nil) {
-        return false;
-    }
-    if ([val respondsToSelector:@selector(boolValue)]) {
-        return [(NSNumber *)val boolValue];
-    }
-    return false;
-}
-
 @interface MTTcpConnection () <MTTcpConnectionInterfaceDelegate>
 {
     id<EncryptionProvider> _encryptionProvider;
@@ -844,7 +833,6 @@ static inline bool isTcpFragmentationEnabled(void) {
     
     bool _addedControlHeader;
     bool _addedHelloHeader;
-    bool _didSendFirstDataPacket;
     
     MTAesCtr *_outgoingAesCtr;
     MTAesCtr *_incomingAesCtr;
@@ -1120,15 +1108,7 @@ static inline bool isTcpFragmentationEnabled(void) {
                             _helloRandom = [[NSData alloc] initWithBytes:cHMAC length:CC_SHA256_DIGEST_LENGTH];
                             memcpy(((uint8_t *)helloData.mutableBytes) + 11, cHMAC, CC_SHA256_DIGEST_LENGTH);
 
-                            if (isTcpFragmentationEnabled() && helloData.length > 24) {
-                                NSUInteger splitSize = 5;
-                                NSData *part1 = [helloData subdataWithRange:NSMakeRange(0, splitSize)];
-                                NSData *part2 = [helloData subdataWithRange:NSMakeRange(splitSize, helloData.length - splitSize)];
-                                [strongSelf->_socket writeData:part1];
-                                [strongSelf->_socket writeData:part2];
-                            } else {
-                                [strongSelf->_socket writeData:helloData];
-                            }
+                            [strongSelf->_socket writeData:helloData];
                             [strongSelf->_socket readDataToLength:5 withTimeout:-1 tag:MTTcpSocksReceiveHelloResponse];
                         } else {
                             strongSelf->_readyToSendData = true;
@@ -1174,7 +1154,6 @@ static inline bool isTcpFragmentationEnabled(void) {
         if (!_closed)
         {
             _closed = true;
-            _didSendFirstDataPacket = false;
             
             [_socket disconnect];
             [_socket resetDelegate];
@@ -1371,16 +1350,7 @@ static inline bool isTcpFragmentationEnabled(void) {
                             
                             offset += partLength;
                         }
-                        if (isTcpFragmentationEnabled() && !_didSendFirstDataPacket && partitionedCompleteData.length > 24) {
-                            _didSendFirstDataPacket = true;
-                            NSUInteger splitSize = 5;
-                            NSData *part1 = [partitionedCompleteData subdataWithRange:NSMakeRange(0, splitSize)];
-                            NSData *part2 = [partitionedCompleteData subdataWithRange:NSMakeRange(splitSize, partitionedCompleteData.length - splitSize)];
-                            [_socket writeData:part1];
-                            [_socket writeData:part2];
-                        } else {
-                            [_socket writeData:partitionedCompleteData];
-                        }
+                        [_socket writeData:partitionedCompleteData];
                     } else {
                         [_socket writeData:completeData];
                     }

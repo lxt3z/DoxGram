@@ -47,13 +47,6 @@ public class SGSimpleSettings {
             }
             UserDefaults.standard.set(true, forKey: chatListLinesMigrationKey)
         }
-
-        let antiCensorshipMigrationKey = "migrated_anti_censorship_defaults_v1"
-        if !UserDefaults.standard.bool(forKey: antiCensorshipMigrationKey) {
-            UserDefaults.standard.set(false, forKey: Keys.tcpFragmentation.rawValue)
-            UserDefaults.standard.set(false, forKey: Keys.ipv6Priority.rawValue)
-            UserDefaults.standard.set(true, forKey: antiCensorshipMigrationKey)
-        }
     }
     
     private func preCacheValues() {
@@ -106,8 +99,6 @@ public class SGSimpleSettings {
         case accountColorsSaturation
         case uploadSpeedBoost
         case downloadSpeedBoost
-        case tcpFragmentation
-        case ipv6Priority
         case bottomTabStyle
         case rememberLastFolder
         case lastAccountFolders
@@ -296,8 +287,6 @@ public class SGSimpleSettings {
         Keys.accountColorsSaturation.rawValue: 100,
         Keys.uploadSpeedBoost.rawValue: false,
         Keys.downloadSpeedBoost.rawValue: DownloadSpeedBoostValues.none.rawValue,
-        Keys.tcpFragmentation.rawValue: false,
-        Keys.ipv6Priority.rawValue: false,
         Keys.rememberLastFolder.rawValue: false,
         Keys.bottomTabStyle.rawValue: BottomTabStyleValues.telegram.rawValue,
         Keys.lastAccountFolders.rawValue: [:],
@@ -426,11 +415,6 @@ public class SGSimpleSettings {
     @UserDefault(key: Keys.downloadSpeedBoost.rawValue)
     public var downloadSpeedBoost: String
     
-    @UserDefault(key: Keys.tcpFragmentation.rawValue)
-    public var tcpFragmentation: Bool
-
-    @UserDefault(key: Keys.ipv6Priority.rawValue)
-    public var ipv6Priority: Bool
     @UserDefault(key: Keys.rememberLastFolder.rawValue)
     public var rememberLastFolder: Bool
     
