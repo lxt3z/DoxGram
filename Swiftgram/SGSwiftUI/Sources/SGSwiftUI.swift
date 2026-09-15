@@ -273,23 +273,42 @@ extension UIHostingController {
 @available(iOS 13.0, *)
 public struct TGNavigationBackButtonModifier: ViewModifier {
     weak var wrapperController: LegacyController?
+    var title: String?
+    @Environment(\.lang) var lang: String
+
+    public init(wrapperController: LegacyController?, title: String? = nil) {
+        self.wrapperController = wrapperController
+        self.title = title
+    }
+
+    private var backText: String {
+        if let title = title, !title.isEmpty {
+            return title
+        }
+        if let commonBack = wrapperController?.presentationStrings?.Common_Back, !commonBack.isEmpty {
+            return commonBack
+        }
+        if lang.lowercased().hasPrefix("ru") {
+            return "Назад"
+        }
+        return "Back"
+    }
     
     public func body(content: Content) -> some View {
         content
             .navigationBarBackButtonHidden(true)
             .navigationBarItems(leading:
-                NavigationBarBackButton(action: {
+                NavigationBarBackButton(text: backText, action: {
                     wrapperController?.dismiss()
                 })
-                .padding(.leading, -8)
             )
     }
 }
 
 @available(iOS 13.0, *)
 public extension View {
-    func tgNavigationBackButton(wrapperController: LegacyController?) -> some View {
-        modifier(TGNavigationBackButtonModifier(wrapperController: wrapperController))
+    func tgNavigationBackButton(wrapperController: LegacyController?, title: String? = nil) -> some View {
+        modifier(TGNavigationBackButtonModifier(wrapperController: wrapperController, title: title))
     }
 }
 
@@ -308,16 +327,18 @@ public struct NavigationBarBackButton: View {
 
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 if let customBackArrow = navigationBarBackArrowImage(color: color.uiColor()) {
                     Image(uiImage: customBackArrow)
                 } else {
                     Image(systemName: "chevron.left")
-                        .font(Font.body.weight(.bold))
+                        .font(Font.system(size: 16, weight: .semibold))
                         .foregroundColor(color)
                 }
                 Text(text)
+                    .font(Font.system(size: 17))
                     .foregroundColor(color)
+                    .lineLimit(1)
             }
             .contentShape(Rectangle())
         }

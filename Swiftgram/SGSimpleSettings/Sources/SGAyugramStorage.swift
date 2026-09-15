@@ -120,6 +120,23 @@ public final class SGAyugramLogger {
         return try? Data(contentsOf: url)
     }
 
+    public static func getLogFileSize() -> String? {
+        shared.lock.readLock()
+        defer { shared.lock.unlock() }
+        guard let url = shared.logFileUrl,
+              let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int64, size > 0 else {
+            return nil
+        }
+        if size < 1024 {
+            return "\(size) B"
+        } else if size < 1024 * 1024 {
+            return String(format: "%.1f KB", Double(size) / 1024.0)
+        } else {
+            return String(format: "%.2f MB", Double(size) / (1024.0 * 1024.0))
+        }
+    }
+
     public static func clearLogs() {
         shared.lock.writeLock()
         defer { shared.lock.unlock() }

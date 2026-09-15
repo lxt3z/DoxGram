@@ -279,11 +279,11 @@
 "Settings.NY.Notice" = "Available for a limited time only!";
 
 "Settings.Ayugram.Header" = "AYUGRAM";
-"Settings.Ayugram.GhostHeader" = "AYUGRAM: GHOST MODE";
+"Settings.Ayugram.GhostHeader" = "GHOST MODE";
 "Settings.Ayugram.MediaHeader" = "MESSAGES & MEDIA";
 "Settings.Ayugram.StreamerHeader" = "STREAMER MODE";
 "Settings.Ayugram.PrivacyHeader" = "PRIVACY & PROTECTION";
-"Settings.Ayugram.DebugHeader" = "DEBUGGING & LOGS";
+"Settings.Ayugram.DebugHeader" = "DOXGRAM";
 "Settings.Ayugram.StreamerSettings" = "Streamer Mode Privacy Settings";
 "Settings.Ayugram.DeletedMediaVault" = "Deleted Media Vault";
 "Settings.Ayugram.GhostDontSendTyping" = "Don't send typing status";
@@ -309,9 +309,9 @@
 "Settings.Ayugram.BypassCopyProtection" = "Allow saving, forwarding and screenshots";
 "Settings.Ayugram.BypassCopyProtection.Notice" = "Removes restrictions on copying, forwarding, screenshots, and screen recording in protected chats, channels, and stories.";
 "Settings.Ayugram.DisableTelemetry" = "Disable telemetry and analytics";
-"Settings.Ayugram.Debugger" = "Ayugram debugger";
-"Settings.Ayugram.ExportLogs" = "Export Ayugram logs";
-"Settings.Ayugram.ClearLogs" = "Clear Ayugram logs";
+"Settings.Ayugram.Debugger" = "DoxGram debugger";
+"Settings.Ayugram.ExportLogs" = "Export DoxGram logs";
+"Settings.Ayugram.ClearLogs" = "Clear DoxGram logs";
 "Settings.Ayugram.EditHistoryTitle" = "Edit History";
 "Settings.Ayugram.OriginalMessage" = "Original message";
 "Settings.Ayugram.DeletedBadge" = "deleted";

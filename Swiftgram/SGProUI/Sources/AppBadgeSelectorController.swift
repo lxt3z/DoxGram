@@ -93,39 +93,44 @@ struct AppBadgeSettingsView: View {
     }
     
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, alignment: .center, spacing: Layout.columnSpacing) {
-                ForEach(availableAppBadges) { badge in
-                    Button {
-                        onSelectBadge(badge)
-                    } label: {
-                        VStack(spacing: 8) {
-                            Image(badge.assetName)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: Layout.imageHeight)
-                                .accessibilityHidden(true)
+        NavigationView {
+            ScrollView {
+                LazyVGrid(columns: columns, alignment: .center, spacing: Layout.columnSpacing) {
+                    ForEach(availableAppBadges) { badge in
+                        Button {
+                            onSelectBadge(badge)
+                        } label: {
+                            VStack(spacing: 8) {
+                                Image(badge.assetName)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(height: Layout.imageHeight)
+                                    .accessibilityHidden(true)
 
-                            Text(badge.displayName)
-                                .font(.footnote)
+                                Text(badge.displayName)
+                                    .font(.footnote)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(colorScheme == .dark ? .secondarySystemBackground : .systemBackground))
+                            .cornerRadius(Layout.cardCorner)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Layout.cardCorner)
+                                    .stroke(selectedBadge == badge ? Color.accentColor : Color.clear, lineWidth: 2)
+                            )
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(colorScheme == .dark ? .secondarySystemBackground : .systemBackground))
-                        .cornerRadius(Layout.cardCorner)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Layout.cardCorner)
-                                .stroke(selectedBadge == badge ? Color.accentColor : Color.clear, lineWidth: 2)
-                        )
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
-            }
-            .padding(.horizontal, Layout.horizontalPadding)
-            .padding(.vertical, 24)
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.vertical, 24)
 
+            }
+            .background(Color(colorScheme == .light ? .secondarySystemBackground : .systemBackground).ignoresSafeArea())
+            .navigationBarTitle("AppBadge.Title".i18n(lang), displayMode: .inline)
+            .tgNavigationBackButton(wrapperController: wrapperController)
         }
-        .background(Color(colorScheme == .light ? .secondarySystemBackground : .systemBackground).ignoresSafeArea())
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
 }
@@ -143,13 +148,10 @@ public func sgAppBadgeSettingsController(context: AccountContext, presentationDa
     )
 
     legacyController.statusBar.statusBarStyle = theme.rootController.statusBarStyle.style
-    legacyController.title = "AppBadge.Title".i18n(strings.baseLanguageCode)
-    legacyController.navigationItem.backBarButtonItem = UIBarButtonItem(title: strings.Common_Back, style: .plain, target: nil, action: nil)
-    legacyController.setNavigationBarPresentationData(NavigationBarPresentationData(theme: NavigationBarTheme(rootControllerTheme: theme, style: .glass), strings: NavigationBarStrings(presentationStrings: strings)), animated: false)
+    legacyController.displayNavigationBar = false
     
     let swiftUIView = SGSwiftUIView<AppBadgeSettingsView>(
         legacyController: legacyController,
-        manageSafeArea: true,
         content: {
             AppBadgeSettingsView(wrapperController: legacyController, context: context)
         }

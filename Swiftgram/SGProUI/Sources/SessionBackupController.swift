@@ -316,7 +316,7 @@ struct SessionBackupManagerView: View {
     }
     
     
-    var body: some View {
+    var bodyContent: some View {
         List {
             Section() {
                 Button(action: performBackup) {
@@ -383,6 +383,8 @@ struct SessionBackupManagerView: View {
 //                }
             }
         }
+        .navigationBarTitle("SessionBackup.Title".i18n(lang), displayMode: .inline)
+        .tgNavigationBackButton(wrapperController: wrapperController)
         .onAppear {
             withAnimation {
                 sessions = getBackedSessions()
@@ -420,6 +422,13 @@ struct SessionBackupManagerView: View {
         .onDisappear {
             loggedInAccountsDisposable?.dispose()
         }
+    }
+    
+    var body: some View {
+        NavigationView {
+            bodyContent
+        }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
 }
@@ -502,11 +511,10 @@ public func sgSessionBackupManagerController(context: AccountContext, presentati
     )
     legacyController.statusBar.statusBarStyle = theme.rootController
         .statusBarStyle.style
-    legacyController.title = "SessionBackup.Title".i18n(strings.baseLanguageCode)
+    legacyController.displayNavigationBar = false
 
     let swiftUIView = SGSwiftUIView<SessionBackupManagerView>(
         legacyController: legacyController,
-        manageSafeArea: true,
         content: {
             SessionBackupManagerView(wrapperController: legacyController, context: context)
         }

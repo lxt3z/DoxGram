@@ -253,10 +253,16 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.notice(id: id.count, section: .ayugramWsProxy, text: i18n("Settings.WsProxy.Enabled.Notice", lang)))
 
 
-    // AyuGram: Debug & Logs
+    // DoxGram: Debug & Logs
     entries.append(.header(id: id.count, section: .ayugramDebug, text: i18n("Settings.Ayugram.DebugHeader", lang), badge: nil))
     entries.append(.toggle(id: id.count, section: .ayugramDebug, settingName: .ayugramDebugger, value: SGSimpleSettings.shared.ayugramDebugger, text: i18n("Settings.Ayugram.Debugger", lang), enabled: true))
-    entries.append(.disclosure(id: id.count, section: .ayugramDebug, link: .ayugramExportLogs, text: i18n("Settings.Ayugram.ExportLogs", lang)))
+    let exportLogsTitle: String
+    if let size = SGAyugramLogger.getLogFileSize() {
+        exportLogsTitle = "\(i18n("Settings.Ayugram.ExportLogs", lang)) (\(size))"
+    } else {
+        exportLogsTitle = i18n("Settings.Ayugram.ExportLogs", lang)
+    }
+    entries.append(.disclosure(id: id.count, section: .ayugramDebug, link: .ayugramExportLogs, text: exportLogsTitle))
     entries.append(.disclosure(id: id.count, section: .ayugramDebug, link: .ayugramClearLogs, text: i18n("Settings.Ayugram.ClearLogs", lang)))
     
     if SGSimpleSettings.shared.canUseNY {

@@ -274,11 +274,11 @@
 "Settings.NY.Notice" = "Доступны только на ограниченное время!";
 
 "Settings.Ayugram.Header" = "AYUGRAM";
-"Settings.Ayugram.GhostHeader" = "AYUGRAM: ПРИЗРАЧНЫЙ РЕЖИМ";
+"Settings.Ayugram.GhostHeader" = "ПРИЗРАЧНЫЙ РЕЖИМ";
 "Settings.Ayugram.MediaHeader" = "СООБЩЕНИЯ И МЕДИА";
 "Settings.Ayugram.StreamerHeader" = "РЕЖИМ СТРИМЕРА";
 "Settings.Ayugram.PrivacyHeader" = "КОНФИДЕНЦИАЛЬНОСТЬ И ЗАЩИТА";
-"Settings.Ayugram.DebugHeader" = "ОТЛАДКА И ЛОГИ";
+"Settings.Ayugram.DebugHeader" = "DOXGRAM";
 "Settings.Ayugram.StreamerSettings" = "Настройки скрытия в режиме стримера";
 "Settings.Ayugram.DeletedMediaVault" = "Хранилище удалённых медиа";
 "Settings.Ayugram.GhostDontSendTyping" = "Не отправлять статус печати";
@@ -304,9 +304,9 @@
 "Settings.Ayugram.BypassCopyProtection" = "Разрешить сохранение, пересылку и скриншоты";
 "Settings.Ayugram.BypassCopyProtection.Notice" = "Снимает ограничения на копирование, пересылку, скриншоты и запись экрана в защищённых чатах, каналах и историях.";
 "Settings.Ayugram.DisableTelemetry" = "Отключить телеметрию и сбор данных";
-"Settings.Ayugram.Debugger" = "Отладчик Ayugram";
-"Settings.Ayugram.ExportLogs" = "Экспорт логов Ayugram";
-"Settings.Ayugram.ClearLogs" = "Очистить логи Ayugram";
+"Settings.Ayugram.Debugger" = "Отладчик DoxGram";
+"Settings.Ayugram.ExportLogs" = "Экспорт логов DoxGram";
+"Settings.Ayugram.ClearLogs" = "Очистить логи DoxGram";
 "Settings.Ayugram.EditHistoryTitle" = "История изменений";
 "Settings.Ayugram.OriginalMessage" = "Исходное сообщение";
 "Settings.Ayugram.DeletedBadge" = "удалено";
