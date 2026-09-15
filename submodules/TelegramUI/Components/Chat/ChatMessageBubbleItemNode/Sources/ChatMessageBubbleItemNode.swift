@@ -139,6 +139,14 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
     var addedPollMedia = false
     var addedQuizAnswer = false
     
+    if SGSimpleSettings.shared.hideChannelAds && item.content.contains(where: { SGAdDetector.isAd($0.0) && !SGAdFilterState.shared.isRevealed($0.0.id) }) {
+        for (message, itemAttributes) in item.content {
+            result.append((message, ChatMessageHiddenAdBubbleContentNode.self, itemAttributes, BubbleItemAttributes(isAttachment: false, neighborType: .text, neighborSpacing: .default)))
+            break
+        }
+        return (result, false, false)
+    }
+    
     outer: for (message, itemAttributes) in item.content {
         if SGSimpleSettings.shared.hideChannelAds && SGAdDetector.isAd(message) && !SGAdFilterState.shared.isRevealed(message.id) {
             result.append((message, ChatMessageHiddenAdBubbleContentNode.self, itemAttributes, BubbleItemAttributes(isAttachment: false, neighborType: .text, neighborSpacing: .default)))
@@ -2242,7 +2250,8 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             }
         }
         
-        if firstMessage.isRestricted(platform: "ios", contentSettings: item.context.currentContentSettings.with { $0 }) || (SGSimpleSettings.shared.hideChannelAds && SGAdDetector.isAd(firstMessage) && !SGAdFilterState.shared.isRevealed(firstMessage.id)) {
+        let isHiddenAd = SGSimpleSettings.shared.hideChannelAds && item.content.contains(where: { SGAdDetector.isAd($0.0) && !SGAdFilterState.shared.isRevealed($0.0.id) })
+        if firstMessage.isRestricted(platform: "ios", contentSettings: item.context.currentContentSettings.with { $0 }) || isHiddenAd {
             replyMarkup = nil
         }
         
@@ -2423,7 +2432,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         var bottomNodeMergeStatus: ChatMessageBubbleMergeStatus = mergedBottom.merged ? (incoming ? .Left : .Right) : .None(incoming ? .Incoming : .Outgoing)
         
         let bubbleReactions: ReactionsMessageAttribute
-        if (needReactions || forceReactionsOutside) && !(SGSimpleSettings.shared.hideChannelAds && SGAdDetector.isAd(firstMessage) && !SGAdFilterState.shared.isRevealed(firstMessage.id)) {
+        if (needReactions || forceReactionsOutside) && !isHiddenAd {
             bubbleReactions = mergedMessageReactions(attributes: item.message.attributes, isTags: item.message.areReactionsTags(accountPeerId: item.context.account.peerId)) ?? ReactionsMessageAttribute(canViewList: false, isTags: false, reactions: [], recentPeers: [], topPeers: [])
         } else {
             bubbleReactions = ReactionsMessageAttribute(canViewList: false, isTags: false, reactions: [], recentPeers: [], topPeers: [])

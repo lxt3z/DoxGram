@@ -811,6 +811,9 @@ extension SGSimpleSettings {
 }
 
 public func getSGDownloadPartSize(_ default: Int64, fileSize: Int64?) -> Int64 {
+    if ProcessInfo.processInfo.isLowPowerModeEnabled {
+        return min(128 * 1024, `default`)
+    }
     let currentDownloadSetting = SGSimpleSettings.shared.downloadSpeedBoost
     // Increasing chunk size for small files make it worse in terms of overall download performance
     let smallFileSizeThreshold = 1 * 1024 * 1024 // 1 MB
@@ -831,6 +834,9 @@ public func getSGDownloadPartSize(_ default: Int64, fileSize: Int64?) -> Int64 {
 }
 
 public func getSGMaxPendingParts(_ default: Int) -> Int {
+    if ProcessInfo.processInfo.isLowPowerModeEnabled {
+        return min(3, `default`)
+    }
     let currentDownloadSetting = SGSimpleSettings.shared.downloadSpeedBoost
     switch (currentDownloadSetting) {
         case SGSimpleSettings.DownloadSpeedBoostValues.medium.rawValue:

@@ -39,7 +39,13 @@ public struct SGAdDetector {
         "реклама.",
         "реклама ",
         "рекламодатель",
-        "инн "
+        "инн ",
+        "#промо",
+        "#реклама",
+        "#promo",
+        "#ad",
+        "промо-пост",
+        "промо пост"
     ]
     
     private static let maxAndCityAdKeywords: [String] = [

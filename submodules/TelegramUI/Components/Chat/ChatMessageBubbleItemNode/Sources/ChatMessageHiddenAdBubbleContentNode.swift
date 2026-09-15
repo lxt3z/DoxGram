@@ -48,11 +48,8 @@ public final class ChatMessageHiddenAdBubbleContentNode: ChatMessageBubbleConten
         guard let item = self.item else {
             return
         }
-        SGAdFilterState.shared.reveal(item.message.id)
-        if case let .group(messages) = item.content {
-            for message in messages {
-                SGAdFilterState.shared.reveal(message.0.id)
-            }
+        for (message, _) in item.content {
+            SGAdFilterState.shared.reveal(message.id)
         }
         let _ = item.controllerInteraction.requestMessageUpdate(item.message.id, false, nil)
     }

@@ -162,6 +162,10 @@ public final class SGAyugramStorage {
 
     private let fileManager = FileManager.default
     private let storageUrl: URL?
+    private let saveQueue = DispatchQueue(label: "org.doxgram.storage.save", qos: .utility)
+    private var pendingDeletedSave: DispatchWorkItem?
+    private var pendingEditsSave: DispatchWorkItem?
+    private var pendingMediaSave: DispatchWorkItem?
 
     public var isScreenCaptured: Bool {
         self.lock.readLock()
@@ -455,10 +459,15 @@ public final class SGAyugramStorage {
         self.lock.readLock()
         let dict = self.deletedMessages
         self.lock.unlock()
-        DispatchQueue.global(qos: .utility).async {
-            if let data = try? JSONEncoder().encode(dict) {
-                try? data.write(to: url, options: .atomic)
+        self.saveQueue.async {
+            self.pendingDeletedSave?.cancel()
+            let workItem = DispatchWorkItem {
+                if let data = try? JSONEncoder().encode(dict) {
+                    try? data.write(to: url, options: .atomic)
+                }
             }
+            self.pendingDeletedSave = workItem
+            self.saveQueue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
         }
     }
 
@@ -467,10 +476,15 @@ public final class SGAyugramStorage {
         self.lock.readLock()
         let edits = self.editHistories
         self.lock.unlock()
-        DispatchQueue.global(qos: .utility).async {
-            if let data = try? JSONEncoder().encode(edits) {
-                try? data.write(to: url, options: .atomic)
+        self.saveQueue.async {
+            self.pendingEditsSave?.cancel()
+            let workItem = DispatchWorkItem {
+                if let data = try? JSONEncoder().encode(edits) {
+                    try? data.write(to: url, options: .atomic)
+                }
             }
+            self.pendingEditsSave = workItem
+            self.saveQueue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
         }
     }
 
@@ -479,9 +493,45 @@ public final class SGAyugramStorage {
         self.lock.readLock()
         let items = self.deletedMediaItems
         self.lock.unlock()
-        DispatchQueue.global(qos: .utility).async {
+        self.saveQueue.async {
+            self.pendingMediaSave?.cancel()
+            let workItem = DispatchWorkItem {
+                if let data = try? JSONEncoder().encode(items) {
+                    try? data.write(to: url, options: .atomic)
+                }
+            }
+            self.pendingMediaSave = workItem
+            self.saveQueue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
+        }
+    }
+
+    public func flushNow() {
+        guard let storageUrl = self.storageUrl else { return }
+        self.lock.readLock()
+        let dict = self.deletedMessages
+        let edits = self.editHistories
+        let items = self.deletedMediaItems
+        self.lock.unlock()
+
+        self.saveQueue.sync {
+            self.pendingDeletedSave?.cancel()
+            self.pendingDeletedSave = nil
+            self.pendingEditsSave?.cancel()
+            self.pendingEditsSave = nil
+            self.pendingMediaSave?.cancel()
+            self.pendingMediaSave = nil
+
+            let deletedUrl = storageUrl.appendingPathComponent("deleted_messages.json")
+            if let data = try? JSONEncoder().encode(dict) {
+                try? data.write(to: deletedUrl, options: .atomic)
+            }
+            let editsUrl = storageUrl.appendingPathComponent("edit_history.json")
+            if let data = try? JSONEncoder().encode(edits) {
+                try? data.write(to: editsUrl, options: .atomic)
+            }
+            let mediaUrl = storageUrl.appendingPathComponent("deleted_media.json")
             if let data = try? JSONEncoder().encode(items) {
-                try? data.write(to: url, options: .atomic)
+                try? data.write(to: mediaUrl, options: .atomic)
             }
         }
     }
