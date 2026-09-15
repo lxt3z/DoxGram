@@ -70,7 +70,7 @@ extension ChatControllerImpl {
                 present(statusController, nil)
             }
             
-            let disposable = (fetchAndPreloadReplyThreadInfo(context: context, subject: isChannelPost ? .channelPost(messageId) : .groupMessage(messageId), atMessageId: atMessageId, preload: true)
+            let disposable = (fetchAndPreloadReplyThreadInfo(context: context, subject: isChannelPost ? .channelPost(messageId) : .groupMessage(messageId), atMessageId: atMessageId, preload: false)
             |> deliverOnMainQueue).startStrict(next: { [weak statusController] result in
                 if displayModalProgress {
                     statusController?.dismiss()

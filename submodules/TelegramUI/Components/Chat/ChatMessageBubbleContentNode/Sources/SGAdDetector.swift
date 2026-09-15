@@ -45,7 +45,108 @@ public struct SGAdDetector {
         "#promo",
         "#ad",
         "промо-пост",
-        "промо пост"
+        "промо пост",
+        "на правах рекламы",
+        "партнёрский материал",
+        "партнерский материал",
+        "партнёрский пост",
+        "партнерский пост",
+        "спонсорский пост",
+        "рекламная интеграция",
+        "рекламная публикация",
+        "рекламная пауза"
+    ]
+    
+    private static let brandPromoTokens: [String] = [
+        "@alfabank",
+        "alfa.me",
+        "alfabank.ru",
+        "альфа-карта",
+        "альфа карта",
+        "альфакарта",
+        "алиса ai",
+        "алиса ии",
+        "яндекс алиса",
+        "яндекс станция",
+        "chat.alice.yandex",
+        "alice.yandex",
+        "алису ai",
+        "алисой ai"
+    ]
+    
+    private static let personalAndChannelPromoKeywords: [String] = [
+        "теперь в telegram",
+        "теперь в телеграм",
+        "теперь в тг",
+        "теперь и в telegram",
+        "теперь и в телеграм",
+        "теперь и в тг",
+        "переехал в telegram",
+        "переехал в телеграм",
+        "переехал в тг",
+        "переходи в telegram",
+        "переходите в telegram",
+        "переходи в телеграм",
+        "переходите в телеграм",
+        "переходи в мой тг",
+        "переходите в мой тг",
+        "переходи в мой",
+        "переходите в мой",
+        "подписывайся на мой",
+        "подписывайтесь на мой",
+        "подпишись на мой",
+        "создал свой канал",
+        "создала свой канал",
+        "открыл свой канал",
+        "открыла свой канал",
+        "завёл свой канал",
+        "завел свой канал",
+        "завела свой канал",
+        "запустил свой канал",
+        "запустила свой канал",
+        "веду свой канал",
+        "веду свой тг",
+        "мой личный канал",
+        "мой авторский канал",
+        "в моем личном канале",
+        "в моём личном канале",
+        "в моем авторском",
+        "в моём авторском",
+        "авторский канал",
+        "авторский блог",
+        "мой личный блог",
+        "выкладываю туторы",
+        "выкладывает туторы",
+        "делюсь туторами",
+        "мои туторы",
+        "бесплатные туторы",
+        "туториалы по",
+        "сливаю курсы",
+        "сливы курсов",
+        "слив курса",
+        "авторский курс",
+        "авторские курсы",
+        "бесплатный курс",
+        "бесплатный интенсив",
+        "бесплатный вебинар",
+        "бесплатный марафон",
+        "записаться на курс",
+        "записаться на интенсив",
+        "научу зарабатывать",
+        "научит зарабатывать",
+        "беру на наставничество",
+        "возьму на наставничество",
+        "наставничество до результата",
+        "мест на обучение",
+        "места на обучение",
+        "обучаю заработку",
+        "вход бесплатный первые",
+        "вход свободный еще",
+        "вход свободный ещё",
+        "только первые 100",
+        "ссылка в закрепе",
+        "ссылка в описании канала",
+        "ссылка в профиле"
     ]
     
     private static let maxAndCityAdKeywords: [String] = [
@@ -225,6 +326,16 @@ public struct SGAdDetector {
             }
         }
         
+        for attribute in message.attributes {
+            if let textEntities = attribute as? TextEntitiesMessageAttribute {
+                for entity in textEntities.entities {
+                    if case let .TextUrl(url) = entity.type {
+                        fullText += " " + url.lowercased()
+                    }
+                }
+            }
+        }
+        
         // 1. Official ad token / ERID marker
         for token in officialAdTokens {
             if fullText.contains(token) {
@@ -232,7 +343,35 @@ public struct SGAdDetector {
             }
         }
         
-        // 2. MAX ads & City channel selections & Scam folders
+        // 2. Brand promos (Alfa-Bank, Alice AI, etc.)
+        for token in brandPromoTokens {
+            if fullText.contains(token) {
+                return true
+            }
+        }
+        
+        let isAlfaBankMention = fullText.contains("альфа-банк") || fullText.contains("альфа банк") || fullText.contains("альфабанк")
+        if isAlfaBankMention {
+            let bankPromoTerms = ["карт", "кешбэк", "кэшбэк", "бонус", "оформи", "заказ", "скидк", "бесплатн", "процент", "акци", "ссылк", "рубл"]
+            for term in bankPromoTerms {
+                if fullText.contains(term) {
+                    return true
+                }
+            }
+        }
+        
+        if fullText.contains("алиса") && (fullText.contains("нейросеть") || fullText.contains("искусственный интеллект") || fullText.contains("чат-бот") || fullText.contains("чат бот") || fullText.contains("попробуй") || fullText.contains("яндекс")) {
+            return true
+        }
+        
+        // 3. Personal channel, courses, tutors & creator promo
+        for keyword in personalAndChannelPromoKeywords {
+            if fullText.contains(keyword) {
+                return true
+            }
+        }
+        
+        // 4. MAX ads & City channel selections & Scam folders
         for keyword in maxAndCityAdKeywords {
             if fullText.contains(keyword) {
                 return true
@@ -304,7 +443,7 @@ public struct SGAdDetector {
                                     return true
                                 }
                             }
-                            if urlLower.contains("gamewin") || urlLower.contains("max.ru") || urlLower.contains("luckyjet") {
+                            if urlLower.contains("gamewin") || urlLower.contains("max.ru") || urlLower.contains("luckyjet") || urlLower.contains("alfa.me") || urlLower.contains("alfabank") || urlLower.contains("alice.yandex") {
                                 return true
                             }
                         }
