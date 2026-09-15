@@ -127,7 +127,7 @@ struct AppBadgeSettingsView: View {
 
             }
             .background(Color(colorScheme == .light ? .secondarySystemBackground : .systemBackground).ignoresSafeArea())
-            .navigationBarTitle("AppBadge.Title".i18n(lang), displayMode: .inline)
+            .navigationBarTitle(Text("AppBadge.Title".i18n(lang)), displayMode: .inline)
             .tgNavigationBackButton(wrapperController: wrapperController)
         }
         .navigationViewStyle(StackNavigationViewStyle())

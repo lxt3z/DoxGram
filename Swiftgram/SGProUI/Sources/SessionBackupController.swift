@@ -383,7 +383,7 @@ struct SessionBackupManagerView: View {
 //                }
             }
         }
-        .navigationBarTitle("SessionBackup.Title".i18n(lang), displayMode: .inline)
+        .navigationBarTitle(Text("SessionBackup.Title".i18n(lang)), displayMode: .inline)
         .tgNavigationBackButton(wrapperController: wrapperController)
         .onAppear {
             withAnimation {
