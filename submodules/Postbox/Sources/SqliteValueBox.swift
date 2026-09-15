@@ -445,7 +445,7 @@ public final class SqliteValueBox: ValueBox {
         postboxLog("Did set up encryption")
 
         if !self.useCaches {
-            resultCode = database.execute("PRAGMA cache_size=32")
+            resultCode = database.execute("PRAGMA cache_size=512")
             assert(resultCode)
         }
         resultCode = database.execute("PRAGMA mmap_size=0")

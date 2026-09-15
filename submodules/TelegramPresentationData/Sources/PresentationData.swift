@@ -531,6 +531,9 @@ private func automaticThemeShouldSwitch(_ settings: AutomaticThemeSwitchSetting,
 }
 
 public func automaticEnergyUsageShouldBeOnNow(settings: MediaAutoDownloadSettings) -> Bool {
+    if ProcessInfo.processInfo.isLowPowerModeEnabled {
+        return true
+    }
     if settings.energyUsageSettings.activationThreshold <= 4 {
         return false
     } else if settings.energyUsageSettings.activationThreshold >= 96 {
@@ -546,25 +549,23 @@ public func automaticEnergyUsageShouldBeOnNow(settings: MediaAutoDownloadSetting
 }
 
 public func automaticEnergyUsageShouldBeOn(settings: MediaAutoDownloadSettings) -> Signal<Bool, NoError> {
-    if settings.energyUsageSettings.activationThreshold <= 4 {
-        return .single(false)
-    } else if settings.energyUsageSettings.activationThreshold >= 96 {
-        return .single(true)
-    } else {
-        return Signal { subscriber in
+    return Signal { subscriber in
+        subscriber.putNext(automaticEnergyUsageShouldBeOnNow(settings: settings))
+        
+        let observer1 = NotificationCenter.default.addObserver(forName: UIDevice.batteryLevelDidChangeNotification, object: nil, queue: OperationQueue.main, using: { _ in
             subscriber.putNext(automaticEnergyUsageShouldBeOnNow(settings: settings))
-            
-            let observer = NotificationCenter.default.addObserver(forName: UIDevice.batteryLevelDidChangeNotification, object: nil, queue: OperationQueue.main, using: { _ in
-                subscriber.putNext(automaticEnergyUsageShouldBeOnNow(settings: settings))
-            })
-            
-            return ActionDisposable {
-                NotificationCenter.default.removeObserver(observer)
-            }
+        })
+        let observer2 = NotificationCenter.default.addObserver(forName: NSNotification.Name.NSProcessInfoPowerStateDidChange, object: nil, queue: OperationQueue.main, using: { _ in
+            subscriber.putNext(automaticEnergyUsageShouldBeOnNow(settings: settings))
+        })
+        
+        return ActionDisposable {
+            NotificationCenter.default.removeObserver(observer1)
+            NotificationCenter.default.removeObserver(observer2)
         }
-        |> runOn(Queue.mainQueue())
-        |> distinctUntilChanged
     }
+    |> runOn(Queue.mainQueue())
+    |> distinctUntilChanged
 }
 
 private func serviceColor(for data: Signal<MediaResourceData, NoError>) -> Signal<UIColor, NoError> {

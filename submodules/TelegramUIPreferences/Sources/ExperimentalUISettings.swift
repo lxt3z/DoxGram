@@ -89,7 +89,7 @@ public struct ExperimentalUISettings: Codable, Equatable {
             experimentalCompatibility: false,
             enableDebugDataDisplay: false,
             fakeGlass: false,
-            compressedEmojiCache: false,
+            compressedEmojiCache: true,
             localTranscription: false,
             enableReactionOverrides: false,
             browserExperiment: false,
