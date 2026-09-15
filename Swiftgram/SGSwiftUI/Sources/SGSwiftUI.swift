@@ -170,6 +170,7 @@ public final class LegacySwiftUIController: LegacyController {
     public var containerViewLayoutModel: ObservedValue<ContainerViewLayout?>
     public var inputHeightModel: ObservedValue<CGFloat?>
     public let lang: String
+    public let commonBackString: String?
 //    public var containerViewLayoutUpdateCountModel: ObservedValue<Int64>
 
     override public init(presentation: LegacyControllerPresentation, theme: PresentationTheme? = nil, strings: PresentationStrings? = nil, initialLayout: ContainerViewLayout? = nil) {
@@ -177,7 +178,7 @@ public final class LegacySwiftUIController: LegacyController {
         containerViewLayoutModel = ObservedValue<ContainerViewLayout?>(initialLayout)
         inputHeightModel = ObservedValue<CGFloat?>(nil)
         lang = strings?.baseLanguageCode ?? "en"
-//        containerViewLayoutUpdateCountModel = ObservedValue<Int64>(0)
+        commonBackString = strings?.Common_Back
         super.init(presentation: presentation, theme: theme, strings: strings, initialLayout: initialLayout)
     }
 
@@ -285,7 +286,8 @@ public struct TGNavigationBackButtonModifier: ViewModifier {
         if let title = title, !title.isEmpty {
             return title
         }
-        if let commonBack = wrapperController?.presentationStrings?.Common_Back, !commonBack.isEmpty {
+        if let legacySwiftUI = wrapperController as? LegacySwiftUIController,
+           let commonBack = legacySwiftUI.commonBackString, !commonBack.isEmpty {
             return commonBack
         }
         if lang.lowercased().hasPrefix("ru") {

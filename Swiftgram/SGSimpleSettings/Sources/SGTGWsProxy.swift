@@ -56,6 +56,12 @@ public final class SGTGWsProxy {
             name: Notification.Name("UIApplicationWillEnterForegroundNotification"),
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.applicationDidEnterBackground),
+            name: Notification.Name("UIApplicationDidEnterBackgroundNotification"),
+            object: nil
+        )
     }
 
     deinit {
@@ -68,6 +74,16 @@ public final class SGTGWsProxy {
             if SGSimpleSettings.shared.tgWsProxyEnabled && !self.isRunning {
                 self.startInternal()
             }
+        }
+    }
+
+    @objc private func applicationDidEnterBackground() {
+        self.queue.async {
+            // Close active proxy sessions on background to avoid draining battery with sockets
+            for session in self.activeSessions.values {
+                session.cancel()
+            }
+            self.activeSessions.removeAll()
         }
     }
 
@@ -407,7 +423,7 @@ private final class SGTGWsSession {
     private func startPingTimer() {
         self.stopPingTimer()
         let timer = DispatchSource.makeTimerSource(queue: self.queue)
-        timer.schedule(deadline: .now() + 25.0, repeating: 25.0)
+        timer.schedule(deadline: .now() + 50.0, repeating: 50.0)
         timer.setEventHandler { [weak self] in
             guard let self = self, !self.isClosed else { return }
             if #available(iOS 13.0, *) {
@@ -441,7 +457,7 @@ private final class SGTGWsSession {
 
             if !self.hasReceivedWsData {
                 let totalBuffered = self.pendingClientData.reduce(0) { $0 + $1.count }
-                if totalBuffered < 131072 {
+                if totalBuffered < 262144 {
                     self.pendingClientData.append(data)
                 }
             }
@@ -450,10 +466,8 @@ private final class SGTGWsSession {
                 self.webSocketTask?.send(.data(data)) { [weak self] sendError in
                     guard let self = self, !self.isClosed else { return }
                     if let sendError = sendError {
-                        if self.hasReceivedWsData {
-                            SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS send error: \(sendError)")
-                            self.close()
-                        }
+                        SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS send error: \(sendError)")
+                        self.close()
                     } else {
                         self.readFromClient()
                     }

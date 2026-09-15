@@ -85,12 +85,18 @@ public final class SGAyugramLogger {
         }
     }
 
+    private static let dateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        return formatter
+    }()
+
     public static func log(_ message: String) {
+        guard SGSimpleSettings.shared.ayugramDebugger else { return }
         shared.appendLog(message)
     }
 
     public func appendLog(_ message: String) {
-        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let timestamp = SGAyugramLogger.dateFormatter.string(from: Date())
         let line = "[\(timestamp)] \(message)\n"
         self.lock.writeLock()
         defer { self.lock.unlock() }

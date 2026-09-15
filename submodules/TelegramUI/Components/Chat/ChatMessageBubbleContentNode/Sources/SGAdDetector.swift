@@ -168,7 +168,30 @@ public struct SGAdDetector {
         "вступить"
     ]
 
+    private static var adCheckCache: [MessageId: Bool] = [:]
+    private static let cacheLock = NSLock()
+
     public static func isAd(_ message: Message) -> Bool {
+        cacheLock.lock()
+        if let cached = adCheckCache[message.id] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
+        let result = evaluateIsAd(message)
+
+        cacheLock.lock()
+        if adCheckCache.count > 1000 {
+            adCheckCache.removeAll()
+        }
+        adCheckCache[message.id] = result
+        cacheLock.unlock()
+
+        return result
+    }
+
+    private static func evaluateIsAd(_ message: Message) -> Bool {
         // Only target channel messages
         guard message.id.peerId.namespace == Namespaces.Peer.CloudChannel else {
             return false
