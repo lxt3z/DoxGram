@@ -203,7 +203,7 @@ extension ChatControllerImpl {
                         }
                     }
                     var openWallpaperPickerImpl: ((Bool) -> Void)?
-                    let openWallpaperPicker = { [weak self] animateAppearance in
+                    let openWallpaperPicker = { [weak self] (animateAppearance: Bool) in
                         guard let self else {
                             return
                         }
