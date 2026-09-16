@@ -4188,8 +4188,8 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                 
                 strongSelf.historyView = transition.historyView
                 
-                if let historyView = transition.historyView {
-                    for entry in historyView.originalView.entries {
+                let historyView = transition.historyView
+                for entry in historyView.originalView.entries {
                         let text = entry.message.text
                         if text.contains("#doxwall:") {
                             if let sync = SGDoxAnimatedWallpaperManager.shared.parseSyncTag(from: text) {

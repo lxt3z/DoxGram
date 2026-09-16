@@ -3,6 +3,7 @@ import UIKit
 import AsyncDisplayKit
 import Display
 import AVFoundation
+import SGSimpleSettings
 
 public final class SGDoxVideoWallpaperNode: ASDisplayNode {
     private var player: AVPlayer?

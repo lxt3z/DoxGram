@@ -434,6 +434,6 @@ extension ChatControllerImpl {
             strongSelf.controllerInteraction?.sendMessage(syncTag, nil)
         }))
         
-        self.present(alert, in: .window(.root))
+        self.context.sharedContext.applicationBindings.presentNativeController(alert)
     }
 }
