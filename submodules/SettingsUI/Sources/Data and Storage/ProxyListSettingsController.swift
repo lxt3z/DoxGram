@@ -17,6 +17,7 @@ import UrlEscaping
 
 private final class ProxySettingsControllerArguments {
     let toggleTgWsProxy: (Bool) -> Void
+    let toggleTgWsProxyFakeTLS: (Bool) -> Void
     let toggleHideProxyButton: (Bool) -> Void
     let toggleLocalDNS: (Bool) -> Void
     let toggleEnabled: (Bool) -> Void
@@ -28,8 +29,9 @@ private final class ProxySettingsControllerArguments {
     let toggleUseForCalls: (Bool) -> Void
     let shareProxyList: () -> Void
 
-    init(toggleTgWsProxy: @escaping (Bool) -> Void, toggleHideProxyButton: @escaping (Bool) -> Void, toggleLocalDNS: @escaping (Bool) -> Void, toggleEnabled: @escaping (Bool) -> Void, addNewServer: @escaping () -> Void, activateServer: @escaping (ProxyServerSettings) -> Void, editServer: @escaping (ProxyServerSettings) -> Void, removeServer: @escaping (ProxyServerSettings) -> Void, setServerWithRevealedOptions: @escaping (ProxyServerSettings?, ProxyServerSettings?) -> Void, toggleUseForCalls: @escaping (Bool) -> Void, shareProxyList: @escaping () -> Void) {
+    init(toggleTgWsProxy: @escaping (Bool) -> Void, toggleTgWsProxyFakeTLS: @escaping (Bool) -> Void, toggleHideProxyButton: @escaping (Bool) -> Void, toggleLocalDNS: @escaping (Bool) -> Void, toggleEnabled: @escaping (Bool) -> Void, addNewServer: @escaping () -> Void, activateServer: @escaping (ProxyServerSettings) -> Void, editServer: @escaping (ProxyServerSettings) -> Void, removeServer: @escaping (ProxyServerSettings) -> Void, setServerWithRevealedOptions: @escaping (ProxyServerSettings?, ProxyServerSettings?) -> Void, toggleUseForCalls: @escaping (Bool) -> Void, shareProxyList: @escaping () -> Void) {
         self.toggleTgWsProxy = toggleTgWsProxy
+        self.toggleTgWsProxyFakeTLS = toggleTgWsProxyFakeTLS
         self.toggleHideProxyButton = toggleHideProxyButton
         self.toggleLocalDNS = toggleLocalDNS
         self.toggleEnabled = toggleEnabled
@@ -84,6 +86,7 @@ public enum ProxySettingsEntryTag: ItemListItemTag, Equatable {
 
 private enum ProxySettingsControllerEntry: ItemListNodeEntry {
     case tgWsProxyToggle(PresentationTheme, String, Bool)
+    case tgWsProxyFakeTLSToggle(PresentationTheme, String, Bool)
     case tgWsProxyNotice(PresentationTheme, String)
     case enabled(PresentationTheme, String, Bool, Bool)
     case localDNSToggle(PresentationTheme, String, Bool)
@@ -99,7 +102,7 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-            case .tgWsProxyToggle, .tgWsProxyNotice, .localDNSToggle, .localDNSNotice, .hideProxyButtonToggle, .hideProxyButtonNotice, .enabled:
+            case .tgWsProxyToggle, .tgWsProxyFakeTLSToggle, .tgWsProxyNotice, .localDNSToggle, .localDNSNotice, .hideProxyButtonToggle, .hideProxyButtonNotice, .enabled:
                 return ProxySettingsControllerSection.enabled.rawValue
             case .serversHeader, .addServer, .server:
                 return ProxySettingsControllerSection.servers.rawValue
@@ -113,6 +116,8 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
     var stableId: ProxySettingsControllerEntryId {
         switch self {
             case .tgWsProxyToggle:
+                return .index(-5)
+            case .tgWsProxyFakeTLSToggle:
                 return .index(-4)
             case .tgWsProxyNotice:
                 return .index(-3)
@@ -145,6 +150,12 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
         switch lhs {
             case let .tgWsProxyToggle(lhsTheme, lhsText, lhsValue):
                 if case let .tgWsProxyToggle(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
+                    return true
+                } else {
+                    return false
+                }
+            case let .tgWsProxyFakeTLSToggle(lhsTheme, lhsText, lhsValue):
+                if case let .tgWsProxyFakeTLSToggle(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
                     return true
                 } else {
                     return false
@@ -227,6 +238,8 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
     private var order: Int {
         switch self {
             case .tgWsProxyToggle:
+                return -5
+            case .tgWsProxyFakeTLSToggle:
                 return -4
             case .tgWsProxyNotice:
                 return -3
@@ -265,6 +278,10 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
             case let .tgWsProxyToggle(_, text, value):
                 return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, enabled: true, sectionId: self.section, style: .blocks, updated: { value in
                     arguments.toggleTgWsProxy(value)
+                })
+            case let .tgWsProxyFakeTLSToggle(_, text, value):
+                return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, enabled: true, sectionId: self.section, style: .blocks, updated: { value in
+                    arguments.toggleTgWsProxyFakeTLS(value)
                 })
             case let .tgWsProxyNotice(_, text):
                 return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
@@ -323,6 +340,7 @@ private func proxySettingsControllerEntries(theme: PresentationTheme, strings: P
 
     // MARK: DoxGram TG WS Proxy
     entries.append(.tgWsProxyToggle(theme, i18n("Settings.WsProxy.Enabled", strings.baseLanguageCode), SGSimpleSettings.shared.tgWsProxyEnabled))
+    entries.append(.tgWsProxyFakeTLSToggle(theme, i18n("Settings.WsProxy.FakeTLS", strings.baseLanguageCode), SGSimpleSettings.shared.tgWsProxyFakeTLS))
     entries.append(.tgWsProxyNotice(theme, i18n("Settings.WsProxy.Enabled.Notice", strings.baseLanguageCode)))
 
     entries.append(.enabled(theme, strings.ChatSettings_ConnectionType_UseProxy, proxySettings.enabled, proxySettings.servers.isEmpty))
@@ -444,6 +462,9 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
             SGTGWsProxy.shared.stop()
         }
         let _ = updateProxySettingsInteractively(accountManager: accountManager, { $0 }).start()
+        updateState { $0 }
+    }, toggleTgWsProxyFakeTLS: { value in
+        SGSimpleSettings.shared.tgWsProxyFakeTLS = value
         updateState { $0 }
     }, toggleHideProxyButton: { value in
         SGSimpleSettings.shared.hideProxyButton = value

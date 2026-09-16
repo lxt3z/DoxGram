@@ -460,14 +460,9 @@ public final class SGAyugramStorage {
         let dict = self.deletedMessages
         self.lock.unlock()
         self.saveQueue.async {
-            self.pendingDeletedSave?.cancel()
-            let workItem = DispatchWorkItem {
-                if let data = try? JSONEncoder().encode(dict) {
-                    try? data.write(to: url, options: .atomic)
-                }
+            if let data = try? JSONEncoder().encode(dict) {
+                try? data.write(to: url, options: .atomic)
             }
-            self.pendingDeletedSave = workItem
-            self.saveQueue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
         }
     }
 
@@ -477,14 +472,9 @@ public final class SGAyugramStorage {
         let edits = self.editHistories
         self.lock.unlock()
         self.saveQueue.async {
-            self.pendingEditsSave?.cancel()
-            let workItem = DispatchWorkItem {
-                if let data = try? JSONEncoder().encode(edits) {
-                    try? data.write(to: url, options: .atomic)
-                }
+            if let data = try? JSONEncoder().encode(edits) {
+                try? data.write(to: url, options: .atomic)
             }
-            self.pendingEditsSave = workItem
-            self.saveQueue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
         }
     }
 
@@ -494,14 +484,9 @@ public final class SGAyugramStorage {
         let items = self.deletedMediaItems
         self.lock.unlock()
         self.saveQueue.async {
-            self.pendingMediaSave?.cancel()
-            let workItem = DispatchWorkItem {
-                if let data = try? JSONEncoder().encode(items) {
-                    try? data.write(to: url, options: .atomic)
-                }
+            if let data = try? JSONEncoder().encode(items) {
+                try? data.write(to: url, options: .atomic)
             }
-            self.pendingMediaSave = workItem
-            self.saveQueue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
         }
     }
 

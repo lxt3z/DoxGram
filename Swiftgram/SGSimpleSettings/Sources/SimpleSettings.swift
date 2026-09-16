@@ -79,6 +79,7 @@ public class SGSimpleSettings {
             { let _ = self.dismissedSGSuggestions },
             { let _ = self.customAppBadge },
             { let _ = self.tgWsProxyEnabled },
+            { let _ = self.tgWsProxyFakeTLS },
             { let _ = self.hideProxyButton },
             { let _ = self.hideChannelAds }
         ]
@@ -212,6 +213,7 @@ public class SGSimpleSettings {
         case hiddenChatsPin
         case hiddenChatsList
         case tgWsProxyEnabled
+        case tgWsProxyFakeTLS
         case tgWsProxyCustomWorker
         case tgWsProxyPort
         case hideProxyButton
@@ -399,6 +401,7 @@ public class SGSimpleSettings {
         Keys.hiddenChatsPin.rawValue: "7777",
         Keys.hiddenChatsList.rawValue: [Int64](),
         Keys.tgWsProxyEnabled.rawValue: false,
+        Keys.tgWsProxyFakeTLS.rawValue: false,
         Keys.tgWsProxyCustomWorker.rawValue: "",
         Keys.tgWsProxyPort.rawValue: 10855,
         Keys.hideProxyButton.rawValue: false,
@@ -762,6 +765,9 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.tgWsProxyEnabled.rawValue)
     public var tgWsProxyEnabled: Bool
+
+    @UserDefault(key: Keys.tgWsProxyFakeTLS.rawValue)
+    public var tgWsProxyFakeTLS: Bool
 
     @UserDefault(key: Keys.tgWsProxyCustomWorker.rawValue)
     public var tgWsProxyCustomWorker: String

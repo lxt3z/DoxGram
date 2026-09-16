@@ -139,6 +139,7 @@ private enum SGBoolSetting: String {
     case cleanUrlTrackers
     case warnOnAllExternalLinks
     case tgWsProxyEnabled
+    case tgWsProxyFakeTLS
     case hideProxyButton
 }
 
@@ -247,6 +248,7 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     // DoxGram: TG WS Proxy (Bypass via Cloudflare WebSocket)
     entries.append(.header(id: id.count, section: .ayugramWsProxy, text: i18n("Settings.WsProxy.Header", lang), badge: nil))
     entries.append(.toggle(id: id.count, section: .ayugramWsProxy, settingName: .tgWsProxyEnabled, value: SGSimpleSettings.shared.tgWsProxyEnabled, text: i18n("Settings.WsProxy.Enabled", lang), enabled: true))
+    entries.append(.toggle(id: id.count, section: .ayugramWsProxy, settingName: .tgWsProxyFakeTLS, value: SGSimpleSettings.shared.tgWsProxyFakeTLS, text: i18n("Settings.WsProxy.FakeTLS", lang), enabled: true))
     let workerText = SGSimpleSettings.shared.tgWsProxyCustomWorker.isEmpty ? (lang.hasPrefix("ru") ? "Авто" : "Auto") : SGSimpleSettings.shared.tgWsProxyCustomWorker
     entries.append(.disclosure(id: id.count, section: .ayugramWsProxy, link: .tgWsProxyWorkerDomain, text: i18n("Settings.WsProxy.WorkerDomain", lang) + ": " + workerText))
     entries.append(.toggle(id: id.count, section: .ayugramWsProxy, settingName: .hideProxyButton, value: SGSimpleSettings.shared.hideProxyButton, text: i18n("Settings.WsProxy.HideButton", lang), enabled: true))
@@ -694,6 +696,9 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             }
             simplePromise.set(true)
             let _ = updateProxySettingsInteractively(accountManager: context.sharedContext.accountManager, { $0 }).start()
+        case .tgWsProxyFakeTLS:
+            SGSimpleSettings.shared.tgWsProxyFakeTLS = value
+            simplePromise.set(true)
         case .hideProxyButton:
             SGSimpleSettings.shared.hideProxyButton = value
             simplePromise.set(true)

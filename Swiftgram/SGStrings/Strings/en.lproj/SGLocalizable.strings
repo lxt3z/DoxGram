@@ -332,6 +332,8 @@
 
 "Settings.WsProxy.Header" = "TG WS PROXY (CLOUDFLARE BYPASS)";
 "Settings.WsProxy.Enabled" = "Enable TG WS Proxy";
+"Settings.WsProxy.FakeTLS" = "Fake-TLS Masking";
+"Settings.WsProxy.FakeTLS.Notice" = "Disguises WebSocket Origin and headers as standard browser traffic to bypass DPI throttling.";
 "Settings.WsProxy.Enabled.Notice" = "Tunnels Telegram MTProto traffic via WebSocket through Cloudflare edge servers. Bypasses DPI throttling and blocks without requiring an external VPN.";
 "Settings.WsProxy.WorkerDomain" = "Worker Domain";
 "Settings.WsProxy.HideButton" = "Hide Proxy Icon in Chat List";

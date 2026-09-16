@@ -3799,6 +3799,42 @@ private func verifyTransaction(_ transaction: Transaction, finalState: AccountMu
     return !failed
 }
 
+func saveMessageMediaToAyugramStorage(msg: Message, mediaBox: MediaBox) {
+    let peerId = msg.id.peerId.toInt64()
+    for media in msg.effectiveMedia {
+        if let image = media as? TelegramMediaImage, let rep = image.representations.last {
+            let path = mediaBox.storePathsForId(rep.resource.id).complete
+            if FileManager.default.fileExists(atPath: path) {
+                SGAyugramStorage.shared.saveDeletedMedia(
+                    peerId: peerId,
+                    messageId: msg.id.id,
+                    sourcePath: path,
+                    fileName: "photo_\(msg.id.id).jpg",
+                    mediaType: "photo",
+                    timestamp: msg.timestamp,
+                    caption: msg.text
+                )
+            }
+        } else if let file = media as? TelegramMediaFile {
+            let path = mediaBox.storePathsForId(file.resource.id).complete
+            if FileManager.default.fileExists(atPath: path) {
+                let ext = file.fileName?.components(separatedBy: ".").last ?? (file.isVideo ? "mp4" : (file.isVoice ? "m4a" : "dat"))
+                let name = file.fileName ?? "file_\(msg.id.id).\(ext)"
+                let type = file.isVideo ? "video" : (file.isVoice ? "voice" : "file")
+                SGAyugramStorage.shared.saveDeletedMedia(
+                    peerId: peerId,
+                    messageId: msg.id.id,
+                    sourcePath: path,
+                    fileName: name,
+                    mediaType: type,
+                    timestamp: msg.timestamp,
+                    caption: msg.text
+                )
+            }
+        }
+    }
+}
+
 private final class OptimizeAddMessagesState {
     var messages: [StoreMessage]
     var location: AddMessagesLocation
@@ -4159,42 +4195,6 @@ func replayFinalState(
     
     var isPremiumUpdated = false
     
-    func saveMessageMediaToAyugramStorage(msg: Message, mediaBox: MediaBox) {
-        let peerId = msg.id.peerId.toInt64()
-        for media in msg.effectiveMedia {
-            if let image = media as? TelegramMediaImage, let rep = image.representations.last {
-                let path = mediaBox.storePathsForId(rep.resource.id).complete
-                if FileManager.default.fileExists(atPath: path) {
-                    SGAyugramStorage.shared.saveDeletedMedia(
-                        peerId: peerId,
-                        messageId: msg.id.id,
-                        sourcePath: path,
-                        fileName: "photo_\(msg.id.id).jpg",
-                        mediaType: "photo",
-                        timestamp: msg.timestamp,
-                        caption: msg.text
-                    )
-                }
-            } else if let file = media as? TelegramMediaFile {
-                let path = mediaBox.storePathsForId(file.resource.id).complete
-                if FileManager.default.fileExists(atPath: path) {
-                    let ext = file.fileName?.components(separatedBy: ".").last ?? (file.isVideo ? "mp4" : (file.isVoice ? "m4a" : "dat"))
-                    let name = file.fileName ?? "file_\(msg.id.id).\(ext)"
-                    let type = file.isVideo ? "video" : (file.isVoice ? "voice" : "file")
-                    SGAyugramStorage.shared.saveDeletedMedia(
-                        peerId: peerId,
-                        messageId: msg.id.id,
-                        sourcePath: path,
-                        fileName: name,
-                        mediaType: type,
-                        timestamp: msg.timestamp,
-                        caption: msg.text
-                    )
-                }
-            }
-        }
-    }
-
     for operation in optimizedOperations(finalState.state.operations) {
         switch operation {
             case let .AddMessages(messages, location):
@@ -4545,12 +4545,16 @@ func replayFinalState(
                 if let message = transaction.getMessage(id) {
                     updatePeerChatInclusionWithMinTimestamp(transaction: transaction, id: id.peerId, minTimestamp: message.timestamp, forceRootGroupIfNotExists: false)
                 }
-                var resourceIds: [MediaResourceId] = []
-                transaction.deleteMessagesInRange(peerId: id.peerId, namespace: id.namespace, minId: 1, maxId: id.id, forEachMedia: { media in
-                    addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
-                })
-                if !resourceIds.isEmpty {
-                    let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
+                if SGSimpleSettings.shared.antiRecall && id.peerId.namespace != Namespaces.Peer.SecretChat {
+                    // Anti-recall: preserve messages locally
+                } else {
+                    var resourceIds: [MediaResourceId] = []
+                    transaction.deleteMessagesInRange(peerId: id.peerId, namespace: id.namespace, minId: 1, maxId: id.id, forEachMedia: { media in
+                        addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
+                    })
+                    if !resourceIds.isEmpty {
+                        let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
+                    }
                 }
             case let .UpdatePeerChatInclusion(peerId, groupId, changedGroup):
                 if shouldExcludePeerFromChatList(transaction: transaction, peerId: peerId) {

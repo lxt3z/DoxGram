@@ -18,18 +18,16 @@ struct AppBadge: Identifiable, Hashable {
 
 func getAvailableAppBadges() -> [AppBadge] {
     var appBadges: [AppBadge] = [
+        .init(displayName: "Telegram", assetName: "Components/AppBadge"),
         .init(displayName: "DoxGram", assetName: "DoxGramAppBadge"),
         .init(displayName: "AyuGram", assetName: "AyuGramAppBadge"),
         .init(displayName: "1448", assetName: "Badge1448AppBadge"),
         .init(displayName: "Makima", assetName: "MakimaAppBadge"),
         .init(displayName: "1337", assetName: "LeetAppBadge"),
         .init(displayName: "Viperr", assetName: "ViperrAppBadge"),
-        .init(displayName: "Sigma", assetName: "SigmaAppBadge"),
-        .init(displayName: "Clown", assetName: "ClownAppBadge"),
         .init(displayName: "Major", assetName: "MajorAppBadge"),
         .init(displayName: "1000-7", assetName: "GhoulAppBadge"),
         .init(displayName: "Durov", assetName: "DurovAppBadge"),
-        .init(displayName: "Default", assetName: "Components/AppBadge"),
         .init(displayName: "Sky", assetName: "SkyAppBadge"),
         .init(displayName: "Night", assetName: "NightAppBadge"),
         .init(displayName: "Titanium", assetName: "TitaniumAppBadge"),

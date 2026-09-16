@@ -327,6 +327,8 @@
 
 "Settings.WsProxy.Header" = "TG WS PROXY (ОБХОД ЧЕРЕЗ CLOUDFLARE)";
 "Settings.WsProxy.Enabled" = "Включить TG WS Proxy";
+"Settings.WsProxy.FakeTLS" = "Fake-TLS маскировка";
+"Settings.WsProxy.FakeTLS.Notice" = "Маскирует Origin и заголовки под обычный веб-браузер для обхода DPI-блокировок и троттлинга провайдера.";
 "Settings.WsProxy.Enabled.Notice" = "Маршрутизирует MTProto-трафик Telegram через защищённый WebSocket (WSS) серверов Cloudflare. Обходит DPI-замедления и блокировки без внешних VPN на полной скорости.";
 "Settings.WsProxy.WorkerDomain" = "Домен Cloudflare Worker";
 "Settings.WsProxy.HideButton" = "Скрыть иконку прокси в списке чатов";
