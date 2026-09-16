@@ -257,6 +257,162 @@ public struct SGAdDetector {
         "связка p2p"
     ]
     
+    private static let vpnHookKeywords: [String] = [
+        "не работает тг",
+        "не работает телеграм",
+        "не работает telegram",
+        "глушат тг",
+        "глушат телеграм",
+        "глушат telegram",
+        "блокируют тг",
+        "блокируют телеграм",
+        "блокируют telegram",
+        "замедляют тг",
+        "замедляют телеграм",
+        "замедляют telegram",
+        "сбои в тг",
+        "сбои в телеграм",
+        "сбои в telegram",
+        "сбой в тг",
+        "сбой в телеграм",
+        "сбой в telegram",
+        "тг не грузит",
+        "телеграм не грузит",
+        "telegram не грузит",
+        "тг зависает",
+        "телеграм зависает",
+        "плохо работает тг",
+        "плохо работает телеграм",
+        "если тормозит тг",
+        "если тормозит телеграм",
+        "если не грузит тг",
+        "если не грузит телеграм"
+    ]
+
+    private static let vpnDirectKeywords: [String] = [
+        "быстрый впн",
+        "лучший впн",
+        "бесплатный впн",
+        "впн для тг",
+        "впн для телеграм",
+        "впн для telegram",
+        "впн, который работает",
+        "скачать впн",
+        "подключить впн",
+        "наш впн",
+        "личный впн",
+        "впн бот",
+        "vpn бот",
+        "vpn bot",
+        "бесплатный vpn",
+        "лучший vpn",
+        "быстрый vpn",
+        "outline vpn",
+        "протокол vless",
+        "конфиг vless",
+        "ключ vless",
+        "ключи vless",
+        "подписка vless",
+        "shadowsocks vpn",
+        "v2ray vpn"
+    ]
+
+    private static let bookmakerKeywords: [String] = [
+        "fonbet",
+        "фонбет",
+        "фон бет",
+        "winline",
+        "винлайн",
+        "вин лайн",
+        "betboom",
+        "бетбум",
+        "бет бум",
+        "лига ставок",
+        "лигаставок",
+        "ligastavok",
+        "олимпбет",
+        "олимп бет",
+        "olimpbet",
+        "paribet",
+        "парибет",
+        "бк леон",
+        "leonbets",
+        "leonbet",
+        "marathonbet",
+        "марафонбет",
+        "1xставка",
+        "1xstavka",
+        "betcity",
+        "бетсити",
+        "тенниси",
+        "tennisi"
+    ]
+
+    private static let sportsAndBettingKeywords: [String] = [
+        "фрибет",
+        "фрибеты",
+        "фрибетов",
+        "freebet",
+        "freebets",
+        "ставка на матч",
+        "ставки на матч",
+        "ставка на спорт",
+        "ставки на спорт",
+        "ставка на футбол",
+        "ставки на футбол",
+        "прогноз на матч",
+        "прогнозы на матч",
+        "прогноз на футбол",
+        "прогнозы на футбол",
+        "прогнозы на спорт",
+        "прогноз на спорт",
+        "железобетонный экспресс",
+        "жб экспресс",
+        "жб прогноз",
+        "экспресс на сегодня",
+        "экспресс на матч",
+        "проходной экспресс",
+        "договорной матч",
+        "договорные матчи",
+        "договорной исход",
+        "линия на матч",
+        "коэффициент на матч",
+        "кэф на матч",
+        "тотал на матч",
+        "фора на матч",
+        "купон на матч",
+        "поднял на матче",
+        "поднял на футболе",
+        "занос на матче",
+        "занос на ставках",
+        "поднял на ставках",
+        "выигрыш со ставки",
+        "бесплатная ставка",
+        "бесплатные ставки",
+        "прямая трансляция матча",
+        "трансляция матча",
+        "трансляция футбола",
+        "смотреть матч онлайн",
+        "смотреть матч бесплатно",
+        "где смотреть матч",
+        "ссылка на трансляцию матча",
+        "смотреть футбол онлайн",
+        "смотреть футбол бесплатно",
+        "прямой эфир матча",
+        "футбольная трансляция",
+        "футбольные трансляции",
+        "трансляция боя",
+        "смотреть бой онлайн",
+        "ufc прямая трансляция"
+    ]
+
+    private static let bookmakerUrlDomains: [String] = [
+        "fon.bet", "fonbet", "winline", "betboom", "ligastavok",
+        "olimp.bet", "olimpbet", "pari.ru", "paribet", "leon.ru",
+        "leonbets", "leonbet", "marathonbet", "1xstavka", "betcity",
+        "tennisi"
+    ]
+
     private static let adButtonKeywords: [String] = [
         "🎰",
         "играть",
@@ -272,7 +428,18 @@ public struct SGAdDetector {
         "открыть кейс",
         "подать заявку",
         "получить доступ",
-        "вступить"
+        "вступить",
+        "забрать фрибет",
+        "получить фрибет",
+        "сделать ставку",
+        "смотреть матч",
+        "трансляция",
+        "прямой эфир",
+        "смотреть онлайн",
+        "подключить vpn",
+        "подключить впн",
+        "скачать vpn",
+        "скачать впн"
     ]
 
     private static var adCheckCache: [MessageId: Bool] = [:]
@@ -378,10 +545,44 @@ public struct SGAdDetector {
             }
         }
         
-        // 3. Slot machine emoji check
+        // 5. VPN ads & disguised "TG not working?" promos
+        for keyword in vpnDirectKeywords {
+            if fullText.contains(keyword) {
+                return true
+            }
+        }
+        
+        for hook in vpnHookKeywords {
+            if fullText.contains(hook) {
+                let vpnRelatedIndicators = ["?", "vpn", "впн", "proxy", "прокси", "vless", "outline", "shadowsocks", "wireguard", "v2ray", "бот", "bot", "подключ", "забирай", "ссылк", "переходи", "решение", "настроить", "инструкци", "канал"]
+                for indicator in vpnRelatedIndicators {
+                    if fullText.contains(indicator) {
+                        return true
+                    }
+                }
+                if !message.media.isEmpty || message.attributes.contains(where: { $0 is ReplyMarkupMessageAttribute }) {
+                    return true
+                }
+            }
+        }
+        
+        // 6. Bookmakers, sports betting, match live streams & sports casino
+        for bookmaker in bookmakerKeywords {
+            if fullText.contains(bookmaker) {
+                return true
+            }
+        }
+        
+        for keyword in sportsAndBettingKeywords {
+            if fullText.contains(keyword) {
+                return true
+            }
+        }
+        
+        // 7. Slot machine emoji check
         let hasSlotEmoji = fullText.contains("🎰")
         
-        // 4. Casino brand names
+        // 8. Casino brand names
         var hasCasinoBrand = false
         for brand in casinoKeywords {
             if fullText.contains(brand) {
@@ -390,7 +591,7 @@ public struct SGAdDetector {
             }
         }
         
-        // 5. Gambling promo words
+        // 9. Gambling promo words
         var hasGamblingPromo = false
         for promo in gamblingPromoKeywords {
             if fullText.contains(promo) {
@@ -399,7 +600,7 @@ public struct SGAdDetector {
             }
         }
         
-        // 6. Schemes and bot scams
+        // 10. Schemes and bot scams
         for scheme in schemeAndScamKeywords {
             if fullText.contains(scheme) {
                 return true
@@ -414,15 +615,22 @@ public struct SGAdDetector {
             return true
         }
         
-        // 7. Check inline reply markup buttons
+        // 11. Check inline reply markup buttons
         for attribute in message.attributes {
             if let replyMarkup = attribute as? ReplyMarkupMessageAttribute {
                 for row in replyMarkup.rows {
                     for button in row.buttons {
                         let buttonTitle = button.title.lowercased()
                         
-                        if buttonTitle.contains("🎰") {
-                            return true
+                        let instantAdButtons = [
+                            "🎰", "забрать фрибет", "получить фрибет", "сделать ставку",
+                            "подключить vpn", "подключить впн", "скачать vpn", "скачать впн",
+                            "смотреть матч", "смотреть онлайн"
+                        ]
+                        for btn in instantAdButtons {
+                            if buttonTitle.contains(btn) {
+                                return true
+                            }
                         }
                         
                         for btnKeyword in adButtonKeywords {
@@ -430,7 +638,7 @@ public struct SGAdDetector {
                                 if hasSlotEmoji || hasCasinoBrand || hasGamblingPromo {
                                     return true
                                 }
-                                if fullText.contains("бонус") || fullText.contains("канал") || fullText.contains("ссылк") || fullText.contains("город") || fullText.contains("рубл") {
+                                if fullText.contains("бонус") || fullText.contains("канал") || fullText.contains("ссылк") || fullText.contains("город") || fullText.contains("рубл") || fullText.contains("матч") || fullText.contains("футбол") || fullText.contains("vpn") || fullText.contains("впн") || fullText.contains("тг") || fullText.contains("телеграм") {
                                     return true
                                 }
                             }
@@ -443,7 +651,12 @@ public struct SGAdDetector {
                                     return true
                                 }
                             }
-                            if urlLower.contains("gamewin") || urlLower.contains("max.ru") || urlLower.contains("luckyjet") || urlLower.contains("alfa.me") || urlLower.contains("alfabank") || urlLower.contains("alice.yandex") {
+                            for bookmaker in bookmakerUrlDomains {
+                                if urlLower.contains(bookmaker) {
+                                    return true
+                                }
+                            }
+                            if urlLower.contains("gamewin") || urlLower.contains("max.ru") || urlLower.contains("luckyjet") || urlLower.contains("alfa.me") || urlLower.contains("alfabank") || urlLower.contains("alice.yandex") || urlLower.contains("vless") || urlLower.contains("outline") {
                                 return true
                             }
                         }

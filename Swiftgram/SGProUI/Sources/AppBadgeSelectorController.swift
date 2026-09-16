@@ -99,11 +99,19 @@ struct AppBadgeSettingsView: View {
                             onSelectBadge(badge)
                         } label: {
                             VStack(spacing: 8) {
-                                Image(badge.assetName)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(height: Layout.imageHeight)
-                                    .accessibilityHidden(true)
+                                if let uiImage = UIImage(bundleImageName: badge.assetName) ?? UIImage(named: badge.assetName) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(height: Layout.imageHeight)
+                                        .accessibilityHidden(true)
+                                } else {
+                                    Image(badge.assetName)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(height: Layout.imageHeight)
+                                        .accessibilityHidden(true)
+                                }
 
                                 Text(badge.displayName)
                                     .font(.footnote)
