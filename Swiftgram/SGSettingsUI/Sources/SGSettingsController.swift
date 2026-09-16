@@ -33,6 +33,7 @@ private enum SGControllerSection: Int32, SGItemListSection {
     case ayugramPrivacy
     case ayugramAntiDeanon
     case ayugramWsProxy
+    case ayugramAnimatedWallpapers
     case ayugramDebug
     case trending
     case content
@@ -141,6 +142,7 @@ private enum SGBoolSetting: String {
     case tgWsProxyEnabled
     case tgWsProxyFakeTLS
     case hideProxyButton
+    case blockScreenshotNotifications
 }
 
 private enum SGOneFromManySetting: String {
@@ -152,6 +154,7 @@ private enum SGOneFromManySetting: String {
     case translationBackend
     case transcriptionBackend
     case ayugramRetention
+    case animatedWallpaperQuality
 }
 
 private enum SGSliderSetting: String {
@@ -168,6 +171,7 @@ private enum SGDisclosureLink: String {
     case streamerSettings
     case deletedMediaVault
     case tgWsProxyWorkerDomain
+    case clearAnimatedWallpaperCache
 }
 
 private struct PeerNameColorScreenState: Equatable {
@@ -232,6 +236,8 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .hideAds, value: SGSimpleSettings.shared.hideAds, text: i18n("Settings.Ayugram.HideAds", lang), enabled: true))
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .hideChannelAds, value: SGSimpleSettings.shared.hideChannelAds, text: lang.hasPrefix("ru") ? "Скрывать рекламу в каналах" : "Hide Channel Ads", enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramPrivacy, text: lang.hasPrefix("ru") ? "Скрывает рекламу, подборки каналов и казино в каналах плашкой в стиле даты. По тапу на «Показать» сообщение раскрывается без автозагрузки медиа." : "Hides ads, channel collections, and casino posts in channels using a date-style badge. Tapping 'Show' reveals the post without auto-loading media."))
+    entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .blockScreenshotNotifications, value: SGSimpleSettings.shared.blockScreenshotNotifications, text: lang.hasPrefix("ru") ? "Блокировать уведомления о скриншотах" : "Block Screenshot Notifications", enabled: true))
+    entries.append(.notice(id: id.count, section: .ayugramPrivacy, text: lang.hasPrefix("ru") ? "Собеседник не получит уведомление о том, что вы сделали снимок экрана в секретном чате или при просмотре самоуничтожающихся фото и видео." : "Prevents sending screenshot notifications in secret chats and view-once media."))
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .bypassCopyProtection, value: SGSimpleSettings.shared.bypassCopyProtection, text: i18n("Settings.Ayugram.BypassCopyProtection", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramPrivacy, text: i18n("Settings.Ayugram.BypassCopyProtection.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .ayugramPrivacy, settingName: .disableTelemetry, value: SGSimpleSettings.shared.disableTelemetry, text: i18n("Settings.Ayugram.DisableTelemetry", lang), enabled: true))
@@ -253,6 +259,12 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.disclosure(id: id.count, section: .ayugramWsProxy, link: .tgWsProxyWorkerDomain, text: i18n("Settings.WsProxy.WorkerDomain", lang) + ": " + workerText))
     entries.append(.toggle(id: id.count, section: .ayugramWsProxy, settingName: .hideProxyButton, value: SGSimpleSettings.shared.hideProxyButton, text: i18n("Settings.WsProxy.HideButton", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .ayugramWsProxy, text: i18n("Settings.WsProxy.Enabled.Notice", lang)))
+
+    // DoxGram: Animated Video Wallpapers
+    entries.append(.header(id: id.count, section: .ayugramAnimatedWallpapers, text: lang.hasPrefix("ru") ? "Анимированные обои DoxGram" : "DoxGram Animated Wallpapers", badge: nil))
+    entries.append(.oneFromManySelector(id: id.count, section: .ayugramAnimatedWallpapers, settingName: .animatedWallpaperQuality, text: lang.hasPrefix("ru") ? "Качество загрузки видео" : "Video Download Quality", value: SGSimpleSettings.shared.animatedWallpaperQuality, enabled: true))
+    entries.append(.disclosure(id: id.count, section: .ayugramAnimatedWallpapers, link: .clearAnimatedWallpaperCache, text: lang.hasPrefix("ru") ? "Очистить кэш видео-обоев" : "Clear Video Wallpapers Cache"))
+    entries.append(.notice(id: id.count, section: .ayugramAnimatedWallpapers, text: lang.hasPrefix("ru") ? "Вы можете установить видео-обои в любом чате по прямой ссылке. При включении опции «Установить для обоих» они автоматически применятся у собеседника с DoxGram." : "You can set animated video wallpapers in any chat using a direct link. If 'Set for Both' is selected, it will also apply for peers using DoxGram."))
 
 
     // DoxGram: Debug & Logs
@@ -385,7 +397,6 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.toggle(id: id.count, section: .contextMenu, settingName: .contextShowPin, value: SGSimpleSettings.shared.contextShowPin, text: strings.Conversation_Pin, enabled: true))
     entries.append(.toggle(id: id.count, section: .contextMenu, settingName: .contextShowSaveMedia, value: SGSimpleSettings.shared.contextShowSaveMedia, text: strings.Conversation_SaveToFiles, enabled: true))
     entries.append(.toggle(id: id.count, section: .contextMenu, settingName: .contextShowMessageReplies, value: SGSimpleSettings.shared.contextShowMessageReplies, text: strings.Conversation_ContextViewThread, enabled: true))
-    entries.append(.toggle(id: id.count, section: .contextMenu, settingName: .contextShowJson, value: SGSimpleSettings.shared.contextShowJson, text: "JSON", enabled: true))
     /* entries.append(.toggle(id: id.count, section: .contextMenu, settingName: .contextShowRestrict, value: SGSimpleSettings.shared.contextShowRestrict, text: strings.Conversation_ContextMenuBan)) */
     
     entries.append(.header(id: id.count, section: .accountColors, text: i18n("Settings.CustomColors.Header", lang), badge: nil))
@@ -702,6 +713,9 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
         case .hideProxyButton:
             SGSimpleSettings.shared.hideProxyButton = value
             simplePromise.set(true)
+        case .blockScreenshotNotifications:
+            SGSimpleSettings.shared.blockScreenshotNotifications = value
+            simplePromise.set(true)
         }
     }, updateSliderValue: { setting, value in
         switch (setting) {
@@ -873,6 +887,18 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
                         setAction(days)
                     }))
                 }
+            case .animatedWallpaperQuality:
+                let setAction: (String) -> Void = { value in
+                    SGSimpleSettings.shared.animatedWallpaperQuality = value
+                    simplePromise.set(true)
+                }
+
+                for quality in SGDoxAnimatedWallpaperManager.Quality.allCases {
+                    items.append(ActionSheetButtonItem(title: quality.displayName, color: .accent, action: { [weak actionSheet] in
+                        actionSheet?.dismissAnimated()
+                        setAction(quality.rawValue)
+                    }))
+                }
         }
         
         actionSheet.setItemGroups([ActionSheetItemGroup(items: items), ActionSheetItemGroup(items: [
@@ -940,6 +966,12 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
                     }
                 }))
                 context.sharedContext.applicationBindings.presentNativeController(alert)
+            case .clearAnimatedWallpaperCache:
+                SGDoxAnimatedWallpaperManager.shared.clearCache()
+                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                let isRu = presentationData.strings.baseLanguageCode.hasPrefix("ru")
+                let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Кэш видео-обоев очищен" : "Video wallpaper cache cleared", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                presentControllerImpl?(overlay, nil)
         }
     }, searchInput: { searchQuery in
         updateState { state in

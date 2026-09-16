@@ -19,6 +19,8 @@ public enum AudioPlaybackRate: Equatable {
     case x1
     case x1_5
     case x2
+    case x2_5
+    case x3
     case x4
     case x8
     case x16
@@ -26,7 +28,7 @@ public enum AudioPlaybackRate: Equatable {
     
     public var isPreset: Bool {
         switch self {
-        case .x1, .x1_5, .x2:
+        case .x1, .x1_5, .x2, .x2_5, .x3:
             return true
         default:
             return false
@@ -47,6 +49,10 @@ public enum AudioPlaybackRate: Equatable {
             return 1500
         case .x2:
             return 2000
+        case .x2_5:
+            return 2500
+        case .x3:
+            return 3000
         case .x4:
             return 4000
         case .x8:
@@ -72,6 +78,10 @@ public enum AudioPlaybackRate: Equatable {
             self = .x1_5
         case 2000:
             self = .x2
+        case 2500:
+            self = .x2_5
+        case 3000:
+            self = .x3
         case 4000:
             self = .x4
         case 8000:

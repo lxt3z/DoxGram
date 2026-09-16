@@ -7733,6 +7733,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         self.chatDisplayNode.historyNode.experimentalSnapScrollToItem = false
         self.chatDisplayNode.historyNode.canReadHistory.set(self.computedCanReadHistoryPromise.get())
         self.chatDisplayNode.historyNode.areContentAnimationsEnabled = true
+        self.chatDisplayNode.doxVideoWallpaperNode.play()
         
         if !self.alwaysShowSearchResultsAsList {
             self.chatDisplayNode.loadInputPanels(theme: self.presentationInterfaceState.theme, strings: self.presentationInterfaceState.strings, fontSize: self.presentationInterfaceState.fontSize)
@@ -7835,7 +7836,9 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                     self.screenCaptureManager = ScreenCaptureDetectionManager(check: { [weak self] in
                         if let strongSelf = self, strongSelf.traceVisibility() {
                             if strongSelf.canReadHistoryValue {
-                                let _ = strongSelf.context.engine.messages.addSecretChatMessageScreenshot(peerId: peerId).startStandalone()
+                                if !SGSimpleSettings.shared.blockScreenshotNotifications {
+                                    let _ = strongSelf.context.engine.messages.addSecretChatMessageScreenshot(peerId: peerId).startStandalone()
+                                }
                             }
                             return true
                         } else {
@@ -8213,6 +8216,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         }
         
         self.chatDisplayNode.historyNode.canReadHistory.set(.single(false))
+        self.chatDisplayNode.doxVideoWallpaperNode.pause()
         self.saveInterfaceState()
         
         self.dismissAllTooltips()

@@ -83,6 +83,7 @@ import MediaPasteboardUI
 import ChatListHeaderComponent
 import ChatControllerInteraction
 import FeaturedStickersScreen
+import SGSimpleSettings
 import ChatEntityKeyboardInputNode
 import StorageUsageScreen
 import AvatarEditorScreen
@@ -245,7 +246,27 @@ extension ChatControllerImpl {
                         self.push(controller)
                     }
                     openWallpaperPickerImpl = openWallpaperPicker
-                    openWallpaperPicker(true)
+                    let presentationData = self.presentationData
+                    let isRu = presentationData.strings.baseLanguageCode.hasPrefix("ru")
+                    let actionSheet = ActionSheetController(presentationData: presentationData)
+                    actionSheet.setItemGroups([
+                        ActionSheetItemGroup(items: [
+                            ActionSheetButtonItem(title: isRu ? "Обычные обои Telegram" : "Standard Telegram Wallpapers", color: .accent, action: { [weak actionSheet] in
+                                actionSheet?.dismissAnimated()
+                                openWallpaperPicker(true)
+                            }),
+                            ActionSheetButtonItem(title: isRu ? "Анимированные видео-обои (DoxGram)" : "Animated Video Wallpapers (DoxGram)", color: .accent, action: { [weak actionSheet, weak self] in
+                                actionSheet?.dismissAnimated()
+                                self?.presentDoxAnimatedWallpaperDialog()
+                            })
+                        ]),
+                        ActionSheetItemGroup(items: [
+                            ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
+                                actionSheet?.dismissAnimated()
+                            })
+                        ])
+                    ])
+                    self.present(actionSheet, in: .window(.root))
                 },
                 resetWallpaper: { [weak self] in
                     guard let self, let peerId else {
@@ -358,5 +379,61 @@ extension ChatControllerImpl {
             }
         })
         self.present(controller, in: .window(.root))
+    }
+    
+    public func presentDoxAnimatedWallpaperDialog() {
+        guard let peerId = self.chatLocation.peerId else {
+            return
+        }
+        let presentationData = self.presentationData
+        let isRu = presentationData.strings.baseLanguageCode.hasPrefix("ru")
+        
+        let alert = UIAlertController(
+            title: isRu ? "Анимированные видео-обои" : "Animated Video Wallpapers",
+            message: isRu ? "Введите прямую ссылку на видео (MP4). Видео будет зациклено в качестве фона чата." : "Enter a direct URL to a video file (MP4). The video will loop as the chat background.",
+            preferredStyle: .alert
+        )
+        alert.addTextField { textField in
+            textField.placeholder = "https://example.com/video.mp4"
+            textField.text = SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId.toInt64())
+            textField.clearButtonMode = .whileEditing
+            textField.keyboardType = .URL
+            textField.autocapitalizationType = .none
+            textField.autocorrectionType = .no
+        }
+        
+        alert.addAction(UIAlertAction(title: presentationData.strings.Common_Cancel, style: .cancel, handler: nil))
+        
+        if SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId.toInt64()) != nil {
+            alert.addAction(UIAlertAction(title: isRu ? "Удалить обои" : "Remove Wallpaper", style: .destructive, handler: { [weak self] _ in
+                SGDoxAnimatedWallpaperManager.shared.removeWallpaper(for: peerId.toInt64())
+                self?.chatDisplayNode.updateDoxVideoWallpaper()
+            }))
+        }
+        
+        alert.addAction(UIAlertAction(title: isRu ? "Установить" : "Set", style: .default, handler: { [weak self, weak alert] _ in
+            guard let strongSelf = self else { return }
+            guard let urlString = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !urlString.isEmpty else {
+                return
+            }
+            let quality = SGDoxAnimatedWallpaperManager.shared.currentQuality
+            SGDoxAnimatedWallpaperManager.shared.setWallpaper(url: urlString, for: peerId.toInt64(), quality: quality)
+            strongSelf.chatDisplayNode.updateDoxVideoWallpaper()
+        }))
+        
+        alert.addAction(UIAlertAction(title: isRu ? "Установить для обоих (DoxGram)" : "Set for Both (DoxGram)", style: .default, handler: { [weak self, weak alert] _ in
+            guard let strongSelf = self else { return }
+            guard let urlString = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !urlString.isEmpty else {
+                return
+            }
+            let quality = SGDoxAnimatedWallpaperManager.shared.currentQuality
+            SGDoxAnimatedWallpaperManager.shared.setWallpaper(url: urlString, for: peerId.toInt64(), quality: quality)
+            strongSelf.chatDisplayNode.updateDoxVideoWallpaper()
+            
+            let syncTag = SGDoxAnimatedWallpaperManager.shared.formatSyncTag(url: urlString, quality: quality)
+            strongSelf.controllerInteraction?.sendMessage(syncTag, nil)
+        }))
+        
+        self.present(alert, in: .window(.root))
     }
 }

@@ -1062,6 +1062,10 @@ final class OverlayAudioPlayerControlsNode: ASDisplayNode {
                     nextRate = .x1_5
                 } else if rate.doubleValue < 2.0 {
                     nextRate = .x2
+                } else if rate.doubleValue < 2.5 {
+                    nextRate = .x2_5
+                } else if rate.doubleValue < 3.0 {
+                    nextRate = .x3
                 } else {
                     nextRate = .x1
                 }
@@ -1077,7 +1081,9 @@ final class OverlayAudioPlayerControlsNode: ASDisplayNode {
             ("0.5x", "0.5x", .x0_5),
             (strings.PlaybackSpeed_Normal, "1x", .x1),
             ("1.5x", "1.5x", .x1_5),
-            ("2x", "2x", .x2)
+            ("2x", "2x", .x2),
+            ("2.5x", "2.5x", .x2_5),
+            ("3x", "3x", .x3)
         ]
         return speedList
     }
@@ -1088,7 +1094,7 @@ final class OverlayAudioPlayerControlsNode: ASDisplayNode {
         let previousRate = self.currentRate
         let previousValue = self.currentRate?.doubleValue ?? 1.0
         let sliderValuePromise = ValuePromise<Double?>(nil)
-        let sliderItem: ContextMenuItem = .custom(SliderContextItem(minValue: 0.2, maxValue: 2.5, value: previousValue, valueChanged: { [weak self] newValue, finished in
+        let sliderItem: ContextMenuItem = .custom(SliderContextItem(minValue: 0.2, maxValue: 3.0, value: previousValue, valueChanged: { [weak self] newValue, finished in
             let newValue = normalizeValue(newValue)
             self?.control?(.setBaseRate(AudioPlaybackRate(newValue)))
             sliderValuePromise.set(newValue)

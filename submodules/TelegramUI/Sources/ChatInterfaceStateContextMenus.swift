@@ -1568,17 +1568,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             })))
         }
         
-        let showJsonAction: ContextMenuItem = .action(ContextMenuActionItem(text: "JSON", icon: { theme in
-            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Settings"), color: theme.actionSheet.primaryTextColor)
-        }, action: { _, f in
-            showMessageJson(controllerInteraction: controllerInteraction, chatPresentationInterfaceState: chatPresentationInterfaceState, message: message, context: context)
-            f(.default)
-        }))
-        if SGSimpleSettings.shared.contextShowJson {
-            actions.append(showJsonAction)
-        } else {
-            sgActions.append(showJsonAction)
-        }
+
         
         let isRu = chatPresentationInterfaceState.strings.baseLanguageCode.hasPrefix("ru")
         let ayuDateFormatter = DateFormatter()

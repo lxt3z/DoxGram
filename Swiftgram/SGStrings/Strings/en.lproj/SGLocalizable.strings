@@ -83,6 +83,7 @@
 "Settings.DownloadsBoost.none" = "Disabled";
 "Settings.DownloadsBoost.medium" = "Medium";
 "Settings.DownloadsBoost.maximum" = "Maximum";
+"Settings.DownloadsBoost.turbo" = "Turbo (Multi-threaded)";
 
 "Settings.ShowProfileID" = "Show Profile ID";
 "Settings.ShowDC" = "Show Data Center";

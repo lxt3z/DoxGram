@@ -78,6 +78,7 @@
 "Settings.DownloadsBoost.none" = "Выключено";
 "Settings.DownloadsBoost.medium" = "Средне";
 "Settings.DownloadsBoost.maximum" = "Максимум";
+"Settings.DownloadsBoost.turbo" = "Турбо (Многопоточно)";
 
 "Settings.ShowProfileID" = "ID профилей";
 "Settings.ShowDC" = "Показать дата-центр (DC)";

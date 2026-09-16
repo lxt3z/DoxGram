@@ -81,7 +81,9 @@ public class SGSimpleSettings {
             { let _ = self.tgWsProxyEnabled },
             { let _ = self.tgWsProxyFakeTLS },
             { let _ = self.hideProxyButton },
-            { let _ = self.hideChannelAds }
+            { let _ = self.hideChannelAds },
+            { let _ = self.blockScreenshotNotifications },
+            { let _ = self.animatedWallpaperQuality }
         ]
 
         tasks.forEach { task in
@@ -218,12 +220,15 @@ public class SGSimpleSettings {
         case tgWsProxyPort
         case hideProxyButton
         case hideChannelAds
+        case blockScreenshotNotifications
+        case animatedWallpaperQuality
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
         case none
         case medium
         case maximum
+        case turbo
     }
     
     public enum BottomTabStyleValues: String, CaseIterable {
@@ -405,7 +410,9 @@ public class SGSimpleSettings {
         Keys.tgWsProxyCustomWorker.rawValue: "",
         Keys.tgWsProxyPort.rawValue: 10855,
         Keys.hideProxyButton.rawValue: false,
-        Keys.hideChannelAds.rawValue: false
+        Keys.hideChannelAds.rawValue: false,
+        Keys.blockScreenshotNotifications.rawValue: true,
+        Keys.animatedWallpaperQuality.rawValue: "720p"
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -780,6 +787,12 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.hideChannelAds.rawValue)
     public var hideChannelAds: Bool
+
+    @UserDefault(key: Keys.blockScreenshotNotifications.rawValue)
+    public var blockScreenshotNotifications: Bool
+
+    @UserDefault(key: Keys.animatedWallpaperQuality.rawValue)
+    public var animatedWallpaperQuality: String
 }
 
 extension SGSimpleSettings {
@@ -829,7 +842,7 @@ public func getSGDownloadPartSize(_ default: Int64, fileSize: Int64?) -> Int64 {
                 return `default`
             }
             return 512 * 1024
-        case SGSimpleSettings.DownloadSpeedBoostValues.maximum.rawValue:
+        case SGSimpleSettings.DownloadSpeedBoostValues.maximum.rawValue, SGSimpleSettings.DownloadSpeedBoostValues.turbo.rawValue:
             if let fileSize, fileSize <= smallFileSizeThreshold {
                 return `default`
             }
@@ -849,6 +862,8 @@ public func getSGMaxPendingParts(_ default: Int) -> Int {
             return 8
         case SGSimpleSettings.DownloadSpeedBoostValues.maximum.rawValue:
             return 12
+        case SGSimpleSettings.DownloadSpeedBoostValues.turbo.rawValue:
+            return 16
         default:
             return `default`
     }

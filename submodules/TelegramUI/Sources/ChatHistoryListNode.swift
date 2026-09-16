@@ -4188,6 +4188,20 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                 
                 strongSelf.historyView = transition.historyView
                 
+                if let historyView = transition.historyView {
+                    for entry in historyView.originalView.entries {
+                        let text = entry.message.text
+                        if text.contains("#doxwall:") {
+                            if let sync = SGDoxAnimatedWallpaperManager.shared.parseSyncTag(from: text) {
+                                let peerId = entry.message.id.peerId.toInt64()
+                                if SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != sync.url {
+                                    SGDoxAnimatedWallpaperManager.shared.setWallpaper(url: sync.url, for: peerId, quality: sync.quality)
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 let loadState: ChatHistoryNodeLoadState
                 var alwaysHasMessages = false
                 if case .custom = strongSelf.source {

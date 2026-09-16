@@ -455,7 +455,7 @@ public final class SecretMediaPreviewController: ViewController {
             self.screenCaptureEventsDisposable = (screenCaptureEvents()
             |> deliverOnMainQueue).start(next: { [weak self] _ in
                 if let strongSelf = self, strongSelf.traceVisibility() {
-                    if SGSimpleSettings.shared.bypassCopyProtection || SGSimpleSettings.shared.keepViewOnceMedia {
+                    if SGSimpleSettings.shared.bypassCopyProtection || SGSimpleSettings.shared.keepViewOnceMedia || SGSimpleSettings.shared.blockScreenshotNotifications {
                         return
                     }
                     if strongSelf.messageId.peerId.namespace == Namespaces.Peer.CloudUser {

@@ -204,6 +204,8 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
     let contentContainerNode: ChatNodeContainer
     let contentDimNode: ASDisplayNode
     let backgroundNode: WallpaperBackgroundNode
+    let doxVideoWallpaperNode: SGDoxVideoWallpaperNode
+    private var doxWallpaperObserver: Any?
     var historyNode: ChatHistoryListNodeImpl
     var blurredHistoryNode: ASImageNode?
     let historyNodeContainer: HistoryNodeContainer
@@ -480,6 +482,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         self.controller = controller
         
         self.backgroundNode = backgroundNode
+        self.doxVideoWallpaperNode = SGDoxVideoWallpaperNode()
         
         self.wrappingNode = SpaceWarpNodeImpl()
         
@@ -884,6 +887,11 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         self.addSubnode(self.wrappingNode)
         self.wrappingNode.contentNode.addSubnode(self.contentContainerNode)
         self.contentContainerNode.contentNode.addSubnode(self.backgroundNode)
+        self.contentContainerNode.contentNode.addSubnode(self.doxVideoWallpaperNode)
+        self.doxWallpaperObserver = NotificationCenter.default.addObserver(forName: .doxChatWallpaperDidChange, object: nil, queue: .main) { [weak self] _ in
+            self?.updateDoxVideoWallpaper()
+        }
+        self.updateDoxVideoWallpaper()
         self.contentContainerNode.contentNode.addSubnode(self.historyNodeContainer)
         
         self.contentContainerNode.contentNode.addSubnode(self.messageTransitionNode)
@@ -1048,6 +1056,24 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         self.inputMediaNodeDataDisposable?.dispose()
         self.inlineSearchResultsReadyDisposable?.dispose()
         self.loadMoreSearchResultsDisposable?.dispose()
+        if let doxWallpaperObserver = self.doxWallpaperObserver {
+            NotificationCenter.default.removeObserver(doxWallpaperObserver)
+        }
+    }
+    
+    func updateDoxVideoWallpaper() {
+        guard let peerId = self.chatLocation.peerId else {
+            self.doxVideoWallpaperNode.clear()
+            self.backgroundNode.alpha = 1.0
+            return
+        }
+        if SGDoxAnimatedWallpaperManager.shared.localFileUrl(for: peerId.toInt64()) != nil {
+            self.doxVideoWallpaperNode.setup(peerId: peerId.toInt64())
+            self.backgroundNode.alpha = 0.0
+        } else {
+            self.doxVideoWallpaperNode.clear()
+            self.backgroundNode.alpha = 1.0
+        }
     }
     
     override func didLoad() {
@@ -2083,6 +2109,8 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             }
         }
         self.backgroundNode.updateLayout(size: wallpaperBounds.size, displayMode: displayMode, transition: transition)
+        transition.updateFrame(node: self.doxVideoWallpaperNode, frame: wallpaperBounds)
+        self.doxVideoWallpaperNode.updateLayout(size: wallpaperBounds.size, transition: transition)
 
         transition.updateBounds(node: self.historyNodeContainer, bounds: contentBounds)
         transition.updatePosition(node: self.historyNodeContainer, position: contentBounds.center)
