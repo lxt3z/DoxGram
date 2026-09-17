@@ -120,6 +120,13 @@ jobs:
           cp "./$OUTPUT_PATH/Telegram.DSYMs.zip" "./$OUTPUT_PATH/Swiftgram.DSYMs.zip" 2>/dev/null || true
           cp "./$OUTPUT_PATH/Telegram.DSYMs.zip" "./$OUTPUT_PATH/DoxGram.DSYMs.zip" 2>/dev/null || true
 
+      - name: Upload Artifacts Backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: DoxGram-${{ env.BUILD_NUMBER }}
+          path: /Users/Shared/telegram-ios/build/artifacts/DoxGram.ipa
+          retention-days: 14
+
       - name: Publish Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -129,27 +136,43 @@ jobs:
           TITLE="DoxGram ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})"
           NOTES="An unsigned build of DoxGram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})"
           ARTIFACTS_DIR="/Users/Shared/telegram-ios/build/artifacts"
+          IPA_FILE="$ARTIFACTS_DIR/DoxGram.ipa"
 
-          # 1. Ensure release exists
+          if [ ! -f "$IPA_FILE" ]; then
+            echo "ERROR: $IPA_FILE does not exist!"
+            exit 1
+          fi
+
+          echo "Found IPA: $(ls -lh "$IPA_FILE")"
+
+          # 1. Try atomic create with IPA if release does not exist yet
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Creating release $TAG..."
-            gh release create "$TAG" --title "$TITLE" --notes "$NOTES"
+            echo "Creating release $TAG with DoxGram.ipa..."
+            if gh release create "$TAG" "$IPA_FILE" --title "$TITLE" --notes "$NOTES"; then
+              echo "Release $TAG created and DoxGram.ipa uploaded successfully!"
+              exit 0
+            fi
+            echo "Atomic create returned an error, waiting for release propagation..."
+            sleep 5
           fi
 
-          # 2. Upload DoxGram.ipa (Primary asset)
-          echo "Uploading DoxGram.ipa..."
-          gh release upload "$TAG" "$ARTIFACTS_DIR/DoxGram.ipa" --clobber
+          # 2. Upload DoxGram.ipa with retry loop (handles GitHub upload API 500 errors / eventual consistency)
+          MAX_RETRIES=5
+          RETRY_DELAY=5
+          UPLOADED=0
 
-          # 3. Upload DSYMs (Non-fatal if GitHub upload API returns HTTP 500 on large zip files)
-          if [ -f "$ARTIFACTS_DIR/DoxGram.DSYMs.zip" ]; then
-            echo "Uploading DoxGram.DSYMs.zip..."
-            gh release upload "$TAG" "$ARTIFACTS_DIR/DoxGram.DSYMs.zip" --clobber || echo "::warning::GitHub failed to save DoxGram.DSYMs.zip, continuing without it..."
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Uploading DoxGram.ipa (Attempt $i/$MAX_RETRIES)..."
+            if gh release upload "$TAG" "$IPA_FILE" --clobber; then
+              echo "Successfully uploaded DoxGram.ipa to release $TAG!"
+              UPLOADED=1
+              break
+            fi
+            echo "Upload attempt $i failed with error, retrying in ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+            RETRY_DELAY=$((RETRY_DELAY * 2))
+          done
+
+          if [ "$UPLOADED" -eq 0 ]; then
+            echo "::warning::GitHub Releases upload endpoint returned 500 after $MAX_RETRIES attempts. DoxGram.ipa is safely available in the Actions Artifacts tab above."
           fi
-
-      - name: Upload Artifacts Backup
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: DoxGram-${{ env.BUILD_NUMBER }}
-          path: /Users/Shared/telegram-ios/build/artifacts/DoxGram.ipa
-          retention-days: 14
