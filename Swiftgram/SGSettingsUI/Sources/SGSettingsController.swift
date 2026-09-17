@@ -172,6 +172,7 @@ private enum SGDisclosureLink: String {
     case deletedMediaVault
     case tgWsProxyWorkerDomain
     case clearAnimatedWallpaperCache
+    case globalAnimatedWallpaper
 }
 
 private struct PeerNameColorScreenState: Equatable {
@@ -261,10 +262,14 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     entries.append(.notice(id: id.count, section: .ayugramWsProxy, text: i18n("Settings.WsProxy.Enabled.Notice", lang)))
 
     // DoxGram: Animated Video Wallpapers
-    entries.append(.header(id: id.count, section: .ayugramAnimatedWallpapers, text: lang.hasPrefix("ru") ? "Анимированные обои DoxGram" : "DoxGram Animated Wallpapers", badge: nil))
-    entries.append(.oneFromManySelector(id: id.count, section: .ayugramAnimatedWallpapers, settingName: .animatedWallpaperQuality, text: lang.hasPrefix("ru") ? "Качество загрузки видео" : "Video Download Quality", value: SGSimpleSettings.shared.animatedWallpaperQuality, enabled: true))
-    entries.append(.disclosure(id: id.count, section: .ayugramAnimatedWallpapers, link: .clearAnimatedWallpaperCache, text: lang.hasPrefix("ru") ? "Очистить кэш видео-обоев" : "Clear Video Wallpapers Cache"))
-    entries.append(.notice(id: id.count, section: .ayugramAnimatedWallpapers, text: lang.hasPrefix("ru") ? "Вы можете установить видео-обои в любом чате по прямой ссылке. При включении опции «Установить для обоих» они автоматически применятся у собеседника с DoxGram." : "You can set animated video wallpapers in any chat using a direct link. If 'Set for Both' is selected, it will also apply for peers using DoxGram."))
+    let isRu = lang.hasPrefix("ru")
+    entries.append(.header(id: id.count, section: .ayugramAnimatedWallpapers, text: isRu ? "Анимированные обои DoxGram" : "DoxGram Animated Wallpapers", badge: nil))
+    let hasGlobalWall = SGDoxAnimatedWallpaperManager.shared.hasGlobalWallpaper
+    let globalStatus = hasGlobalWall ? (isRu ? "Включены" : "Enabled") : (isRu ? "Выключены" : "Disabled")
+    entries.append(.disclosure(id: id.count, section: .ayugramAnimatedWallpapers, link: .globalAnimatedWallpaper, text: "\(isRu ? "Обои для всех чатов" : "Wallpaper for all chats") (\(globalStatus))"))
+    entries.append(.oneFromManySelector(id: id.count, section: .ayugramAnimatedWallpapers, settingName: .animatedWallpaperQuality, text: isRu ? "Качество загрузки видео" : "Video Download Quality", value: SGSimpleSettings.shared.animatedWallpaperQuality, enabled: true))
+    entries.append(.disclosure(id: id.count, section: .ayugramAnimatedWallpapers, link: .clearAnimatedWallpaperCache, text: isRu ? "Очистить кэш видео-обоев" : "Clear Video Wallpapers Cache"))
+    entries.append(.notice(id: id.count, section: .ayugramAnimatedWallpapers, text: isRu ? "Установите анимированные видео-обои (MP4, TikTok или из галереи/файлов) для всех чатов сразу либо индивидуально внутри конкретного чата. При включении опции «Установить для обоих» они автоматически применятся у собеседника с DoxGram." : "Set animated video wallpapers (MP4, TikTok, or from gallery/files) globally for all chats or individually inside any chat. If 'Set for Both' is selected, it will also apply for peers using DoxGram."))
 
 
     // DoxGram: Debug & Logs
@@ -972,6 +977,102 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
                 let isRu = presentationData.strings.baseLanguageCode.hasPrefix("ru")
                 let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Кэш видео-обоев очищен" : "Video wallpaper cache cleared", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
                 presentControllerImpl?(overlay, nil)
+            case .globalAnimatedWallpaper:
+                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                let isRu = presentationData.strings.baseLanguageCode.hasPrefix("ru")
+                let hasGlobal = SGDoxAnimatedWallpaperManager.shared.hasGlobalWallpaper
+
+                let actionSheet = ActionSheetController(presentationData: presentationData)
+                var items: [ActionSheetItem] = []
+
+                items.append(ActionSheetButtonItem(title: isRu ? "Выбрать из Фото (Галереи)" : "Pick from Photo Library", color: .accent, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
+                    guard let rootController = context.sharedContext.mainWindow?.viewController else { return }
+                    SGDoxVideoPickerHelper.shared.pickVideoFromGallery(from: rootController) { selectedUrl in
+                        guard let selectedUrl = selectedUrl else { return }
+                        SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: SGDoxAnimatedWallpaperManager.globalWallpaperPeerId) { success, _ in
+                            if success {
+                                simplePromise.set(true)
+                                let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Обои для всех чатов установлены" : "Global wallpaper set", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                                presentControllerImpl?(overlay, nil)
+                            }
+                        }
+                    }
+                }))
+
+                items.append(ActionSheetButtonItem(title: isRu ? "Выбрать из Файлов (iCloud)" : "Pick from Files", color: .accent, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
+                    guard let rootController = context.sharedContext.mainWindow?.viewController else { return }
+                    SGDoxVideoPickerHelper.shared.pickVideoFromFiles(from: rootController) { selectedUrl in
+                        guard let selectedUrl = selectedUrl else { return }
+                        SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: SGDoxAnimatedWallpaperManager.globalWallpaperPeerId) { success, _ in
+                            if success {
+                                simplePromise.set(true)
+                                let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Обои для всех чатов установлены" : "Global wallpaper set", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                                presentControllerImpl?(overlay, nil)
+                            }
+                        }
+                    }
+                }))
+
+                items.append(ActionSheetButtonItem(title: isRu ? "Ввести ссылку (URL / TikTok)" : "Enter URL or TikTok Link", color: .accent, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
+                    let alert = UIAlertController(
+                        title: isRu ? "Обои для всех чатов" : "Global Animated Wallpaper",
+                        message: isRu ? "Вставьте прямую ссылку на видео (MP4) или ссылку на видео из TikTok (tiktok.com, vt.tiktok.com):" : "Paste a direct MP4 URL or TikTok video link (tiktok.com, vt.tiktok.com):",
+                        preferredStyle: .alert
+                    )
+                    alert.addTextField { textField in
+                        textField.placeholder = "https://... / tiktok.com/..."
+                        textField.text = SGDoxAnimatedWallpaperManager.shared.globalWallpaperUrl
+                        textField.clearButtonMode = .whileEditing
+                        textField.keyboardType = .URL
+                        textField.autocapitalizationType = .none
+                        textField.autocorrectionType = .no
+                    }
+                    alert.addAction(UIAlertAction(title: presentationData.strings.Common_Cancel, style: .cancel, handler: nil))
+                    alert.addAction(UIAlertAction(title: presentationData.strings.Common_Done, style: .default, handler: { [weak alert] _ in
+                        guard let text = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+                            return
+                        }
+                        let quality = SGDoxAnimatedWallpaperManager.shared.currentQuality
+                        let hud = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
+                        presentControllerImpl?(hud, nil)
+
+                        SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: SGDoxAnimatedWallpaperManager.globalWallpaperPeerId, urlString: text, quality: quality) { success, error in
+                            hud.dismiss()
+                            if success {
+                                simplePromise.set(true)
+                                let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Обои для всех чатов установлены" : "Global wallpaper set", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                                presentControllerImpl?(overlay, nil)
+                            } else {
+                                let errOverlay = UndoOverlayController(presentationData: presentationData, content: .info(title: isRu ? "Ошибка" : "Error", text: error ?? (isRu ? "Не удалось скачать видео" : "Failed to download video"), timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
+                                presentControllerImpl?(errOverlay, nil)
+                            }
+                        }
+                    }))
+                    context.sharedContext.applicationBindings.presentNativeController(alert)
+                }))
+
+                if hasGlobal {
+                    items.append(ActionSheetButtonItem(title: isRu ? "Удалить обои для всех чатов" : "Remove Global Wallpaper", color: .destructive, action: { [weak actionSheet] in
+                        actionSheet?.dismissAnimated()
+                        SGDoxAnimatedWallpaperManager.shared.removeGlobalWallpaper()
+                        simplePromise.set(true)
+                        let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Обои для всех чатов удалены" : "Global wallpaper removed", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                        presentControllerImpl?(overlay, nil)
+                    }))
+                }
+
+                actionSheet.setItemGroups([
+                    ActionSheetItemGroup(items: items),
+                    ActionSheetItemGroup(items: [
+                        ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
+                            actionSheet?.dismissAnimated()
+                        })
+                    ])
+                ])
+                presentControllerImpl?(actionSheet, nil)
         }
     }, searchInput: { searchQuery in
         updateState { state in

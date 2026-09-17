@@ -8,6 +8,7 @@ public extension Notification.Name {
 
 public final class SGDoxAnimatedWallpaperManager {
     public static let shared = SGDoxAnimatedWallpaperManager()
+    public static let globalWallpaperPeerId: Int64 = 0
     
     public enum Quality: String, CaseIterable {
         case p360 = "360p"
@@ -22,6 +23,22 @@ public final class SGDoxAnimatedWallpaperManager {
 
     public var currentQuality: String {
         return SGSimpleSettings.shared.animatedWallpaperQuality
+    }
+
+    public var hasGlobalWallpaper: Bool {
+        return self.getWallpaper(for: Self.globalWallpaperPeerId, fallbackToGlobal: false) != nil
+    }
+
+    public var globalWallpaperUrl: String? {
+        return self.getWallpaper(for: Self.globalWallpaperPeerId, fallbackToGlobal: false)?.url
+    }
+
+    public func removeGlobalWallpaper() {
+        self.removeWallpaper(for: Self.globalWallpaperPeerId)
+    }
+
+    public func hasChatSpecificWallpaper(for peerId: Int64) -> Bool {
+        return self.getWallpaper(for: peerId, fallbackToGlobal: false) != nil
     }
 
     public func wallpaperUrl(for peerId: Int64) -> String? {
@@ -86,17 +103,153 @@ public final class SGDoxAnimatedWallpaperManager {
         UserDefaults.standard.set(data, forKey: self.userDefaultsKey)
     }
     
-    public func getWallpaper(for peerId: Int64) -> (url: String, localPath: String, quality: String)? {
+    public func getWallpaper(for peerId: Int64, fallbackToGlobal: Bool = true) -> (url: String, localPath: String, quality: String)? {
         let data = self.getStoredData()
-        guard let entry = data[String(peerId)],
-              let url = entry["url"],
-              let localPath = entry["localPath"],
-              FileManager.default.fileExists(atPath: localPath) else {
-            return nil
+        if let entry = data[String(peerId)],
+           let url = entry["url"],
+           let localPath = entry["localPath"],
+           FileManager.default.fileExists(atPath: localPath) {
+            let quality = entry["quality"] ?? "720p"
+            return (url, localPath, quality)
         }
-        let quality = entry["quality"] ?? "720p"
-        return (url, localPath, quality)
+        if fallbackToGlobal && peerId != Self.globalWallpaperPeerId {
+            return self.getWallpaper(for: Self.globalWallpaperPeerId, fallbackToGlobal: false)
+        }
+        return nil
     }
+
+    // MARK: - Local Video Picker (Gallery / Files)
+
+    public func setLocalWallpaper(from sourceUrl: URL, for peerId: Int64, completion: ((Bool, String?) -> Void)? = nil) {
+        self.ensureDirectoryExists()
+        let isSecurityScoped = sourceUrl.startAccessingSecurityScopedResource()
+        defer {
+            if isSecurityScoped {
+                sourceUrl.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let ext = sourceUrl.pathExtension.isEmpty ? "mp4" : sourceUrl.pathExtension
+        let destinationFile = self.wallpapersDirectory.appendingPathComponent("\(peerId).\(ext)")
+
+        do {
+            if FileManager.default.fileExists(atPath: destinationFile.path) {
+                try FileManager.default.removeItem(at: destinationFile)
+            }
+            try FileManager.default.copyItem(at: sourceUrl, to: destinationFile)
+
+            self.queue.async {
+                var data = self.getStoredData()
+                data[String(peerId)] = [
+                    "url": "file://" + sourceUrl.lastPathComponent,
+                    "localPath": destinationFile.path,
+                    "quality": "local"
+                ]
+                self.saveStoredData(data)
+
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .doxChatWallpaperDidChange, object: nil, userInfo: ["peerId": peerId])
+                    completion?(true, nil)
+                }
+            }
+        } catch {
+            SGLogger.shared.log("SGDoxAnimatedWallpaperManager", "Local copy error: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                completion?(false, error.localizedDescription)
+            }
+        }
+    }
+
+    // MARK: - TikTok URL Detection & Resolution
+
+    public func isTikTokUrl(_ urlString: String) -> Bool {
+        guard let host = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines))?.host?.lowercased() else {
+            return false
+        }
+        return host == "tiktok.com" || host.hasSuffix(".tiktok.com")
+    }
+
+    public func resolveTikTokUrl(_ urlString: String, completion: @escaping (String?, String?) -> Void) {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let apiUrl = URL(string: "https://www.tikwm.com/api/?url=\(encoded)") else {
+            completion(nil, "Invalid TikTok URL")
+            return
+        }
+
+        var request = URLRequest(url: apiUrl)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15.0
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
+            guard let self = self else { return }
+            if let error = error {
+                self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+                return
+            }
+            guard let data = data else {
+                self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+                return
+            }
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let code = json["code"] as? Int, code == 0,
+                   let dataObj = json["data"] as? [String: Any] {
+                    let directUrl = (dataObj["hdplay"] as? String) ?? (dataObj["play"] as? String)
+                    if let directUrl = directUrl, !directUrl.isEmpty {
+                        completion(directUrl, nil)
+                        return
+                    }
+                }
+                self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+            } catch {
+                self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+            }
+        }
+        task.resume()
+    }
+
+    private func resolveTikTokFallback(urlString: String, completion: @escaping (String?, String?) -> Void) {
+        guard let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let apiUrl = URL(string: "https://api.tiklydown.eu.org/api/download?url=\(encoded)") else {
+            completion(nil, "Не удалось распознать ссылку на TikTok")
+            return
+        }
+
+        var request = URLRequest(url: apiUrl)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15.0
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+
+        let task = URLSession.shared.dataTask(with: request) { data, _, error in
+            if let error = error {
+                completion(nil, error.localizedDescription)
+                return
+            }
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let videoObj = json["video"] as? [String: Any],
+                  let noWatermark = (videoObj["noWatermark"] as? String) ?? (videoObj["watermark"] as? String),
+                  !noWatermark.isEmpty else {
+                completion(nil, "Не удалось извлечь видео из TikTok. Проверьте ссылку.")
+                return
+            }
+            completion(noWatermark, nil)
+        }
+        task.resume()
+    }
+
+    public func resolveVideoUrlIfNeeded(urlString: String, completion: @escaping (String?, String?) -> Void) {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if self.isTikTokUrl(trimmed) {
+            self.resolveTikTokUrl(trimmed, completion: completion)
+        } else {
+            completion(trimmed, nil)
+        }
+    }
+
+    // MARK: - Download & Set Wallpaper
     
     public func setWallpaper(for peerId: Int64, urlString: String, quality: String, completion: @escaping (Bool, String?) -> Void) {
         let trimmedUrl = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -104,58 +257,73 @@ public final class SGDoxAnimatedWallpaperManager {
             completion(false, "Invalid URL")
             return
         }
-        
-        self.ensureDirectoryExists()
-        let ext = url.pathExtension.isEmpty ? "mp4" : url.pathExtension
-        let destinationFile = self.wallpapersDirectory.appendingPathComponent("\(peerId).\(ext)")
-        
-        let session = URLSession(configuration: .default)
-        let task = session.downloadTask(with: url) { [weak self] tempUrl, response, error in
+
+        self.resolveVideoUrlIfNeeded(urlString: trimmedUrl) { [weak self] resolvedUrlString, resolveError in
             guard let self = self else { return }
-            
-            if let error = error {
-                SGLogger.shared.log("SGDoxAnimatedWallpaperManager", "Download error: \(error.localizedDescription)")
+            guard let finalUrlString = resolvedUrlString, let finalUrl = URL(string: finalUrlString) else {
                 DispatchQueue.main.async {
-                    completion(false, error.localizedDescription)
+                    completion(false, resolveError ?? "Не удалось получить видео по ссылке")
                 }
                 return
             }
-            
-            guard let tempUrl = tempUrl else {
-                DispatchQueue.main.async {
-                    completion(false, "Download failed")
-                }
-                return
-            }
-            
-            do {
-                if FileManager.default.fileExists(atPath: destinationFile.path) {
-                    try FileManager.default.removeItem(at: destinationFile)
-                }
-                try FileManager.default.moveItem(at: tempUrl, to: destinationFile)
-                
-                self.queue.async {
-                    var data = self.getStoredData()
-                    data[String(peerId)] = [
-                        "url": trimmedUrl,
-                        "localPath": destinationFile.path,
-                        "quality": quality
-                    ]
-                    self.saveStoredData(data)
-                    
+
+            self.ensureDirectoryExists()
+            let ext = finalUrl.pathExtension.isEmpty ? "mp4" : finalUrl.pathExtension
+            let destinationFile = self.wallpapersDirectory.appendingPathComponent("\(peerId).\(ext)")
+
+            var request = URLRequest(url: finalUrl)
+            request.setValue("https://www.tiktok.com/", forHTTPHeaderField: "Referer")
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+
+            let session = URLSession(configuration: .default)
+            let task = session.downloadTask(with: request) { [weak self] tempUrl, _, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    SGLogger.shared.log("SGDoxAnimatedWallpaperManager", "Download error: \(error.localizedDescription)")
                     DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: .doxChatWallpaperDidChange, object: nil, userInfo: ["peerId": peerId])
-                        completion(true, nil)
+                        completion(false, error.localizedDescription)
+                    }
+                    return
+                }
+
+                guard let tempUrl = tempUrl else {
+                    DispatchQueue.main.async {
+                        completion(false, "Download failed")
+                    }
+                    return
+                }
+
+                do {
+                    if FileManager.default.fileExists(atPath: destinationFile.path) {
+                        try FileManager.default.removeItem(at: destinationFile)
+                    }
+                    try FileManager.default.moveItem(at: tempUrl, to: destinationFile)
+
+                    self.queue.async {
+                        var data = self.getStoredData()
+                        data[String(peerId)] = [
+                            "url": trimmedUrl,
+                            "directUrl": finalUrlString,
+                            "localPath": destinationFile.path,
+                            "quality": quality
+                        ]
+                        self.saveStoredData(data)
+
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(name: .doxChatWallpaperDidChange, object: nil, userInfo: ["peerId": peerId])
+                            completion(true, nil)
+                        }
+                    }
+                } catch {
+                    SGLogger.shared.log("SGDoxAnimatedWallpaperManager", "File error: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        completion(false, error.localizedDescription)
                     }
                 }
-            } catch {
-                SGLogger.shared.log("SGDoxAnimatedWallpaperManager", "File error: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    completion(false, error.localizedDescription)
-                }
             }
+            task.resume()
         }
-        task.resume()
     }
     
     public func removeWallpaper(for peerId: Int64) {
@@ -216,3 +384,4 @@ public final class SGDoxAnimatedWallpaperManager {
         return nil
     }
 }
+
