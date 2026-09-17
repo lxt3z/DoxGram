@@ -214,6 +214,11 @@ private func synchronizePinnedChats(transaction: Transaction, postbox: Postbox, 
             var resultingItemIds: [PinnedItemId]
             if initialRemoteItemIds == localItemIds {
                 resultingItemIds = remoteItemIds
+                for item in localItemIds {
+                    if !resultingItemIds.contains(item) {
+                        resultingItemIds.append(item)
+                    }
+                }
             } else {
                 let locallyRemovedFromRemoteItemIds = Set(initialRemoteItemIdsWithoutSecretChats).subtracting(Set(localItemIdsWithoutSecretChats))
                 let remotelyRemovedItemIds = Set(initialRemoteItemIdsWithoutSecretChats).subtracting(Set(remoteItemIds))

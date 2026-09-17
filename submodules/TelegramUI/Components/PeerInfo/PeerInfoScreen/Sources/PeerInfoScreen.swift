@@ -161,6 +161,7 @@ enum PeerInfoContextSubject {
 }
 
 enum PeerInfoSettingsSection {
+    case doxgram
     case swiftgram
     case swiftgramPro
     case avatar

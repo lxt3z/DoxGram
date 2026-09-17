@@ -46,14 +46,12 @@ extension PeerInfoScreenNode {
             }
         }
         switch section {
+        case .doxgram:
+            self.controller?.push(doxSettingsController(context: self.context))
         case .swiftgram:
             self.controller?.push(sgSettingsController(context: self.context))
         case .swiftgramPro:
-            if let payWallController = self.context.sharedContext.makeSGPayWallController(context: self.context) {
-                self.controller?.present(payWallController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
-            } else {
-                self.controller?.push(self.context.sharedContext.makeSGProController(context: self.context))
-            }
+            self.controller?.push(doxSettingsController(context: self.context))
         case .avatar:
             self.controller?.openAvatarForEditing()
         case .edit:

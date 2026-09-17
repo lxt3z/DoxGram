@@ -1061,15 +1061,30 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         }
     }
     
+    var hasDoxVideoWallpaper: Bool {
+        guard let peerId = self.chatLocation.peerId else {
+            return false
+        }
+        return SGDoxAnimatedWallpaperManager.shared.localFileUrl(for: peerId.toInt64()) != nil
+    }
+    
     func updateDoxVideoWallpaper() {
         guard let peerId = self.chatLocation.peerId else {
             self.doxVideoWallpaperNode.clear()
             self.backgroundNode.alpha = 1.0
             return
         }
-        if SGDoxAnimatedWallpaperManager.shared.localFileUrl(for: peerId.toInt64()) != nil {
+        if self.hasDoxVideoWallpaper {
             self.doxVideoWallpaperNode.setup(peerId: peerId.toInt64())
             self.backgroundNode.alpha = 0.0
+            if let topBackgroundEdgeEffectNode = self.topBackgroundEdgeEffectNode {
+                self.topBackgroundEdgeEffectNode = nil
+                topBackgroundEdgeEffectNode.view.removeFromSuperview()
+            }
+            if let bottomBackgroundEdgeEffectNode = self.bottomBackgroundEdgeEffectNode {
+                self.bottomBackgroundEdgeEffectNode = nil
+                bottomBackgroundEdgeEffectNode.view.removeFromSuperview()
+            }
         } else {
             self.doxVideoWallpaperNode.clear()
             self.backgroundNode.alpha = 1.0
@@ -2455,7 +2470,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         }
         
         var bottomBackgroundEdgeEffectNode: WallpaperEdgeEffectNode?
-        if self.historyNode.rotated && !isOverlay {
+        if self.historyNode.rotated && !isOverlay && !self.hasDoxVideoWallpaper {
             if let current = self.bottomBackgroundEdgeEffectNode {
                 bottomBackgroundEdgeEffectNode = current
             } else {
@@ -2662,7 +2677,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         })
         
         var topBackgroundEdgeEffectNode: WallpaperEdgeEffectNode?
-        if self.historyNode.rotated && !isOverlay {
+        if self.historyNode.rotated && !isOverlay && !self.hasDoxVideoWallpaper {
             if let current = self.topBackgroundEdgeEffectNode {
                 topBackgroundEdgeEffectNode = current
             } else {
@@ -3562,7 +3577,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
                 transition.updateAlpha(node: self.backgroundNode, alpha: 0.0)
             } else {
                 transition.updateAlpha(node: self.historyNode, alpha: 1.0)
-                transition.updateAlpha(node: self.backgroundNode, alpha: 1.0)
+                transition.updateAlpha(node: self.backgroundNode, alpha: self.hasDoxVideoWallpaper ? 0.0 : 1.0)
             }
         } else {
             if let inlineSearchResults = self.inlineSearchResults {
@@ -3587,7 +3602,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             self.inlineSearchResultsReady = false
             
             transition.updateAlpha(node: self.historyNode, alpha: 1.0)
-            transition.updateAlpha(node: self.backgroundNode, alpha: 1.0)
+            transition.updateAlpha(node: self.backgroundNode, alpha: self.hasDoxVideoWallpaper ? 0.0 : 1.0)
         }
         
         transition.updateAlpha(node: self.navigateButtons, alpha: showNavigateButtons ? 1.0 : 0.0)
