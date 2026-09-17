@@ -184,7 +184,7 @@ public final class SGDoxAnimatedWallpaperManager {
 
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
             guard let self = self else { return }
-            if let error = error {
+            if error != nil {
                 self.resolveTikTokFallback(urlString: trimmed, completion: completion)
                 return
             }
