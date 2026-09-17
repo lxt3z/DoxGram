@@ -11,7 +11,7 @@ public final class SGDoxVideoPickerHelper: NSObject, UIImagePickerControllerDele
         super.init()
     }
     
-    public func pickVideoFromGallery(from presenter: UIViewController, completion: @escaping (URL?) -> Void) {
+    public func pickVideoFromGallery(presentation: (UIViewController) -> Void, completion: @escaping (URL?) -> Void) {
         self.onPicked = completion
         let picker = UIImagePickerController()
         picker.delegate = self
@@ -22,10 +22,14 @@ public final class SGDoxVideoPickerHelper: NSObject, UIImagePickerControllerDele
         if UIDevice.current.userInterfaceIdiom == .pad {
             picker.modalPresentationStyle = .formSheet
         }
-        presenter.present(picker, animated: true)
+        presentation(picker)
+    }
+
+    public func pickVideoFromGallery(from presenter: UIViewController, completion: @escaping (URL?) -> Void) {
+        self.pickVideoFromGallery(presentation: { presenter.present($0, animated: true) }, completion: completion)
     }
     
-    public func pickVideoFromFiles(from presenter: UIViewController, completion: @escaping (URL?) -> Void) {
+    public func pickVideoFromFiles(presentation: (UIViewController) -> Void, completion: @escaping (URL?) -> Void) {
         self.onPicked = completion
         let types = ["public.movie", "public.video", "com.apple.quicktime-movie", "public.mpeg-4"]
         let picker = UIDocumentPickerViewController(documentTypes: types, in: .import)
@@ -34,7 +38,11 @@ public final class SGDoxVideoPickerHelper: NSObject, UIImagePickerControllerDele
         if UIDevice.current.userInterfaceIdiom == .pad {
             picker.modalPresentationStyle = .formSheet
         }
-        presenter.present(picker, animated: true)
+        presentation(picker)
+    }
+
+    public func pickVideoFromFiles(from presenter: UIViewController, completion: @escaping (URL?) -> Void) {
+        self.pickVideoFromFiles(presentation: { presenter.present($0, animated: true) }, completion: completion)
     }
     
     // MARK: - UIImagePickerControllerDelegate

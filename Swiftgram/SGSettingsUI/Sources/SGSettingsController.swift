@@ -987,8 +987,9 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
 
                 items.append(ActionSheetButtonItem(title: isRu ? "Выбрать из Фото (Галереи)" : "Pick from Photo Library", color: .accent, action: { [weak actionSheet] in
                     actionSheet?.dismissAnimated()
-                    guard let rootController = context.sharedContext.mainWindow?.viewController else { return }
-                    SGDoxVideoPickerHelper.shared.pickVideoFromGallery(from: rootController) { selectedUrl in
+                    SGDoxVideoPickerHelper.shared.pickVideoFromGallery(presentation: { picker in
+                        context.sharedContext.applicationBindings.presentNativeController(picker)
+                    }) { selectedUrl in
                         guard let selectedUrl = selectedUrl else { return }
                         SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: SGDoxAnimatedWallpaperManager.globalWallpaperPeerId) { success, _ in
                             if success {
@@ -1002,8 +1003,9 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
 
                 items.append(ActionSheetButtonItem(title: isRu ? "Выбрать из Файлов (iCloud)" : "Pick from Files", color: .accent, action: { [weak actionSheet] in
                     actionSheet?.dismissAnimated()
-                    guard let rootController = context.sharedContext.mainWindow?.viewController else { return }
-                    SGDoxVideoPickerHelper.shared.pickVideoFromFiles(from: rootController) { selectedUrl in
+                    SGDoxVideoPickerHelper.shared.pickVideoFromFiles(presentation: { picker in
+                        context.sharedContext.applicationBindings.presentNativeController(picker)
+                    }) { selectedUrl in
                         guard let selectedUrl = selectedUrl else { return }
                         SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: SGDoxAnimatedWallpaperManager.globalWallpaperPeerId) { success, _ in
                             if success {
