@@ -130,16 +130,26 @@ jobs:
           NOTES="An unsigned build of DoxGram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})"
           ARTIFACTS_DIR="/Users/Shared/telegram-ios/build/artifacts"
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists, uploading assets..."
-            gh release upload "$TAG" \
-              "$ARTIFACTS_DIR/DoxGram.ipa" \
-              "$ARTIFACTS_DIR/DoxGram.DSYMs.zip" --clobber
-          else
+          # 1. Ensure release exists
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
             echo "Creating release $TAG..."
-            gh release create "$TAG" \
-              --title "$TITLE" \
-              --notes "$NOTES" \
-              "$ARTIFACTS_DIR/DoxGram.ipa" \
-              "$ARTIFACTS_DIR/DoxGram.DSYMs.zip"
+            gh release create "$TAG" --title "$TITLE" --notes "$NOTES"
           fi
+
+          # 2. Upload DoxGram.ipa (Primary asset)
+          echo "Uploading DoxGram.ipa..."
+          gh release upload "$TAG" "$ARTIFACTS_DIR/DoxGram.ipa" --clobber
+
+          # 3. Upload DSYMs (Non-fatal if GitHub upload API returns HTTP 500 on large zip files)
+          if [ -f "$ARTIFACTS_DIR/DoxGram.DSYMs.zip" ]; then
+            echo "Uploading DoxGram.DSYMs.zip..."
+            gh release upload "$TAG" "$ARTIFACTS_DIR/DoxGram.DSYMs.zip" --clobber || echo "::warning::GitHub failed to save DoxGram.DSYMs.zip, continuing without it..."
+          fi
+
+      - name: Upload Artifacts Backup
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: DoxGram-${{ env.BUILD_NUMBER }}
+          path: /Users/Shared/telegram-ios/build/artifacts/DoxGram.ipa
+          retention-days: 14
