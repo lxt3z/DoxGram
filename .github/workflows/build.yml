@@ -13,7 +13,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
           fetch-depth: '0'
@@ -120,37 +120,26 @@ jobs:
           cp "./$OUTPUT_PATH/Telegram.DSYMs.zip" "./$OUTPUT_PATH/Swiftgram.DSYMs.zip" 2>/dev/null || true
           cp "./$OUTPUT_PATH/Telegram.DSYMs.zip" "./$OUTPUT_PATH/DoxGram.DSYMs.zip" 2>/dev/null || true
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Publish Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: build-${{ env.BUILD_NUMBER }}
-          release_name: DoxGram ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
-          body: |
-            An unsigned build of DoxGram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="build-${{ env.BUILD_NUMBER }}"
+          TITLE="DoxGram ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})"
+          NOTES="An unsigned build of DoxGram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})"
+          ARTIFACTS_DIR="/Users/Shared/telegram-ios/build/artifacts"
 
-      - name: Upload Release IPA
-        id: upload-release-ipa 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /Users/Shared/telegram-ios/build/artifacts/DoxGram.ipa
-          asset_name: DoxGram.ipa
-          asset_content_type: application/zip
-
-      - name: Upload Release DSYM
-        id: upload-release-dsym 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /Users/Shared/telegram-ios/build/artifacts/DoxGram.DSYMs.zip
-          asset_name: DoxGram.DSYMs.zip
-          asset_content_type: application/zip
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, uploading assets..."
+            gh release upload "$TAG" \
+              "$ARTIFACTS_DIR/DoxGram.ipa" \
+              "$ARTIFACTS_DIR/DoxGram.DSYMs.zip" --clobber
+          else
+            echo "Creating release $TAG..."
+            gh release create "$TAG" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              "$ARTIFACTS_DIR/DoxGram.ipa" \
+              "$ARTIFACTS_DIR/DoxGram.DSYMs.zip"
+          fi
