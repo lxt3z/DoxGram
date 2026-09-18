@@ -202,9 +202,19 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     return entries
 }
 
+private final class SGDoxPresentationContext: @unchecked Sendable {
+    var present: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
+    var push: ((ViewController) -> Void)?
+}
+
 public func doxSettingsController(context: AccountContext) -> ViewController {
-    var presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
-    var pushControllerImpl: ((ViewController) -> Void)?
+    let presentationContext = SGDoxPresentationContext()
+    let presentControllerImpl: (ViewController, ViewControllerPresentationArguments?) -> Void = { c, a in
+        presentationContext.present?(c, a)
+    }
+    let pushControllerImpl: (ViewController) -> Void = { c in
+        presentationContext.push?(c)
+    }
 
     let simplePromise = ValuePromise(true, ignoreRepeated: false)
 
@@ -382,16 +392,16 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
                 simplePromise.set(true)
                 if !newToken.isEmpty {
                     let hud = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
-                    presentControllerImpl?(hud, nil)
+                    presentControllerImpl(hud, nil)
                     DiscordRPCService.shared.validateToken(newToken) { success, usernameOrError in
                         hud.dismiss()
                         if success {
                             DiscordRPCService.shared.connect()
                             let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Discord подключен: \(usernameOrError ?? "")" : "Discord connected: \(usernameOrError ?? "")", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
-                            context.sharedContext.mainWindow?.viewController?.present(overlay, in: .window(.root), with: nil)
+                            presentControllerImpl(overlay, nil)
                         } else {
                             let errOverlay = UndoOverlayController(presentationData: presentationData, content: .info(title: isRu ? "Ошибка" : "Error", text: usernameOrError ?? "Неверный токен", timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
-                            context.sharedContext.mainWindow?.viewController?.present(errOverlay, in: .window(.root), with: nil)
+                            presentControllerImpl(errOverlay, nil)
                         }
                     }
                 } else {
@@ -550,13 +560,12 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
     }
 
     let controller = ItemListController(context: context, state: signal)
-    presentControllerImpl = { [weak controller] c, a in
+    presentationContext.present = { [weak controller] c, a in
         controller?.present(c, in: .window(.root), with: a)
     }
-    pushControllerImpl = { [weak controller] c in
+    presentationContext.push = { [weak controller] c in
         (controller?.navigationController as? NavigationController)?.pushViewController(c)
     }
-    let _ = pushControllerImpl
 
     return controller
 }
