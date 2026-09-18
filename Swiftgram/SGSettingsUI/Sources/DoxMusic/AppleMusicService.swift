@@ -6,7 +6,7 @@ import AVFoundation
 import MusicKit
 #endif
 
-public final class AppleMusicService {
+public final class AppleMusicService: @unchecked Sendable {
     public static let shared = AppleMusicService()
     
     public enum AuthStatus: String {

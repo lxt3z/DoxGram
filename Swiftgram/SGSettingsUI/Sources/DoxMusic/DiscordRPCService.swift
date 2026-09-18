@@ -1,8 +1,8 @@
-﻿import Foundation
+import Foundation
 import SGSimpleSettings
 import SGLogging
 
-public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate {
+public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @unchecked Sendable {
     public static let shared = DiscordRPCService()
     
     public enum ConnectionStatus: Equatable {
@@ -308,7 +308,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate {
     
     // MARK: - Validation REST API
     
-    public func validateToken(_ token: String, completion: @escaping (Bool, String?) -> Void) {
+    public func validateToken(_ token: String, completion: @escaping @Sendable (Bool, String?) -> Void) {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let url = URL(string: "https://discord.com/api/v10/users/@me") else {
             completion(false, "Токен не может быть пустым")

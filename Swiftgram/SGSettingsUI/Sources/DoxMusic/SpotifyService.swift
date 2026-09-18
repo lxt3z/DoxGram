@@ -5,7 +5,23 @@ import CommonCrypto
 import AVFoundation
 import SGLogging
 
-public final class SpotifyService: NSObject, ASWebAuthenticationPresentationContextProviding {
+@MainActor
+private final class SpotifyPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        if #available(iOS 15.0, *) {
+            if let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+               let window = windowScene.keyWindow ?? windowScene.windows.first {
+                return window
+            }
+        }
+        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first {
+            return window
+        }
+        return ASPresentationAnchor()
+    }
+}
+
+public final class SpotifyService: NSObject, @unchecked Sendable {
     public static let shared = SpotifyService()
     
     // Default DoxGram client id (or user-configurable via settings)
@@ -17,7 +33,7 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
     private let tokenExpiryKey = "dox_spotify_token_expiry"
     
     private var authSession: ASWebAuthenticationSession?
-    private var codeVerifier: String?
+    private var presentationContextProvider: SpotifyPresentationContextProvider?
     private var avPlayer: AVPlayer?
     
     public var customClientId: String {
@@ -62,22 +78,6 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
         super.init()
     }
     
-    // MARK: - ASWebAuthenticationPresentationContextProviding
-    public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        if #available(iOS 15.0, *) {
-            if let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-               let window = windowScene.keyWindow ?? windowScene.windows.first {
-                return window
-            }
-        }
-        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first {
-            return window
-        }
-        return ASPresentationAnchor()
-    }
-    
-    // MARK: - PKCE OAuth Flow
-    
     private func generateCodeVerifier() -> String {
         var buffer = [UInt8](repeating: 0, count: 64)
         _ = SecRandomCopyBytes(kSecRandomDefault, buffer.count, &buffer)
@@ -101,7 +101,7 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
             .trimmingCharacters(in: .whitespaces)
     }
     
-    public func startAuthorization(completion: @escaping (Bool, String?) -> Void) {
+    public func startAuthorization(completion: @escaping @Sendable (Bool, String?) -> Void) {
         let verifier = self.generateCodeVerifier()
         self.codeVerifier = verifier
         let challenge = self.generateCodeChallenge(from: verifier)
@@ -115,28 +115,36 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
             return
         }
         
-        self.authSession = ASWebAuthenticationSession(url: authUrl, callbackURLScheme: "tg") { [weak self] callbackUrl, error in
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            if let error = error {
-                completion(false, error.localizedDescription)
-                return
-            }
-            guard let callbackUrl = callbackUrl,
-                  let components = URLComponents(url: callbackUrl, resolvingAgainstBaseURL: false),
-                  let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
-                completion(false, "Authorization cancelled or code not found")
-                return
+            let contextProvider = SpotifyPresentationContextProvider()
+            self.presentationContextProvider = contextProvider
+            
+            let authSession = ASWebAuthenticationSession(url: authUrl, callbackURLScheme: "tg") { [weak self] callbackUrl, error in
+                guard let self = self else { return }
+                self.presentationContextProvider = nil
+                if let error = error {
+                    completion(false, error.localizedDescription)
+                    return
+                }
+                guard let callbackUrl = callbackUrl,
+                      let components = URLComponents(url: callbackUrl, resolvingAgainstBaseURL: false),
+                      let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
+                    completion(false, "Authorization cancelled or code not found")
+                    return
+                }
+                
+                self.exchangeCodeForToken(code: code, completion: completion)
             }
             
-            self.exchangeCodeForToken(code: code, completion: completion)
+            self.authSession = authSession
+            authSession.presentationContextProvider = contextProvider
+            authSession.prefersEphemeralWebBrowserSession = false
+            authSession.start()
         }
-        
-        self.authSession?.presentationContextProvider = self
-        self.authSession?.prefersEphemeralWebBrowserSession = false
-        self.authSession?.start()
     }
     
-    private func exchangeCodeForToken(code: String, completion: @escaping (Bool, String?) -> Void) {
+    private func exchangeCodeForToken(code: String, completion: @escaping @Sendable (Bool, String?) -> Void) {
         guard let verifier = self.codeVerifier,
               let tokenUrl = URL(string: "https://accounts.spotify.com/api/token") else {
             completion(false, "Verifier missing")
@@ -184,7 +192,7 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
         }.resume()
     }
     
-    public func refreshAccessToken(completion: ((Bool) -> Void)? = nil) {
+    public func refreshAccessToken(completion: (@Sendable (Bool) -> Void)? = nil) {
         guard let refreshToken = self.refreshToken,
               let tokenUrl = URL(string: "https://accounts.spotify.com/api/token") else {
             completion?(false)
@@ -229,7 +237,7 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
     
     // MARK: - Search & Wave Recommendations
     
-    public func search(query: String, completion: @escaping ([SGDoxMusicTrack], String?) -> Void) {
+    public func search(query: String, completion: @escaping @Sendable ([SGDoxMusicTrack], String?) -> Void) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             completion([], nil)
@@ -260,7 +268,7 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
         }
     }
     
-    public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, completion: @escaping ([SGDoxMusicTrack]) -> Void) {
+    public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
         var endpoint = "https://api.spotify.com/v1/recommendations?limit=25"
         if let trackId = track?.id, track?.source == .spotify {
             endpoint += "&seed_tracks=\(trackId)"
@@ -320,7 +328,7 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
         return result
     }
     
-    private func makeAuthenticatedRequest(url: URL, completion: @escaping (Data?, String?) -> Void) {
+    private func makeAuthenticatedRequest(url: URL, completion: @escaping @Sendable (Data?, String?) -> Void) {
         guard let token = self.accessToken else {
             completion(nil, "Not logged in to Spotify")
             return
@@ -349,30 +357,44 @@ public final class SpotifyService: NSObject, ASWebAuthenticationPresentationCont
         }.resume()
     }
     
-    public func play(track: SGDoxMusicTrack, completion: @escaping (Bool) -> Void) {
+    public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
         if let preview = track.previewUrl, let url = URL(string: preview) {
-            self.avPlayer?.pause()
-            let playerItem = AVPlayerItem(url: url)
-            let player = AVPlayer(playerItem: playerItem)
-            self.avPlayer = player
-            player.play()
-            completion(true)
+            DispatchQueue.main.async { [weak self] in
+                self?.avPlayer?.pause()
+                let playerItem = AVPlayerItem(url: url)
+                let player = AVPlayer(playerItem: playerItem)
+                self?.avPlayer = player
+                player.play()
+                completion(true)
+            }
             return
         }
         
         // Universal deep link / Spotify app launcher
-        if let uri = track.spotifyUri, let url = URL(string: uri), UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url, options: [:], completionHandler: completion)
+        if let uri = track.spotifyUri, let url = URL(string: uri) {
+            DispatchQueue.main.async {
+                if UIApplication.shared.canOpenURL(url) {
+                    UIApplication.shared.open(url, options: [:]) { success in
+                        completion(success)
+                    }
+                } else {
+                    completion(false)
+                }
+            }
             return
         }
         completion(false)
     }
     
     public func pause() {
-        self.avPlayer?.pause()
+        DispatchQueue.main.async { [weak self] in
+            self?.avPlayer?.pause()
+        }
     }
     
     public func resume() {
-        self.avPlayer?.play()
+        DispatchQueue.main.async { [weak self] in
+            self?.avPlayer?.play()
+        }
     }
 }

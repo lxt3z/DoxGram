@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 import ImageIO
 
-public final class SGDoxImageLoader {
+public final class SGDoxImageLoader: @unchecked Sendable {
     public static let shared = SGDoxImageLoader()
     
     private let memoryCache = NSCache<NSString, UIImage>()
@@ -18,7 +18,7 @@ public final class SGDoxImageLoader {
         self.session = URLSession(configuration: config)
     }
     
-    public func loadImage(urlString: String, targetSize: CGSize? = nil, completion: @escaping (UIImage?) -> Void) {
+    public func loadImage(urlString: String, targetSize: CGSize? = nil, scale: CGFloat = 2.0, completion: @escaping @Sendable (UIImage?) -> Void) {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed) else {
             completion(nil)
@@ -41,7 +41,7 @@ public final class SGDoxImageLoader {
             DispatchQueue.global(qos: .userInitiated).async {
                 let decodedImage: UIImage?
                 if let target = targetSize, target.width > 0, target.height > 0 {
-                    decodedImage = self.downsample(data: data, to: target)
+                    decodedImage = self.downsample(data: data, to: target, scale: scale)
                 } else {
                     decodedImage = UIImage(data: data)
                 }
@@ -58,8 +58,8 @@ public final class SGDoxImageLoader {
         }.resume()
     }
     
-    private func downsample(data: Data, to targetSize: CGSize) -> UIImage? {
-        let maxDimension = max(targetSize.width, targetSize.height) * UIScreen.main.scale
+    private func downsample(data: Data, to targetSize: CGSize, scale: CGFloat) -> UIImage? {
+        let maxDimension = max(targetSize.width, targetSize.height) * scale
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceShouldCacheImmediately: true,

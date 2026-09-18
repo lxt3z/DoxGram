@@ -8,7 +8,7 @@ import AccountContext
 import Display
 import UndoUI
 
-public final class SGDoxMusicManager: NSObject {
+public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     public static let shared = SGDoxMusicManager()
     
     public private(set) var currentTrack: SGDoxMusicTrack?

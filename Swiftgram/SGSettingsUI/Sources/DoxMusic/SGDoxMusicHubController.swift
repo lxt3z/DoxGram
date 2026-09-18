@@ -190,10 +190,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         // Search Apple Music
         AppleMusicService.shared.search(query: query) { [weak self] appleTracks, _ in
             // Search Spotify
-            SpotifyService.shared.search(query: query) { spotifyTracks, _ in
+            SpotifyService.shared.search(query: query) { [weak self] spotifyTracks, _ in
                 DispatchQueue.main.async {
-                    self?.searchResults = appleTracks + spotifyTracks
-                    self?.tableView.reloadData()
+                    guard let self = self, self.isSearching else { return }
+                    self.searchResults = appleTracks + spotifyTracks
+                    self.tableView.reloadData()
                 }
             }
         }
