@@ -34,6 +34,7 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
     
     private var authSession: ASWebAuthenticationSession?
     private var presentationContextProvider: SpotifyPresentationContextProvider?
+    private var codeVerifier: String?
     private var avPlayer: AVPlayer?
     
     public var customClientId: String {
@@ -109,7 +110,7 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
         let clientId = self.customClientId
         let scopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing user-top-read user-library-read"
         
-        guard let encodedScopes = scopes.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+        guard let encodedScopes = scopes.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed),
               let authUrl = URL(string: "https://accounts.spotify.com/authorize?client_id=\(clientId)&response_type=code&redirect_uri=\(self.redirectUri)&code_challenge_method=S256&code_challenge=\(challenge)&scope=\(encodedScopes)") else {
             completion(false, "Invalid authorization URL")
             return
@@ -164,7 +165,7 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
             "code_verifier": verifier
         ]
         
-        request.httpBody = bodyParams.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }.joined(separator: "&").data(using: .utf8)
+        request.httpBody = bodyParams.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) ?? "")" }.joined(separator: "&").data(using: String.Encoding.utf8)
         
         URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
             guard let self = self else { return }
@@ -209,7 +210,7 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
             "grant_type": "refresh_token",
             "refresh_token": refreshToken
         ]
-        request.httpBody = bodyParams.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }.joined(separator: "&").data(using: .utf8)
+        request.httpBody = bodyParams.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) ?? "")" }.joined(separator: "&").data(using: String.Encoding.utf8)
         
         URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
             guard let self = self,
@@ -243,7 +244,7 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
             completion([], nil)
             return
         }
-        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed),
               let url = URL(string: "https://api.spotify.com/v1/search?q=\(encoded)&type=track&limit=25") else {
             completion([], "Invalid search query")
             return

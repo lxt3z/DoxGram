@@ -388,10 +388,10 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
                         if success {
                             DiscordRPCService.shared.connect()
                             let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Discord подключен: \(usernameOrError ?? "")" : "Discord connected: \(usernameOrError ?? "")", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
-                            presentControllerImpl?(overlay, nil)
+                            context.sharedContext.mainWindow?.viewController?.present(overlay, in: .window(.root), with: nil)
                         } else {
                             let errOverlay = UndoOverlayController(presentationData: presentationData, content: .info(title: isRu ? "Ошибка" : "Error", text: usernameOrError ?? "Неверный токен", timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
-                            presentControllerImpl?(errOverlay, nil)
+                            context.sharedContext.mainWindow?.viewController?.present(errOverlay, in: .window(.root), with: nil)
                         }
                     }
                 } else {

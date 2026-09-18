@@ -308,10 +308,14 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     
     // MARK: - Validation REST API
     
-    public func validateToken(_ token: String, completion: @escaping @Sendable (Bool, String?) -> Void) {
+    public func validateToken(_ token: String, completion: @escaping @MainActor (Bool, String?) -> Void) {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let url = URL(string: "https://discord.com/api/v10/users/@me") else {
-            completion(false, "Токен не может быть пустым")
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    completion(false, "Токен не может быть пустым")
+                }
+            }
             return
         }
         
@@ -321,12 +325,20 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
-                DispatchQueue.main.async { completion(false, error.localizedDescription) }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        completion(false, error.localizedDescription)
+                    }
+                }
                 return
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                DispatchQueue.main.async { completion(false, "Нет ответа от сервера") }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        completion(false, "Нет ответа от сервера")
+                    }
+                }
                 return
             }
             
@@ -335,11 +347,23 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
                let username = json["username"] as? String {
                 let globalName = json["global_name"] as? String
                 let displayName = (globalName != nil && !globalName!.isEmpty) ? "\(globalName!) (@\(username))" : username
-                DispatchQueue.main.async { completion(true, displayName) }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        completion(true, displayName)
+                    }
+                }
             } else if httpResponse.statusCode == 401 {
-                DispatchQueue.main.async { completion(false, "Неверный токен Discord (401 Unauthorized)") }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        completion(false, "Неверный токен Discord (401 Unauthorized)")
+                    }
+                }
             } else {
-                DispatchQueue.main.async { completion(false, "Ошибка сервера (Код: \(httpResponse.statusCode))") }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        completion(false, "Ошибка сервера (Код: \(httpResponse.statusCode))")
+                    }
+                }
             }
         }.resume()
     }
