@@ -222,6 +222,9 @@ public class SGSimpleSettings {
         case hideChannelAds
         case blockScreenshotNotifications
         case animatedWallpaperQuality
+        case discordRpcEnabled
+        case discordRpcToken
+        case discordRpcApplicationId
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
@@ -412,7 +415,10 @@ public class SGSimpleSettings {
         Keys.hideProxyButton.rawValue: false,
         Keys.hideChannelAds.rawValue: false,
         Keys.blockScreenshotNotifications.rawValue: true,
-        Keys.animatedWallpaperQuality.rawValue: "720p"
+        Keys.animatedWallpaperQuality.rawValue: "720p",
+        Keys.discordRpcEnabled.rawValue: false,
+        Keys.discordRpcToken.rawValue: "",
+        Keys.discordRpcApplicationId.rawValue: "1351834928178167818"
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -793,6 +799,15 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.animatedWallpaperQuality.rawValue)
     public var animatedWallpaperQuality: String
+
+    @UserDefault(key: Keys.discordRpcEnabled.rawValue)
+    public var discordRpcEnabled: Bool
+
+    @UserDefault(key: Keys.discordRpcToken.rawValue)
+    public var discordRpcToken: String
+
+    @UserDefault(key: Keys.discordRpcApplicationId.rawValue)
+    public var discordRpcApplicationId: String
 }
 
 extension SGSimpleSettings {

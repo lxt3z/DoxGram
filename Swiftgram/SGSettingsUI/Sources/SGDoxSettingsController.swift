@@ -24,6 +24,7 @@ import SGProUI
 
 private enum SGDoxControllerSection: Int32, SGItemListSection {
     case doxgramPro
+    case doxMusic
     case ghost
     case media
     case streamer
@@ -57,6 +58,7 @@ private enum SGDoxBoolSetting: String {
     case tgWsProxyFakeTLS
     case hideProxyButton
     case ayugramDebugger
+    case discordRpcEnabled
 }
 
 private enum SGDoxOneFromManySetting: String {
@@ -71,6 +73,8 @@ private enum SGDoxDisclosureLink: String {
     case messageFilter
     case appIcons
     case appBages
+    case doxMusic
+    case discordRpcToken
     case deletedMediaVault
     case streamerSettings
     case tgWsProxyWorkerDomain
@@ -98,6 +102,17 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     entries.append(.disclosure(id: id.count, section: .doxgramPro, link: .appIcons, text: presentationData.strings.Appearance_AppIcon))
     entries.append(.disclosure(id: id.count, section: .doxgramPro, link: .appBages, text: "AppBadge.Title".i18n(lang)))
     entries.append(.notice(id: id.count, section: .doxgramPro, text: "AppBadge.Notice".i18n(lang)))
+
+    // MARK: - DoxMusic & Discord RPC
+    entries.append(.header(id: id.count, section: .doxMusic, text: isRu ? "Музыка DoxMusic (Apple Music & Spotify)" : "DoxMusic (Apple Music & Spotify)", badge: nil))
+    entries.append(.disclosure(id: id.count, section: .doxMusic, link: .doxMusic, text: isRu ? "Плеер и стриминг" : "Music Player & Streaming"))
+    entries.append(.toggle(id: id.count, section: .doxMusic, settingName: .discordRpcEnabled, value: SGSimpleSettings.shared.discordRpcEnabled, text: "Discord Rich Presence (RPC)", enabled: true))
+    if SGSimpleSettings.shared.discordRpcEnabled {
+        let tokenSet = !SGSimpleSettings.shared.discordRpcToken.isEmpty
+        let tokenDesc = tokenSet ? (isRu ? "Настроен" : "Configured") : (isRu ? "Не настроен" : "Not configured")
+        entries.append(.disclosure(id: id.count, section: .doxMusic, link: .discordRpcToken, text: "\(isRu ? "Токен Discord" : "Discord Token") (\(tokenDesc))"))
+    }
+    entries.append(.notice(id: id.count, section: .doxMusic, text: isRu ? "Слушайте треки из Apple Music и Spotify с умной «Волной». Любой трек можно поставить в официальный профиль Telegram одним тапом и транслировать статус «Слушает...» в Discord." : "Stream tracks from Apple Music & Spotify with smart Wave. Pin any track directly to your official Telegram profile in 1 tap, and broadcast your listening status to Discord."))
 
     // MARK: - Ghost Mode
     entries.append(.header(id: id.count, section: .ghost, text: i18n("Settings.Ayugram.GhostHeader", lang), badge: nil))
@@ -249,6 +264,14 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
             simplePromise.set(true)
         case .ayugramDebugger:
             SGSimpleSettings.shared.ayugramDebugger = value
+        case .discordRpcEnabled:
+            SGSimpleSettings.shared.discordRpcEnabled = value
+            simplePromise.set(true)
+            if value {
+                DiscordRPCService.shared.connect()
+            } else {
+                DiscordRPCService.shared.disconnect()
+            }
         }
     }, setOneFromManyValue: { setting in
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -336,6 +359,46 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
             } else {
                 presentControllerImpl?(context.sharedContext.makeSGUpdateIOSController(), nil)
             }
+        case .doxMusic:
+            pushControllerImpl?(SGDoxMusicHubController(context: context))
+        case .discordRpcToken:
+            let alert = UIAlertController(
+                title: "Discord Token",
+                message: isRu ? "Введите User Token аккаунта Discord для трансляции музыки в статус (RPC):" : "Enter your Discord User Token to broadcast music to your status (RPC):",
+                preferredStyle: .alert
+            )
+            alert.addTextField { textField in
+                textField.text = SGSimpleSettings.shared.discordRpcToken
+                textField.placeholder = "User Token..."
+                textField.clearButtonMode = .whileEditing
+                textField.isSecureTextEntry = true
+                textField.autocapitalizationType = .none
+                textField.autocorrectionType = .no
+            }
+            alert.addAction(UIAlertAction(title: presentationData.strings.Common_Cancel, style: .cancel, handler: nil))
+            alert.addAction(UIAlertAction(title: presentationData.strings.Common_Done, style: .default, handler: { [weak alert] _ in
+                let newToken = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                SGSimpleSettings.shared.discordRpcToken = newToken
+                simplePromise.set(true)
+                if !newToken.isEmpty {
+                    let hud = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
+                    presentControllerImpl?(hud, nil)
+                    DiscordRPCService.shared.validateToken(newToken) { success, usernameOrError in
+                        hud.dismiss()
+                        if success {
+                            DiscordRPCService.shared.connect()
+                            let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Discord подключен: \(usernameOrError ?? "")" : "Discord connected: \(usernameOrError ?? "")", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                            presentControllerImpl?(overlay, nil)
+                        } else {
+                            let errOverlay = UndoOverlayController(presentationData: presentationData, content: .info(title: isRu ? "Ошибка" : "Error", text: usernameOrError ?? "Неверный токен", timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
+                            presentControllerImpl?(errOverlay, nil)
+                        }
+                    }
+                } else {
+                    DiscordRPCService.shared.disconnect()
+                }
+            }))
+            context.sharedContext.applicationBindings.presentNativeController(alert)
         case .deletedMediaVault:
             pushControllerImpl?(sgDeletedMediaController(context: context, peerId: nil))
         case .streamerSettings:
