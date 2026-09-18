@@ -64,6 +64,9 @@ public final class SGDoxAnimatedWallpaperManager {
     
     private let userDefaultsKey = "dox_chat_wallpapers_v1"
     private let queue = DispatchQueue(label: "org.doxgram.wallpaper.queue", qos: .utility)
+    private let cacheLock = NSLock()
+    private var memoryCache: [String: (url: String, localPath: String, quality: String)] = [:]
+    private var isCacheLoaded = false
     
     private init() {
         self.ensureDirectoryExists()
@@ -101,16 +104,42 @@ public final class SGDoxAnimatedWallpaperManager {
             groupDefaults.synchronize()
         }
         UserDefaults.standard.set(data, forKey: self.userDefaultsKey)
+
+        self.cacheLock.lock()
+        var updatedCache: [String: (url: String, localPath: String, quality: String)] = [:]
+        for (key, entry) in data {
+            if let url = entry["url"],
+               let localPath = entry["localPath"] {
+                let quality = entry["quality"] ?? "720p"
+                updatedCache[key] = (url, localPath, quality)
+            }
+        }
+        self.memoryCache = updatedCache
+        self.isCacheLoaded = true
+        self.cacheLock.unlock()
     }
     
     public func getWallpaper(for peerId: Int64, fallbackToGlobal: Bool = true) -> (url: String, localPath: String, quality: String)? {
-        let data = self.getStoredData()
-        if let entry = data[String(peerId)],
-           let url = entry["url"],
-           let localPath = entry["localPath"],
-           FileManager.default.fileExists(atPath: localPath) {
-            let quality = entry["quality"] ?? "720p"
-            return (url, localPath, quality)
+        self.cacheLock.lock()
+        if !self.isCacheLoaded {
+            let data = self.getStoredData()
+            var loadedCache: [String: (url: String, localPath: String, quality: String)] = [:]
+            for (key, entry) in data {
+                if let url = entry["url"],
+                   let localPath = entry["localPath"],
+                   FileManager.default.fileExists(atPath: localPath) {
+                    let quality = entry["quality"] ?? "720p"
+                    loadedCache[key] = (url, localPath, quality)
+                }
+            }
+            self.memoryCache = loadedCache
+            self.isCacheLoaded = true
+        }
+        let cached = self.memoryCache[String(peerId)]
+        self.cacheLock.unlock()
+
+        if let cached = cached {
+            return cached
         }
         if fallbackToGlobal && peerId != Self.globalWallpaperPeerId {
             return self.getWallpaper(for: Self.globalWallpaperPeerId, fallbackToGlobal: false)

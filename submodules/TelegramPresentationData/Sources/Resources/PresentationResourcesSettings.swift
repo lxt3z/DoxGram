@@ -41,19 +41,6 @@ public func renderSettingsIcon(name: String, scaleFactor: CGFloat = 1.0, backgro
                 context.fill(imageRect)
                 context.restoreGState()
             }
-            
-            let outerPath = UIBezierPath(rect: CGRect(origin: .zero, size: size))
-            let innerPath = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 8.0)
-            outerPath.append(innerPath)
-
-            context.saveGState()
-            outerPath.usesEvenOddFillRule = true
-            context.addPath(outerPath.cgPath)
-            context.clip(using: .evenOdd)
-
-            context.setBlendMode(.clear)
-            context.fill(CGRect(origin: .zero, size: size))
-            context.restoreGState()
         } else {
             if let image = UIImage(bundleImageName: name), let cgImage = image.cgImage {
                 let imageSize: CGSize
@@ -65,6 +52,19 @@ public func renderSettingsIcon(name: String, scaleFactor: CGFloat = 1.0, backgro
                 context.draw(cgImage, in: CGRect(origin: CGPoint(x: (bounds.width - imageSize.width) * 0.5, y: (bounds.height - imageSize.height) * 0.5), size: imageSize))
             }
         }
+        
+        let outerPath = UIBezierPath(rect: CGRect(origin: .zero, size: size))
+        let innerPath = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 8.0)
+        outerPath.append(innerPath)
+
+        context.saveGState()
+        outerPath.usesEvenOddFillRule = true
+        context.addPath(outerPath.cgPath)
+        context.clip(using: .evenOdd)
+
+        context.setBlendMode(.clear)
+        context.fill(CGRect(origin: .zero, size: size))
+        context.restoreGState()
     })
 }
 
