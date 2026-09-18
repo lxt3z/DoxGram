@@ -9,6 +9,7 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
     private var endObserver: Any?
+    private var statusObserver: NSKeyValueObservation?
     private var isPlaying: Bool = false
     private var currentUrl: URL?
     
@@ -26,6 +27,8 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         if let endObserver = self.endObserver {
             NotificationCenter.default.removeObserver(endObserver)
         }
+        self.statusObserver?.invalidate()
+        self.statusObserver = nil
         self.player?.pause()
         self.player = nil
     }
@@ -40,6 +43,20 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         }
     }
 
+    private func configureAudioSessionForSilentPlayback() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            if session.category != .playAndRecord {
+                if session.category == .playback {
+                    try session.setCategory(.playback, options: [.mixWithOthers])
+                } else {
+                    try session.setCategory(.ambient, options: [.mixWithOthers])
+                }
+            }
+        } catch {
+        }
+    }
+
     public func setup(with fileUrl: URL) {
         if self.currentUrl == fileUrl, self.player != nil {
             self.play()
@@ -51,14 +68,44 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
             NotificationCenter.default.removeObserver(endObserver)
             self.endObserver = nil
         }
+        self.statusObserver?.invalidate()
+        self.statusObserver = nil
         self.player?.pause()
         self.playerLayer?.removeFromSuperlayer()
         
+        self.configureAudioSessionForSilentPlayback()
+        
         let asset = AVURLAsset(url: fileUrl)
         let playerItem = AVPlayerItem(asset: asset)
+        
+        playerItem.audioMix = AVMutableAudioMix()
+        if let audibleGroup = asset.mediaSelectionGroup(forMediaCharacteristic: .audible) {
+            playerItem.select(nil, in: audibleGroup)
+        }
+        for track in playerItem.tracks {
+            if track.assetTrack?.mediaType == .audio {
+                track.isEnabled = false
+            }
+        }
+        
+        self.statusObserver = playerItem.observe(\.status, options: [.new]) { item, _ in
+            if item.status == .readyToPlay {
+                for track in item.tracks {
+                    if track.assetTrack?.mediaType == .audio {
+                        track.isEnabled = false
+                    }
+                }
+            }
+        }
+        
         let player = AVPlayer(playerItem: playerItem)
+        player.volume = 0.0
         player.isMuted = true
         player.actionAtItemEnd = .none
+        player.preventsDisplaySleepDuringVideoPlayback = false
+        if #available(iOS 15.0, *) {
+            player.audiovisualBackgroundPlaybackPolicy = .pauses
+        }
         
         let playerLayer = AVPlayerLayer(player: player)
         playerLayer.videoGravity = .resizeAspectFill
@@ -81,6 +128,8 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
             NotificationCenter.default.removeObserver(endObserver)
             self.endObserver = nil
         }
+        self.statusObserver?.invalidate()
+        self.statusObserver = nil
         self.player?.pause()
         self.playerLayer?.removeFromSuperlayer()
         self.playerLayer = nil
@@ -91,6 +140,7 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
     
     public func play() {
         guard let player = self.player, !self.isPlaying else { return }
+        self.configureAudioSessionForSilentPlayback()
         self.isPlaying = true
         player.play()
     }
