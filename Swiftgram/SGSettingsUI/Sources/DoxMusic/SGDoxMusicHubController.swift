@@ -141,14 +141,12 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         let iconName = manager.isPlaying ? "pause.fill" : "play.fill"
         self.miniPlayPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
         
-        if let artwork = track.artworkUrl, let url = URL(string: artwork) {
-            URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-                if let data = data, let image = UIImage(data: data) {
-                    DispatchQueue.main.async {
-                        self?.miniArtworkImageView.image = image
-                    }
-                }
-            }.resume()
+        if let artwork = track.artworkUrl {
+            SGDoxImageLoader.shared.loadImage(urlString: artwork, targetSize: CGSize(width: 40, height: 40)) { [weak self] image in
+                self?.miniArtworkImageView.image = image
+            }
+        } else {
+            self.miniArtworkImageView.image = nil
         }
         
         self.view.setNeedsLayout()
@@ -275,6 +273,16 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         cell.textLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         cell.detailTextLabel?.text = "\(track.artist) • \(track.source.rawValue)"
         cell.imageView?.image = UIImage(systemName: "music.note")
+        cell.imageView?.layer.cornerRadius = 6
+        cell.imageView?.clipsToBounds = true
+        if let artwork = track.artworkUrl {
+            SGDoxImageLoader.shared.loadImage(urlString: artwork, targetSize: CGSize(width: 44, height: 44)) { [weak cell] image in
+                if let image = image {
+                    cell?.imageView?.image = image
+                    cell?.setNeedsLayout()
+                }
+            }
+        }
         cell.accessoryType = .disclosureIndicator
         return cell
     }

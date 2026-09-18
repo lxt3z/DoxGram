@@ -245,17 +245,14 @@ public final class SGDoxMusicPlayerController: ViewController {
         self.artistLabel.text = track.artist
         self.sourceLabel.text = "Играет из \(track.source.rawValue)"
         
-        if let artworkUrl = track.artworkUrl, let url = URL(string: artworkUrl) {
-            URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-                if let data = data, let image = UIImage(data: data) {
-                    DispatchQueue.main.async {
-                        self?.artworkImageView.image = image
-                        self?.backgroundImageView.image = image
-                    }
-                }
-            }.resume()
+        if let artworkUrl = track.artworkUrl {
+            SGDoxImageLoader.shared.loadImage(urlString: artworkUrl, targetSize: CGSize(width: 320, height: 320)) { [weak self] image in
+                self?.artworkImageView.image = image
+                self?.backgroundImageView.image = image
+            }
         } else {
             self.artworkImageView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
+            self.backgroundImageView.image = nil
         }
         
         let playConfig = UIImage.SymbolConfiguration(pointSize: 34, weight: .bold)
