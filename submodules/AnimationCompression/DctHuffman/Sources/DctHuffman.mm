@@ -315,9 +315,6 @@ bool readMoreData(std::vector<uint8_t> const &bytes, int &readPosition, unsigned
 }
 
 bool readHuffmanBlock(std::vector<uint8_t> const &bytes, int &readPosition, int *dataBlock, unsigned int &data, unsigned int &currentDataLength, int currentComponent, BitCode const *componentTablesDC, BitCode const *componentTablesAC, int &previousDC) {
-    // Debugging
-    static unsigned int byteno = 0;
-    
     // Description of the 8x8 block currently being read
     enum { AC, DC } ACDC = DC;
     
@@ -337,9 +334,6 @@ bool readHuffmanBlock(std::vector<uint8_t> const &bytes, int &readPosition, int 
         if (currentDataLength<3) {
             continue;
         }
-        
-        // Some stats
-        byteno++;
         
         // Current Huffman table
         BitCode const *htable = componentTablesDC;
