@@ -282,17 +282,24 @@ public final class SGDoxMusicManager: NSObject {
         
         // 2. Search Telegram audio library for matching track (Artist - Title)
         let searchQuery = "\(track.artist) \(track.title)"
+        let searchLocation = SearchMessagesLocation.general(
+            scope: .everywhere,
+            groupId: nil,
+            tags: .music,
+            minDate: nil,
+            maxDate: nil,
+            folderId: nil,
+            communityId: nil
+        )
         let searchSignal = context.engine.messages.searchMessages(
-            location: .global(tags: nil),
+            location: searchLocation,
             query: searchQuery,
-            filter: .music,
-            tag: nil,
-            index: MessageIndex.upperBound(peerId: PeerId(0)),
-            limit: 5
+            state: nil,
+            limit: 10
         )
         
-        let _ = (searchSignal |> deliverOnMainQueue).start(next: { searchResult in
-            for message in searchResult.messages {
+        let _ = (searchSignal |> deliverOnMainQueue).start(next: { (result: (SearchMessagesResult, SearchMessagesState)) in
+            for message in result.0.messages {
                 for media in message.media {
                     if let file = media as? TelegramMediaFile, file.isMusic {
                         let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
@@ -305,17 +312,24 @@ public final class SGDoxMusicManager: NSObject {
             }
             
             // If not found in global search, search in user's Saved Messages
+            let savedSearchLocation = SearchMessagesLocation.peer(
+                peerId: context.account.peerId,
+                fromId: nil,
+                tags: .music,
+                reactions: nil,
+                threadId: nil,
+                minDate: nil,
+                maxDate: nil
+            )
             let savedSearchSignal = context.engine.messages.searchMessages(
-                location: .peer(peerId: context.account.peerId, tag: nil),
+                location: savedSearchLocation,
                 query: track.title,
-                filter: .music,
-                tag: nil,
-                index: MessageIndex.upperBound(peerId: context.account.peerId),
-                limit: 5
+                state: nil,
+                limit: 10
             )
             
-            let _ = (savedSearchSignal |> deliverOnMainQueue).start(next: { savedResult in
-                for message in savedResult.messages {
+            let _ = (savedSearchSignal |> deliverOnMainQueue).start(next: { (savedResult: (SearchMessagesResult, SearchMessagesState)) in
+                for message in savedResult.0.messages {
                     for media in message.media {
                         if let file = media as? TelegramMediaFile, file.isMusic {
                             let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
@@ -327,7 +341,7 @@ public final class SGDoxMusicManager: NSObject {
                     }
                 }
                 
-                completion(false, "Трек не найден в Telegram. Отправьте MP3 в Избранное или включите его в чате.")
+                completion(false, "Трек не найден в Telegram. Отправьте аудиозапись в «Избранное» для закрепления в профиле.")
             })
         })
     }

@@ -102,17 +102,16 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.updateMiniPlayer()
     }
     
-    public override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        let bounds = self.view.bounds
-        let safeArea = self.view.safeAreaInsets
+    public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
         
-        let navHeight = self.navigationLayout(layout: ContainerViewLayout(size: bounds.size, metrics: LayoutMetrics(), deviceMetrics: DeviceMetrics(), intrinsicInsets: safeArea, safeInsets: safeArea, additionalInsets: .zero, statusBarHeight: safeArea.top, defaultStatusBarHeight: safeArea.top, inputViewHeight: nil, inputHeight: nil, standardInputHeight: 216.0, inputHeightIsInteractivellyChanging: false, inVoiceOver: false)).navigationFrame.maxY
+        let navHeight = self.navigationLayout(layout: layout).navigationFrame.maxY
+        let bounds = CGRect(origin: .zero, size: layout.size)
         
         self.searchBar.frame = CGRect(x: 8, y: navHeight + 4, width: bounds.width - 16, height: 48)
         
         let miniPlayerHeight: CGFloat = SGDoxMusicManager.shared.currentTrack != nil ? 56.0 : 0.0
-        let miniPlayerY = bounds.height - safeArea.bottom - miniPlayerHeight - 8
+        let miniPlayerY = bounds.height - layout.intrinsicInsets.bottom - miniPlayerHeight - 8
         
         self.miniPlayerView.frame = CGRect(x: 12, y: miniPlayerY, width: bounds.width - 24, height: miniPlayerHeight)
         self.miniPlayerView.isHidden = miniPlayerHeight == 0
@@ -124,6 +123,13 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         let tableY = self.searchBar.frame.maxY + 4
         let tableHeight = (self.miniPlayerView.isHidden ? bounds.height : miniPlayerY) - tableY
         self.tableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: max(0, tableHeight))
+    }
+    
+    public override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if let layout = self.currentlyAppliedLayout {
+            self.containerLayoutUpdated(layout, transition: .immediate)
+        }
     }
     
     private func updateMiniPlayer() {

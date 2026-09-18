@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 import TelegramCore
 
-public enum SGDoxMusicSource: String, Codable, CaseIterable {
+public enum SGDoxMusicSource: String, Codable, CaseIterable, Sendable {
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
     case telegram = "Telegram"
@@ -16,7 +16,7 @@ public enum SGDoxMusicSource: String, Codable, CaseIterable {
     }
 }
 
-public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable {
+public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, @unchecked Sendable {
     public let id: String
     public let title: String
     public let artist: String

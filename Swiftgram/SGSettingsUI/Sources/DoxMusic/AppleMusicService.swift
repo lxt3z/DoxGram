@@ -32,7 +32,7 @@ public final class AppleMusicService {
         }
     }
     
-    public func requestAuthorization(completion: @escaping (Bool) -> Void) {
+    public func requestAuthorization(completion: @escaping @Sendable (Bool) -> Void) {
         if #available(iOS 15.0, *) {
             #if canImport(MusicKit)
             Task {
@@ -57,7 +57,7 @@ public final class AppleMusicService {
         }
     }
     
-    public func search(query: String, completion: @escaping ([SGDoxMusicTrack], String?) -> Void) {
+    public func search(query: String, completion: @escaping @Sendable ([SGDoxMusicTrack], String?) -> Void) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             completion([], nil)
@@ -107,69 +107,18 @@ public final class AppleMusicService {
         }
     }
     
-    public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, completion: @escaping ([SGDoxMusicTrack]) -> Void) {
-        if #available(iOS 15.0, *) {
-            #if canImport(MusicKit)
-            Task {
-                do {
-                    var request = MusicPersonalRecommendationsRequest()
-                    request.limit = 10
-                    let response = try await request.response()
-                    
-                    var tracks: [SGDoxMusicTrack] = []
-                    for recommendation in response.recommendations {
-                        for item in recommendation.items {
-                            if case let .song(song) = item {
-                                let artworkUrl = song.artwork?.url(width: 600, height: 600)?.absoluteString
-                                let duration = song.duration ?? 0.0
-                                let previewUrl = song.previewAssets?.first?.url?.absoluteString
-                                tracks.append(SGDoxMusicTrack(
-                                    id: song.id.rawValue,
-                                    title: song.title,
-                                    artist: song.artistName,
-                                    album: song.albumTitle ?? "",
-                                    artworkUrl: artworkUrl,
-                                    duration: duration,
-                                    previewUrl: previewUrl,
-                                    source: .appleMusic,
-                                    appleMusicId: song.id.rawValue
-                                ))
-                            }
-                        }
-                    }
-                    
-                    if tracks.isEmpty, let track = track {
-                        // Fallback search with artist for wave
-                        self.search(query: track.artist) { artistTracks, _ in
-                            completion(artistTracks.filter { $0.id != track.id })
-                        }
-                        return
-                    }
-                    
-                    DispatchQueue.main.async {
-                        completion(tracks)
-                    }
-                } catch {
-                    if let track = track {
-                        self.search(query: track.artist) { artistTracks, _ in
-                            completion(artistTracks.filter { $0.id != track.id })
-                        }
-                    } else {
-                        DispatchQueue.main.async {
-                            completion([])
-                        }
-                    }
-                }
+    public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
+        let query = (track?.artist.isEmpty == false) ? track!.artist : "Hits"
+        self.search(query: query) { tracks, _ in
+            if let track = track {
+                completion(tracks.filter { $0.id != track.id })
+            } else {
+                completion(tracks)
             }
-            #else
-            completion([])
-            #endif
-        } else {
-            completion([])
         }
     }
     
-    public func play(track: SGDoxMusicTrack, completion: @escaping (Bool) -> Void) {
+    public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
         if #available(iOS 15.0, *) {
             #if canImport(MusicKit)
             guard let appleMusicId = track.appleMusicId else {
@@ -215,7 +164,7 @@ public final class AppleMusicService {
         }
     }
     
-    private func playPreview(url: URL, completion: @escaping (Bool) -> Void) {
+    private func playPreview(url: URL, completion: @escaping @Sendable (Bool) -> Void) {
         self.avPlayer?.pause()
         let playerItem = AVPlayerItem(url: url)
         let player = AVPlayer(playerItem: playerItem)
