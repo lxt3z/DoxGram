@@ -370,7 +370,6 @@ bool readHuffmanBlock(std::vector<uint8_t> const &bytes, int &readPosition, int 
                             endOfFile = true;
                             break;
                         }
-                        byteno++;
                     }
                     
                     // Read out DC coefficient
@@ -454,7 +453,6 @@ bool readHuffmanBlock(std::vector<uint8_t> const &bytes, int &readPosition, int 
                                 //qDebug() << "End of file encountered inside a Huffman code!";
                                 break;
                             }
-                            byteno++;
                         }
                         
                         // Read out AC coefficient
