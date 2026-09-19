@@ -37,6 +37,7 @@ public final class SGDoxMusicPlayerController: ViewController {
     private let pinToProfileButton = UIButton(type: .system)
     
     private var isDraggingSlider = false
+    private var displayedTrackId: String?
     
     public init(context: AccountContext) {
         self.context = context
@@ -65,6 +66,35 @@ public final class SGDoxMusicPlayerController: ViewController {
         
         SGDoxMusicManager.shared.addStateListener { [weak self] in
             self?.updateContent()
+        }
+        
+        SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
+            guard let self = self, !self.isDraggingSlider else { return }
+            let d = duration > 0 ? duration : 30.0
+            self.progressSlider.value = Float(current / d)
+            self.currentTimeLabel.text = self.formatTime(current)
+            self.remainingTimeLabel.text = "-\(self.formatTime(max(0, d - current)))"
+        }
+        
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
+        self.view.addGestureRecognizer(panGesture)
+    }
+    
+    @objc private func handlePanGesture(_ recognizer: UIPanGestureRecognizer) {
+        let translation = recognizer.translation(in: self.view)
+        if recognizer.state == .changed {
+            if translation.y > 0 {
+                self.view.transform = CGAffineTransform(translationX: 0, y: translation.y)
+            }
+        } else if recognizer.state == .ended || recognizer.state == .cancelled {
+            let velocity = recognizer.velocity(in: self.view)
+            if translation.y > 150 || velocity.y > 800 {
+                self.dismiss()
+            } else {
+                UIView.animate(withDuration: 0.25) {
+                    self.view.transform = .identity
+                }
+            }
         }
     }
     
@@ -245,35 +275,32 @@ public final class SGDoxMusicPlayerController: ViewController {
             self.titleLabel.text = "Ничего не играет"
             self.artistLabel.text = "Выберите трек"
             self.sourceLabel.text = "DoxMusic"
+            self.displayedTrackId = nil
             return
         }
         
-        self.titleLabel.text = track.title
-        self.artistLabel.text = track.artist
-        self.sourceLabel.text = "Играет из \(track.source.rawValue)"
-        
-        if let artworkUrl = track.artworkUrl {
-            SGDoxImageLoader.shared.loadImage(urlString: artworkUrl, targetSize: CGSize(width: 320, height: 320)) { [weak self] image in
-                self?.artworkImageView.image = image
-                self?.backgroundImageView.image = image
+        let trackChanged = self.displayedTrackId != track.id
+        if trackChanged {
+            self.displayedTrackId = track.id
+            self.titleLabel.text = track.title
+            self.artistLabel.text = track.artist
+            self.sourceLabel.text = "Играет из \(track.source.rawValue)"
+            
+            if let artworkUrl = track.artworkUrl {
+                SGDoxImageLoader.shared.loadImage(urlString: artworkUrl, targetSize: CGSize(width: 320, height: 320)) { [weak self] image in
+                    self?.artworkImageView.image = image
+                    self?.backgroundImageView.image = image
+                }
+            } else {
+                self.artworkImageView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
+                self.backgroundImageView.image = nil
             }
-        } else {
-            self.artworkImageView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
-            self.backgroundImageView.image = nil
         }
         
         let playConfig = UIImage.SymbolConfiguration(pointSize: 34, weight: .bold)
         let iconName = manager.isPlaying ? "pause.fill" : "play.fill"
         self.playPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: playConfig), for: .normal)
         
-        if !self.isDraggingSlider {
-            let duration = manager.duration > 0 ? manager.duration : 30.0
-            self.progressSlider.value = Float(manager.currentTime / duration)
-            self.currentTimeLabel.text = self.formatTime(manager.currentTime)
-            self.remainingTimeLabel.text = "-\(self.formatTime(max(0, duration - manager.currentTime)))"
-        }
-        
-        // Wave active state indicator
         if manager.isWaveEnabled {
             self.waveButton.backgroundColor = UIColor(red: 0.95, green: 0.25, blue: 0.5, alpha: 0.85)
         } else {

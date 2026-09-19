@@ -30,7 +30,11 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     private var timeObserver: Any?
     private var avPlayer: AVPlayer?
+    private var playbackTimer: Timer?
     private var stateListeners: [() -> Void] = []
+    private var timeListeners: [(Double, Double) -> Void] = []
+    private var lastReportedTrackId: String?
+    private var lastReportedIsPlaying: Bool?
     
     private override init() {
         super.init()
@@ -52,13 +56,69 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.stateListeners.append(listener)
     }
     
+    public func addTimeListener(_ listener: @escaping (Double, Double) -> Void) {
+        self.timeListeners.append(listener)
+    }
+    
     private func notifyStateChanged() {
         DispatchQueue.main.async {
-            DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying)
+            if self.lastReportedTrackId != self.currentTrack?.id || self.lastReportedIsPlaying != self.isPlaying {
+                self.lastReportedTrackId = self.currentTrack?.id
+                self.lastReportedIsPlaying = self.isPlaying
+                DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying)
+            }
             for listener in self.stateListeners {
                 listener()
             }
         }
+    }
+    
+    private func startTimeTracking() {
+        self.stopTimeTracking()
+        self.playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self = self, self.isPlaying else { return }
+            var current = self.currentTime
+            var total = self.duration
+            
+            if let track = self.currentTrack {
+                switch track.source {
+                case .appleMusic:
+                    current = AppleMusicService.shared.currentPlaybackTime
+                    let d = AppleMusicService.shared.playbackDuration
+                    if d > 0 { total = d }
+                case .spotify:
+                    current += 0.5
+                case .telegram:
+                    if let p = self.avPlayer {
+                        current = p.currentTime().seconds
+                        if let d = p.currentItem?.duration.seconds, d > 0 { total = d }
+                    }
+                }
+            }
+            
+            if current.isFinite && !current.isNaN {
+                self.currentTime = current
+            }
+            if total.isFinite && !total.isNaN && total > 0 {
+                self.duration = total
+            }
+            
+            DispatchQueue.main.async {
+                for listener in self.timeListeners {
+                    listener(self.currentTime, self.duration)
+                }
+            }
+            
+            // Check if track ended
+            if total > 0 && current >= total - 0.5 {
+                self.next()
+            }
+        }
+    }
+    
+    private func stopTimeTracking() {
+        self.playbackTimer?.invalidate()
+        self.playbackTimer = nil
     }
     
     // MARK: - Playback
@@ -68,7 +128,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             self.history.append(current)
         }
         self.currentTrack = track
-        self.duration = track.duration
+        self.duration = track.duration > 0 ? track.duration : 30.0
         self.currentTime = 0.0
         
         if !queue.isEmpty {
@@ -82,6 +142,11 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             AppleMusicService.shared.play(track: track) { [weak self] success in
                 guard let self = self else { return }
                 self.isPlaying = success
+                if success {
+                    self.startTimeTracking()
+                } else {
+                    self.stopTimeTracking()
+                }
                 self.notifyStateChanged()
                 self.checkWaveReplenishmentIfNeeded()
             }
@@ -89,6 +154,11 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             SpotifyService.shared.play(track: track) { [weak self] success in
                 guard let self = self else { return }
                 self.isPlaying = success
+                if success {
+                    self.startTimeTracking()
+                } else {
+                    self.stopTimeTracking()
+                }
                 self.notifyStateChanged()
                 self.checkWaveReplenishmentIfNeeded()
             }
@@ -108,16 +178,11 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         let player = AVPlayer(playerItem: playerItem)
         self.avPlayer = player
         
-        self.timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
-            guard let self = self else { return }
-            self.currentTime = time.seconds
-            self.notifyStateChanged()
-        }
-        
         NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
         
         player.play()
         self.isPlaying = true
+        self.startTimeTracking()
         self.notifyStateChanged()
         self.checkWaveReplenishmentIfNeeded()
     }
@@ -136,6 +201,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     public func pause() {
         self.isPlaying = false
+        self.stopTimeTracking()
         self.avPlayer?.pause()
         AppleMusicService.shared.pause()
         SpotifyService.shared.pause()
@@ -153,6 +219,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             case .telegram:
                 self.avPlayer?.play()
             }
+            self.startTimeTracking()
             self.notifyStateChanged()
         }
     }

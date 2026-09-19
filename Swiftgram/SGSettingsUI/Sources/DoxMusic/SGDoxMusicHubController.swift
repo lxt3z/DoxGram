@@ -9,20 +9,224 @@ import PresentationDataUtils
 import SGSimpleSettings
 import AppBundle
 
+// MARK: - Native Telegram-Style Liquid Glass Cells
+
+private final class SGDoxServiceCell: UITableViewCell {
+    let iconContainer = UIView()
+    let iconImageView = UIImageView()
+    let titleLabel = UILabel()
+    let statusLabel = UILabel()
+    let badgeLabel = UILabel()
+    let chevronImageView = UIImageView()
+    let separatorView = UIView()
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+        
+        self.iconContainer.layer.cornerRadius = 10
+        self.iconContainer.clipsToBounds = true
+        self.contentView.addSubview(self.iconContainer)
+        
+        self.iconImageView.contentMode = .scaleAspectFit
+        self.iconImageView.tintColor = .white
+        self.iconContainer.addSubview(self.iconImageView)
+        
+        self.titleLabel.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        self.contentView.addSubview(self.titleLabel)
+        
+        self.statusLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+        self.contentView.addSubview(self.statusLabel)
+        
+        self.badgeLabel.layer.cornerRadius = 11
+        self.badgeLabel.clipsToBounds = true
+        self.badgeLabel.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+        self.badgeLabel.textAlignment = .center
+        self.contentView.addSubview(self.badgeLabel)
+        
+        self.chevronImageView.image = UIImage(systemName: "chevron.right")
+        self.chevronImageView.contentMode = .scaleAspectFit
+        self.contentView.addSubview(self.chevronImageView)
+        
+        self.contentView.addSubview(self.separatorView)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let bounds = self.contentView.bounds
+        
+        self.iconContainer.frame = CGRect(x: 16, y: 11, width: 38, height: 38)
+        self.iconImageView.frame = CGRect(x: 7, y: 7, width: 24, height: 24)
+        
+        let hasBadge = !(self.badgeLabel.text?.isEmpty ?? true)
+        let rightMargin: CGFloat = hasBadge ? 110 : 36
+        let titleWidth = bounds.width - 66 - rightMargin
+        
+        self.titleLabel.frame = CGRect(x: 66, y: 10, width: titleWidth, height: 20)
+        self.statusLabel.frame = CGRect(x: 66, y: 31, width: titleWidth, height: 18)
+        
+        if hasBadge {
+            self.badgeLabel.frame = CGRect(x: bounds.width - 98, y: 18, width: 62, height: 24)
+            self.chevronImageView.frame = CGRect(x: bounds.width - 28, y: 22, width: 14, height: 16)
+        } else {
+            self.badgeLabel.frame = .zero
+            self.chevronImageView.frame = CGRect(x: bounds.width - 28, y: 22, width: 14, height: 16)
+        }
+        
+        self.separatorView.frame = CGRect(x: 66, y: bounds.height - 0.5, width: bounds.width - 66, height: 0.5)
+    }
+}
+
+private final class SGDoxWaveHeroCell: UITableViewCell {
+    let containerCard = UIView()
+    let gradientLayer = CAGradientLayer()
+    let iconImageView = UIImageView()
+    let titleLabel = UILabel()
+    let subtitleLabel = UILabel()
+    let playPill = UIView()
+    let playIcon = UIImageView()
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+        
+        self.containerCard.layer.cornerRadius = 18
+        self.containerCard.clipsToBounds = true
+        self.contentView.addSubview(self.containerCard)
+        
+        self.gradientLayer.colors = [
+            UIColor(red: 0.95, green: 0.18, blue: 0.52, alpha: 0.92).cgColor,
+            UIColor(red: 0.55, green: 0.15, blue: 0.95, alpha: 0.92).cgColor,
+            UIColor(red: 0.12, green: 0.58, blue: 0.98, alpha: 0.90).cgColor
+        ]
+        self.gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
+        self.gradientLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
+        self.containerCard.layer.insertSublayer(self.gradientLayer, at: 0)
+        
+        self.iconImageView.image = UIImage(systemName: "dot.radiowaves.left.and.right")
+        self.iconImageView.tintColor = .white
+        self.iconImageView.contentMode = .scaleAspectFit
+        self.containerCard.addSubview(self.iconImageView)
+        
+        self.titleLabel.text = "⚡ Запустить «Мою волну»"
+        self.titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .bold)
+        self.titleLabel.textColor = .white
+        self.containerCard.addSubview(self.titleLabel)
+        
+        self.subtitleLabel.text = "Умный бесконечный поток под ваш вкус"
+        self.subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.containerCard.addSubview(self.subtitleLabel)
+        
+        self.playPill.backgroundColor = UIColor(white: 1.0, alpha: 0.25)
+        self.playPill.layer.cornerRadius = 18
+        self.playPill.clipsToBounds = true
+        self.containerCard.addSubview(self.playPill)
+        
+        self.playIcon.image = UIImage(systemName: "play.fill")
+        self.playIcon.tintColor = .white
+        self.playIcon.contentMode = .scaleAspectFit
+        self.playPill.addSubview(self.playIcon)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let bounds = self.contentView.bounds
+        self.containerCard.frame = CGRect(x: 16, y: 4, width: bounds.width - 32, height: bounds.height - 8)
+        self.gradientLayer.frame = self.containerCard.bounds
+        
+        self.iconImageView.frame = CGRect(x: 16, y: 20, width: 36, height: 36)
+        
+        let textWidth = self.containerCard.bounds.width - 64 - 56
+        self.titleLabel.frame = CGRect(x: 62, y: 16, width: textWidth, height: 22)
+        self.subtitleLabel.frame = CGRect(x: 62, y: 40, width: textWidth, height: 18)
+        
+        self.playPill.frame = CGRect(x: self.containerCard.bounds.width - 48, y: 20, width: 36, height: 36)
+        self.playIcon.frame = CGRect(x: 10, y: 9, width: 18, height: 18)
+    }
+}
+
+private final class SGDoxTrackCell: UITableViewCell {
+    let artworkView = UIImageView()
+    let titleLabel = UILabel()
+    let artistLabel = UILabel()
+    let sourceBadge = UILabel()
+    let playIcon = UIImageView()
+    let separatorView = UIView()
+    var currentTrackId: String?
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+        
+        self.artworkView.layer.cornerRadius = 8
+        self.artworkView.clipsToBounds = true
+        self.artworkView.contentMode = .scaleAspectFill
+        self.artworkView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
+        self.contentView.addSubview(self.artworkView)
+        
+        self.titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        self.contentView.addSubview(self.titleLabel)
+        
+        self.artistLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+        self.contentView.addSubview(self.artistLabel)
+        
+        self.sourceBadge.font = UIFont.systemFont(ofSize: 10, weight: .bold)
+        self.sourceBadge.layer.cornerRadius = 4
+        self.sourceBadge.clipsToBounds = true
+        self.sourceBadge.textAlignment = .center
+        self.contentView.addSubview(self.sourceBadge)
+        
+        self.playIcon.image = UIImage(systemName: "play.circle.fill")
+        self.playIcon.contentMode = .scaleAspectFit
+        self.contentView.addSubview(self.playIcon)
+        
+        self.contentView.addSubview(self.separatorView)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let bounds = self.contentView.bounds
+        
+        self.artworkView.frame = CGRect(x: 16, y: 9, width: 44, height: 44)
+        
+        let textWidth = bounds.width - 70 - 46
+        self.titleLabel.frame = CGRect(x: 70, y: 12, width: textWidth, height: 19)
+        self.artistLabel.frame = CGRect(x: 70, y: 32, width: textWidth - 50, height: 17)
+        
+        self.sourceBadge.frame = CGRect(x: bounds.width - 80, y: 32, width: 44, height: 16)
+        self.playIcon.frame = CGRect(x: bounds.width - 34, y: 19, width: 22, height: 22)
+        
+        self.separatorView.frame = CGRect(x: 70, y: bounds.height - 0.5, width: bounds.width - 70, height: 0.5)
+    }
+}
+
+// MARK: - SGDoxMusicHubController
+
 public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate, UITableViewDataSource, UITableViewDelegate {
     private let context: AccountContext
     private var presentationData: PresentationData
     
-    // Liquid Glass UI components
-    private let backgroundGradientLayer = CAGradientLayer()
-    private let backgroundBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
-    
-    private let searchContainerView = UIView()
     private let searchBar = UISearchBar()
-    private let tableView = UITableView(frame: .zero, style: .plain)
+    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     
     private let miniPlayerContainer = UIView()
-    private let miniPlayerBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialDark))
+    private let miniPlayerBlurView = UIVisualEffectView()
     private let miniArtworkImageView = UIImageView()
     private let miniTitleLabel = UILabel()
     private let miniArtistLabel = UILabel()
@@ -31,13 +235,14 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     private var searchResults: [SGDoxMusicTrack] = []
     private var isSearching = false
+    private var searchTimer: Timer?
+    private var activeSearchTask: URLSessionDataTask?
     
     public init(context: AccountContext) {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData))
         self.title = "DoxMusic"
-        self.statusBar.statusBarStyle = .White
         self.ready.set(.single(true))
     }
     
@@ -45,17 +250,27 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         fatalError("init(coder:) has not been implemented")
     }
     
+    deinit {
+        self.searchTimer?.invalidate()
+        self.activeSearchTask?.cancel()
+    }
+    
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = UIColor(red: 0.05, green: 0.06, blue: 0.12, alpha: 1.0)
+        self.view.backgroundColor = self.presentationData.theme.list.blocksBackgroundColor
         
-        self.setupBackground()
         self.setupSearchBar()
         self.setupTableView()
         self.setupMiniPlayer()
         
         SGDoxMusicManager.shared.addStateListener { [weak self] in
             self?.updateMiniPlayer()
+        }
+        
+        SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
+            guard let self = self, duration > 0 else { return }
+            let progress = Float(current / duration)
+            self.miniProgressView.setProgress(progress, animated: true)
         }
         
         DiscordRPCService.shared.onStatusChanged = { [weak self] _ in
@@ -67,48 +282,19 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
     }
     
-    private func setupBackground() {
-        self.backgroundGradientLayer.colors = [
-            UIColor(red: 0.08, green: 0.09, blue: 0.18, alpha: 1.0).cgColor,
-            UIColor(red: 0.04, green: 0.05, blue: 0.10, alpha: 1.0).cgColor,
-            UIColor(red: 0.10, green: 0.04, blue: 0.14, alpha: 1.0).cgColor
-        ]
-        self.backgroundGradientLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
-        self.backgroundGradientLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
-        self.view.layer.insertSublayer(self.backgroundGradientLayer, at: 0)
-        
-        self.backgroundBlurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        self.backgroundBlurView.alpha = 0.85
-        self.view.insertSubview(self.backgroundBlurView, at: 1)
-    }
-    
     private func setupSearchBar() {
-        self.searchContainerView.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
-        self.searchContainerView.layer.cornerRadius = 16
-        self.searchContainerView.layer.borderWidth = 1.0
-        self.searchContainerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.15).cgColor
-        self.searchContainerView.clipsToBounds = true
-        self.view.addSubview(self.searchContainerView)
-        
         self.searchBar.delegate = self
         self.searchBar.placeholder = "Поиск в Apple Music и Spotify..."
         self.searchBar.searchBarStyle = .minimal
-        self.searchBar.tintColor = .white
+        self.searchBar.tintColor = self.presentationData.theme.list.itemAccentColor
         
         if let textField = self.searchBar.value(forKey: "searchField") as? UITextField {
-            textField.textColor = .white
-            textField.tintColor = .white
-            textField.backgroundColor = .clear
-            let placeholderColor = UIColor(white: 1.0, alpha: 0.5)
-            textField.attributedPlaceholder = NSAttributedString(
-                string: "Поиск в Apple Music и Spotify...",
-                attributes: [.foregroundColor: placeholderColor]
-            )
-            if let leftView = textField.leftView as? UIImageView {
-                leftView.tintColor = UIColor(white: 1.0, alpha: 0.7)
-            }
+            textField.textColor = self.presentationData.theme.list.itemPrimaryTextColor
+            textField.backgroundColor = self.presentationData.theme.list.itemBlocksBackgroundColor
+            textField.layer.cornerRadius = 10
+            textField.clipsToBounds = true
         }
-        self.searchContainerView.addSubview(self.searchBar)
+        self.view.addSubview(self.searchBar)
     }
     
     private func setupTableView() {
@@ -117,48 +303,50 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.tableView.backgroundColor = .clear
         self.tableView.separatorStyle = .none
         self.tableView.showsVerticalScrollIndicator = false
-        self.tableView.register(UITableViewCell.self, forCellReuseIdentifier: "TrackCell")
-        self.tableView.register(UITableViewCell.self, forCellReuseIdentifier: "ServiceCell")
-        self.tableView.register(UITableViewCell.self, forCellReuseIdentifier: "WaveHeroCell")
+        self.tableView.register(SGDoxServiceCell.self, forCellReuseIdentifier: "ServiceCell")
+        self.tableView.register(SGDoxWaveHeroCell.self, forCellReuseIdentifier: "WaveHeroCell")
+        self.tableView.register(SGDoxTrackCell.self, forCellReuseIdentifier: "TrackCell")
         self.view.addSubview(self.tableView)
     }
     
     private func setupMiniPlayer() {
         self.miniPlayerContainer.backgroundColor = .clear
         self.miniPlayerContainer.layer.shadowColor = UIColor.black.cgColor
-        self.miniPlayerContainer.layer.shadowOpacity = 0.4
-        self.miniPlayerContainer.layer.shadowRadius = 14
-        self.miniPlayerContainer.layer.shadowOffset = CGSize(width: 0, height: 6)
+        self.miniPlayerContainer.layer.shadowOpacity = 0.2
+        self.miniPlayerContainer.layer.shadowRadius = 12
+        self.miniPlayerContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
         
+        let blurEffect = UIBlurEffect(style: self.presentationData.theme.overallDarkAppearance ? .systemMaterialDark : .systemMaterialLight)
+        self.miniPlayerBlurView.effect = blurEffect
         self.miniPlayerBlurView.layer.cornerRadius = 24
-        self.miniPlayerBlurView.layer.borderWidth = 1.0
-        self.miniPlayerBlurView.layer.borderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
+        self.miniPlayerBlurView.layer.borderWidth = 0.5
+        self.miniPlayerBlurView.layer.borderColor = self.presentationData.theme.list.itemBlocksSeparatorColor.cgColor
         self.miniPlayerBlurView.clipsToBounds = true
         self.miniPlayerContainer.addSubview(self.miniPlayerBlurView)
         
         let tap = UITapGestureRecognizer(target: self, action: #selector(self.miniPlayerTapped))
         self.miniPlayerContainer.addGestureRecognizer(tap)
         
-        self.miniArtworkImageView.layer.cornerRadius = 10
+        self.miniArtworkImageView.layer.cornerRadius = 8
         self.miniArtworkImageView.clipsToBounds = true
         self.miniArtworkImageView.contentMode = .scaleAspectFill
         self.miniArtworkImageView.backgroundColor = UIColor(white: 0.2, alpha: 1.0)
         self.miniPlayerBlurView.contentView.addSubview(self.miniArtworkImageView)
         
-        self.miniTitleLabel.font = UIFont.systemFont(ofSize: 14, weight: .bold)
-        self.miniTitleLabel.textColor = .white
+        self.miniTitleLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        self.miniTitleLabel.textColor = self.presentationData.theme.list.itemPrimaryTextColor
         self.miniPlayerBlurView.contentView.addSubview(self.miniTitleLabel)
         
-        self.miniArtistLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-        self.miniArtistLabel.textColor = UIColor(white: 1.0, alpha: 0.65)
+        self.miniArtistLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+        self.miniArtistLabel.textColor = self.presentationData.theme.list.itemSecondaryTextColor
         self.miniPlayerBlurView.contentView.addSubview(self.miniArtistLabel)
         
-        self.miniPlayPauseButton.tintColor = .white
+        self.miniPlayPauseButton.tintColor = self.presentationData.theme.list.itemAccentColor
         self.miniPlayPauseButton.addTarget(self, action: #selector(self.miniPlayPausePressed), for: .touchUpInside)
         self.miniPlayerBlurView.contentView.addSubview(self.miniPlayPauseButton)
         
-        self.miniProgressView.progressTintColor = UIColor(red: 0.95, green: 0.25, blue: 0.6, alpha: 0.9)
-        self.miniProgressView.trackTintColor = UIColor(white: 1.0, alpha: 0.15)
+        self.miniProgressView.progressTintColor = self.presentationData.theme.list.itemAccentColor
+        self.miniProgressView.trackTintColor = self.presentationData.theme.list.itemBlocksSeparatorColor
         self.miniPlayerBlurView.contentView.addSubview(self.miniProgressView)
         
         self.view.addSubview(self.miniPlayerContainer)
@@ -171,46 +359,33 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         let navHeight = self.navigationLayout(layout: layout).navigationFrame.maxY
         let bounds = CGRect(origin: .zero, size: layout.size)
         
-        self.backgroundGradientLayer.frame = bounds
-        self.backgroundBlurView.frame = bounds
+        self.searchBar.frame = CGRect(x: 8, y: navHeight + 4, width: bounds.width - 16, height: 44)
         
-        let searchY = navHeight + 8
-        self.searchContainerView.frame = CGRect(x: 16, y: searchY, width: bounds.width - 32, height: 44)
-        self.searchBar.frame = self.searchContainerView.bounds
-        
-        let miniPlayerHeight: CGFloat = SGDoxMusicManager.shared.currentTrack != nil ? 64.0 : 0.0
-        let miniPlayerY = bounds.height - layout.intrinsicInsets.bottom - miniPlayerHeight - 12
+        let miniPlayerHeight: CGFloat = SGDoxMusicManager.shared.currentTrack != nil ? 60.0 : 0.0
+        let miniPlayerY = bounds.height - layout.intrinsicInsets.bottom - miniPlayerHeight - 8
         
         self.miniPlayerContainer.frame = CGRect(x: 16, y: miniPlayerY, width: bounds.width - 32, height: miniPlayerHeight)
         self.miniPlayerBlurView.frame = self.miniPlayerContainer.bounds
         self.miniPlayerContainer.isHidden = miniPlayerHeight == 0
         
-        self.miniArtworkImageView.frame = CGRect(x: 12, y: 10, width: 44, height: 44)
-        self.miniPlayPauseButton.frame = CGRect(x: self.miniPlayerBlurView.bounds.width - 52, y: 12, width: 40, height: 40)
+        self.miniArtworkImageView.frame = CGRect(x: 10, y: 10, width: 40, height: 40)
+        self.miniPlayPauseButton.frame = CGRect(x: self.miniPlayerBlurView.bounds.width - 48, y: 12, width: 36, height: 36)
         
-        let labelWidth = self.miniPlayerBlurView.bounds.width - 120
-        self.miniTitleLabel.frame = CGRect(x: 66, y: 13, width: labelWidth, height: 18)
-        self.miniArtistLabel.frame = CGRect(x: 66, y: 32, width: labelWidth, height: 16)
-        self.miniProgressView.frame = CGRect(x: 0, y: self.miniPlayerBlurView.bounds.height - 3, width: self.miniPlayerBlurView.bounds.width, height: 3)
+        let labelWidth = self.miniPlayerBlurView.bounds.width - 110
+        self.miniTitleLabel.frame = CGRect(x: 60, y: 12, width: labelWidth, height: 18)
+        self.miniArtistLabel.frame = CGRect(x: 60, y: 30, width: labelWidth, height: 16)
+        self.miniProgressView.frame = CGRect(x: 0, y: self.miniPlayerBlurView.bounds.height - 2, width: self.miniPlayerBlurView.bounds.width, height: 2)
         
-        let tableY = self.searchContainerView.frame.maxY + 10
+        let tableY = self.searchBar.frame.maxY + 4
         let tableBottom = self.miniPlayerContainer.isHidden ? (bounds.height - layout.intrinsicInsets.bottom) : miniPlayerY
         let tableHeight = max(0, tableBottom - tableY)
         self.tableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: tableHeight)
-    }
-    
-    public override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        if let layout = self.currentlyAppliedLayout {
-            self.containerLayoutUpdated(layout, transition: .immediate)
-        }
     }
     
     private func updateMiniPlayer() {
         let manager = SGDoxMusicManager.shared
         guard let track = manager.currentTrack else {
             self.miniPlayerContainer.isHidden = true
-            self.view.setNeedsLayout()
             return
         }
         
@@ -222,50 +397,42 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         let iconName = manager.isPlaying ? "pause.circle.fill" : "play.circle.fill"
         self.miniPlayPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
         
-        let duration = manager.duration > 0 ? manager.duration : 30.0
-        let progress = Float(manager.currentTime / duration)
-        self.miniProgressView.setProgress(progress, animated: true)
-        
         if let artwork = track.artworkUrl {
-            SGDoxImageLoader.shared.loadImage(urlString: artwork, targetSize: CGSize(width: 44, height: 44)) { [weak self] image in
+            SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak self] image in
                 self?.miniArtworkImageView.image = image
             }
         } else {
             self.miniArtworkImageView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
         }
-        
-        self.view.setNeedsLayout()
     }
     
     private func loadDefaultRecommendations() {
-        if SpotifyService.shared.isAuthorized {
-            SpotifyService.shared.fetchWaveTracks(basedOn: nil) { [weak self] tracks in
-                DispatchQueue.main.async {
-                    self?.searchResults = tracks
-                    self?.tableView.reloadData()
-                }
-            }
-        } else {
-            AppleMusicService.shared.fetchWaveTracks(basedOn: nil) { [weak self] tracks in
-                DispatchQueue.main.async {
-                    self?.searchResults = tracks
-                    self?.tableView.reloadData()
-                }
+        AppleMusicService.shared.fetchWaveTracks(basedOn: nil) { [weak self] tracks in
+            DispatchQueue.main.async {
+                self?.searchResults = tracks
+                self?.tableView.reloadData()
             }
         }
     }
     
-    // MARK: - Search
+    // MARK: - Debounced Search
     
     public func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty {
+        self.searchTimer?.invalidate()
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
             self.isSearching = false
             self.loadDefaultRecommendations()
             return
         }
         
         self.isSearching = true
+        self.searchTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
+            self?.performSearch(query: trimmed)
+        }
+    }
+    
+    private func performSearch(query: String) {
         if SpotifyService.shared.isAuthorized {
             SpotifyService.shared.search(query: query) { [weak self] tracks, _ in
                 DispatchQueue.main.async {
@@ -273,7 +440,6 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                         self?.searchResults = tracks
                         self?.tableView.reloadData()
                     } else {
-                        // Fallback to Apple Music catalog
                         AppleMusicService.shared.search(query: query) { appleTracks, _ in
                             DispatchQueue.main.async {
                                 self?.searchResults = appleTracks
@@ -295,6 +461,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     public func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
+        self.searchTimer?.invalidate()
+        let text = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !text.isEmpty {
+            self.performSearch(query: text)
+        }
     }
     
     // MARK: - TableView
@@ -317,232 +488,117 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         if !self.isSearching && indexPath.section == 1 {
-            return 96.0
+            return 88.0
         }
-        return 72.0
+        return 60.0
     }
     
-    public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        let title: String
+    public func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         if self.isSearching {
-            title = "РЕЗУЛЬТАТЫ ПОИСКА"
-        } else {
-            switch section {
-            case 0: title = "ИНТЕГРАЦИИ И АККАУНТЫ"
-            case 1: title = "ПЕРСОНАЛЬНЫЙ МИКС"
-            case 2: title = "РЕКОМЕНДАЦИИ И ТРЕКИ"
-            default: return nil
-            }
+            return "Результаты поиска"
         }
-        
-        let headerView = UIView()
-        headerView.backgroundColor = .clear
-        let label = UILabel(frame: CGRect(x: 20, y: 8, width: 300, height: 20))
-        label.text = title
-        label.font = UIFont.systemFont(ofSize: 12, weight: .bold)
-        label.textColor = UIColor(white: 1.0, alpha: 0.5)
-        headerView.addSubview(label)
-        return headerView
-    }
-    
-    public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        return 34.0
+        switch section {
+        case 0: return "Сервисы и интеграции"
+        case 1: return "Умный поток"
+        case 2: return "Рекомендации"
+        default: return nil
+        }
     }
     
     public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let theme = self.presentationData.theme
+        
         if !self.isSearching && indexPath.section == 0 {
-            let cell = tableView.dequeueReusableCell(withIdentifier: "ServiceCell", for: indexPath)
-            cell.backgroundColor = .clear
-            cell.selectionStyle = .none
-            cell.contentView.subviews.forEach { $0.removeFromSuperview() }
-            
-            let card = UIView(frame: CGRect(x: 16, y: 4, width: tableView.bounds.width - 32, height: 64))
-            card.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
-            card.layer.cornerRadius = 16
-            card.layer.borderWidth = 1.0
-            card.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
-            card.clipsToBounds = true
-            
-            let iconBox = UIView(frame: CGRect(x: 12, y: 12, width: 40, height: 40))
-            iconBox.layer.cornerRadius = 10
-            iconBox.clipsToBounds = true
-            
-            let iconImageView = UIImageView(frame: CGRect(x: 8, y: 8, width: 24, height: 24))
-            iconImageView.tintColor = .white
-            iconImageView.contentMode = .scaleAspectFit
-            iconBox.addSubview(iconImageView)
-            card.addSubview(iconBox)
-            
-            let titleLabel = UILabel(frame: CGRect(x: 64, y: 13, width: card.bounds.width - 130, height: 20))
-            titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .bold)
-            titleLabel.textColor = .white
-            card.addSubview(titleLabel)
-            
-            let statusLabel = UILabel(frame: CGRect(x: 64, y: 33, width: card.bounds.width - 130, height: 16))
-            statusLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-            card.addSubview(statusLabel)
-            
-            let badge = UILabel(frame: CGRect(x: card.bounds.width - 86, y: 18, width: 74, height: 28))
-            badge.layer.cornerRadius = 14
-            badge.clipsToBounds = true
-            badge.textAlignment = .center
-            badge.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-            card.addSubview(badge)
+            let cell = tableView.dequeueReusableCell(withIdentifier: "ServiceCell", for: indexPath) as! SGDoxServiceCell
+            cell.backgroundColor = theme.list.itemBlocksBackgroundColor
+            cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
+            cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
+            cell.chevronImageView.tintColor = theme.list.itemArrowColor
+            cell.separatorView.backgroundColor = theme.list.itemBlocksSeparatorColor
+            cell.separatorView.isHidden = indexPath.row == 2
             
             if indexPath.row == 0 {
                 // Apple Music
-                iconBox.backgroundColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
-                iconImageView.image = UIImage(systemName: "music.note")
-                titleLabel.text = "Apple Music"
+                cell.iconContainer.backgroundColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
+                cell.iconImageView.image = UIImage(systemName: "music.note")
+                cell.titleLabel.text = "Apple Music"
                 let isAuth = AppleMusicService.shared.isAuthorized
-                statusLabel.text = isAuth ? "Доступ к медиатеке разрешен" : "Нажмите для подключения"
-                statusLabel.textColor = isAuth ? UIColor(red: 0.3, green: 0.9, blue: 0.4, alpha: 0.9) : UIColor(white: 1.0, alpha: 0.5)
-                badge.text = isAuth ? "Вкл" : "Войти"
-                badge.backgroundColor = isAuth ? UIColor(red: 0.2, green: 0.8, blue: 0.3, alpha: 0.25) : UIColor(white: 1.0, alpha: 0.15)
-                badge.textColor = isAuth ? UIColor(red: 0.4, green: 1.0, blue: 0.5, alpha: 1.0) : .white
+                cell.statusLabel.text = isAuth ? "Подключено (Полное воспроизведение)" : "Нажмите для входа"
+                cell.statusLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
+                cell.badgeLabel.text = isAuth ? "Вкл" : "Войти"
+                cell.badgeLabel.backgroundColor = isAuth ? theme.list.itemAccentColor.withAlphaComponent(0.2) : theme.list.itemBlocksSeparatorColor
+                cell.badgeLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemPrimaryTextColor
             } else if indexPath.row == 1 {
                 // Spotify
-                iconBox.backgroundColor = UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 1.0)
-                iconImageView.image = UIImage(systemName: "waveform")
-                titleLabel.text = "Spotify"
+                cell.iconContainer.backgroundColor = UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 1.0)
+                cell.iconImageView.image = UIImage(systemName: "waveform")
+                cell.titleLabel.text = "Spotify"
                 let isAuth = SpotifyService.shared.isAuthorized
-                statusLabel.text = isAuth ? "Аккаунт подключен" : (SpotifyService.shared.hasCustomClientId ? "Client ID настроен" : "Нажмите для настройки входа")
-                statusLabel.textColor = isAuth ? UIColor(red: 0.3, green: 0.9, blue: 0.4, alpha: 0.9) : UIColor(white: 1.0, alpha: 0.5)
-                badge.text = isAuth ? "Вкл" : "Вход"
-                badge.backgroundColor = isAuth ? UIColor(red: 0.2, green: 0.8, blue: 0.3, alpha: 0.25) : UIColor(white: 1.0, alpha: 0.15)
-                badge.textColor = isAuth ? UIColor(red: 0.4, green: 1.0, blue: 0.5, alpha: 1.0) : .white
+                cell.statusLabel.text = isAuth ? "Подключено к аккаунту" : (SpotifyService.shared.hasCustomClientId ? "Client ID настроен" : "Нажмите для настройки")
+                cell.statusLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
+                cell.badgeLabel.text = isAuth ? "Вкл" : "Вход"
+                cell.badgeLabel.backgroundColor = isAuth ? theme.list.itemAccentColor.withAlphaComponent(0.2) : theme.list.itemBlocksSeparatorColor
+                cell.badgeLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemPrimaryTextColor
             } else {
                 // Discord RPC
-                iconBox.backgroundColor = UIColor(red: 0.35, green: 0.40, blue: 0.95, alpha: 1.0)
-                iconImageView.image = UIImage(systemName: "bubble.left.and.bubble.right.fill")
-                titleLabel.text = "Discord RPC"
+                cell.iconContainer.backgroundColor = UIColor(red: 0.35, green: 0.40, blue: 0.95, alpha: 1.0)
+                cell.iconImageView.image = UIImage(systemName: "bubble.left.and.bubble.right.fill")
+                cell.titleLabel.text = "Discord RPC"
                 let isEnabled = SGSimpleSettings.shared.discordRpcEnabled && !SGSimpleSettings.shared.discordRpcToken.isEmpty
                 switch DiscordRPCService.shared.status {
                 case .connected(let username):
-                    statusLabel.text = "В сети: \(username)"
-                    statusLabel.textColor = UIColor(red: 0.3, green: 0.9, blue: 0.4, alpha: 0.9)
+                    cell.statusLabel.text = "В сети: \(username)"
+                    cell.statusLabel.textColor = theme.list.itemAccentColor
                 case .connecting:
-                    statusLabel.text = "Подключение..."
-                    statusLabel.textColor = UIColor(red: 0.9, green: 0.7, blue: 0.2, alpha: 0.9)
+                    cell.statusLabel.text = "Подключение..."
+                    cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
                 case .error:
-                    statusLabel.text = "Ошибка токена"
-                    statusLabel.textColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 0.9)
+                    cell.statusLabel.text = "Ошибка токена"
+                    cell.statusLabel.textColor = theme.list.itemDestructiveColor
                 case .disconnected:
-                    statusLabel.text = isEnabled ? "Включен" : "Настроить User Token"
-                    statusLabel.textColor = UIColor(white: 1.0, alpha: 0.5)
+                    cell.statusLabel.text = isEnabled ? "Включен" : "Настроить токен"
+                    cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
                 }
-                badge.text = isEnabled ? "Вкл" : "Токен"
-                badge.backgroundColor = isEnabled ? UIColor(red: 0.2, green: 0.8, blue: 0.3, alpha: 0.25) : UIColor(white: 1.0, alpha: 0.15)
-                badge.textColor = isEnabled ? UIColor(red: 0.4, green: 1.0, blue: 0.5, alpha: 1.0) : .white
+                cell.badgeLabel.text = isEnabled ? "Вкл" : "Токен"
+                cell.badgeLabel.backgroundColor = isEnabled ? theme.list.itemAccentColor.withAlphaComponent(0.2) : theme.list.itemBlocksSeparatorColor
+                cell.badgeLabel.textColor = isEnabled ? theme.list.itemAccentColor : theme.list.itemPrimaryTextColor
             }
-            
-            cell.contentView.addSubview(card)
             return cell
         }
         
         if !self.isSearching && indexPath.section == 1 {
-            let cell = tableView.dequeueReusableCell(withIdentifier: "WaveHeroCell", for: indexPath)
-            cell.backgroundColor = .clear
-            cell.selectionStyle = .none
-            cell.contentView.subviews.forEach { $0.removeFromSuperview() }
-            
-            let card = UIView(frame: CGRect(x: 16, y: 4, width: tableView.bounds.width - 32, height: 88))
-            card.layer.cornerRadius = 20
-            card.clipsToBounds = true
-            
-            let gradient = CAGradientLayer()
-            gradient.frame = card.bounds
-            gradient.colors = [
-                UIColor(red: 0.95, green: 0.15, blue: 0.55, alpha: 0.95).cgColor,
-                UIColor(red: 0.50, green: 0.12, blue: 0.95, alpha: 0.95).cgColor,
-                UIColor(red: 0.15, green: 0.55, blue: 0.95, alpha: 0.90).cgColor
-            ]
-            gradient.startPoint = CGPoint(x: 0.0, y: 0.0)
-            gradient.endPoint = CGPoint(x: 1.0, y: 1.0)
-            card.layer.insertSublayer(gradient, at: 0)
-            
-            card.layer.borderWidth = 1.0
-            card.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
-            
-            let waveIcon = UIImageView(frame: CGRect(x: 18, y: 24, width: 40, height: 40))
-            waveIcon.image = UIImage(systemName: "dot.radiowaves.left.and.right")
-            waveIcon.tintColor = .white
-            waveIcon.contentMode = .scaleAspectFit
-            card.addSubview(waveIcon)
-            
-            let titleLabel = UILabel(frame: CGRect(x: 68, y: 20, width: card.bounds.width - 130, height: 24))
-            titleLabel.text = "⚡ Запустить «Мою волну»"
-            titleLabel.font = UIFont.systemFont(ofSize: 17, weight: .heavy)
-            titleLabel.textColor = .white
-            card.addSubview(titleLabel)
-            
-            let descLabel = UILabel(frame: CGRect(x: 68, y: 44, width: card.bounds.width - 130, height: 20))
-            descLabel.text = "Умный бесконечный поток музыки"
-            descLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-            descLabel.textColor = UIColor(white: 1.0, alpha: 0.85)
-            card.addSubview(descLabel)
-            
-            let playPill = UIView(frame: CGRect(x: card.bounds.width - 56, y: 26, width: 36, height: 36))
-            playPill.backgroundColor = UIColor(white: 1.0, alpha: 0.25)
-            playPill.layer.cornerRadius = 18
-            let playIcon = UIImageView(frame: CGRect(x: 10, y: 9, width: 18, height: 18))
-            playIcon.image = UIImage(systemName: "play.fill")
-            playIcon.tintColor = .white
-            playPill.addSubview(playIcon)
-            card.addSubview(playPill)
-            
-            cell.contentView.addSubview(card)
+            let cell = tableView.dequeueReusableCell(withIdentifier: "WaveHeroCell", for: indexPath) as! SGDoxWaveHeroCell
             return cell
         }
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "TrackCell", for: indexPath)
-        cell.backgroundColor = .clear
-        cell.selectionStyle = .none
-        cell.contentView.subviews.forEach { $0.removeFromSuperview() }
-        
+        let cell = tableView.dequeueReusableCell(withIdentifier: "TrackCell", for: indexPath) as! SGDoxTrackCell
         guard indexPath.row < self.searchResults.count else { return cell }
         let track = self.searchResults[indexPath.row]
         
-        let card = UIView(frame: CGRect(x: 16, y: 4, width: tableView.bounds.width - 32, height: 64))
-        card.backgroundColor = UIColor(white: 1.0, alpha: 0.06)
-        card.layer.cornerRadius = 14
-        card.layer.borderWidth = 1.0
-        card.layer.borderColor = UIColor(white: 1.0, alpha: 0.09).cgColor
-        card.clipsToBounds = true
+        cell.backgroundColor = theme.list.itemBlocksBackgroundColor
+        cell.titleLabel.text = track.title
+        cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
+        cell.artistLabel.text = track.artist
+        cell.artistLabel.textColor = theme.list.itemSecondaryTextColor
+        cell.playIcon.tintColor = theme.list.itemAccentColor
+        cell.separatorView.backgroundColor = theme.list.itemBlocksSeparatorColor
+        cell.separatorView.isHidden = indexPath.row == self.searchResults.count - 1
         
-        let artworkView = UIImageView(frame: CGRect(x: 10, y: 10, width: 44, height: 44))
-        artworkView.layer.cornerRadius = 8
-        artworkView.clipsToBounds = true
-        artworkView.contentMode = .scaleAspectFill
-        artworkView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
-        card.addSubview(artworkView)
+        cell.sourceBadge.text = track.source == .appleMusic ? "Apple" : "Spotify"
+        cell.sourceBadge.backgroundColor = track.source == .appleMusic ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.15) : UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 0.15)
+        cell.sourceBadge.textColor = track.source == .appleMusic ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 1.0)
         
+        cell.currentTrackId = track.id
         if let artwork = track.artworkUrl {
-            SGDoxImageLoader.shared.loadImage(urlString: artwork, targetSize: CGSize(width: 44, height: 44)) { [weak artworkView] image in
-                artworkView?.image = image
+            SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak cell] image in
+                if cell?.currentTrackId == track.id {
+                    cell?.artworkView.image = image
+                }
             }
         } else {
-            artworkView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
+            cell.artworkView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
         }
         
-        let titleLabel = UILabel(frame: CGRect(x: 64, y: 13, width: card.bounds.width - 120, height: 20))
-        titleLabel.text = track.title
-        titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .bold)
-        titleLabel.textColor = .white
-        card.addSubview(titleLabel)
-        
-        let subtitleLabel = UILabel(frame: CGRect(x: 64, y: 33, width: card.bounds.width - 120, height: 16))
-        subtitleLabel.text = "\(track.artist) • \(track.source.rawValue)"
-        subtitleLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-        subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.6)
-        card.addSubview(subtitleLabel)
-        
-        let playButton = UIImageView(frame: CGRect(x: card.bounds.width - 42, y: 20, width: 24, height: 24))
-        playButton.image = UIImage(systemName: "play.circle.fill")
-        playButton.tintColor = UIColor(white: 1.0, alpha: 0.7)
-        card.addSubview(playButton)
-        
-        cell.contentView.addSubview(card)
         return cell
     }
     
@@ -551,15 +607,12 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         
         if !self.isSearching && indexPath.section == 0 {
             if indexPath.row == 0 {
-                // Apple Music authorization
                 AppleMusicService.shared.requestAuthorization { [weak self] _ in
                     DispatchQueue.main.async { self?.tableView.reloadData() }
                 }
             } else if indexPath.row == 1 {
-                // Spotify Configuration Dialog
                 self.presentSpotifyMenu()
             } else {
-                // Discord RPC dialog
                 self.presentDiscordRpcDialog()
             }
             return
@@ -579,13 +632,13 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.openPlayer()
     }
     
-    // MARK: - Spotify & Discord Dialogs
+    // MARK: - Dialogs
     
     private func presentSpotifyMenu() {
         let isAuth = SpotifyService.shared.isAuthorized
         let alert = UIAlertController(
             title: "Spotify",
-            message: isAuth ? "Spotify подключен к вашему аккаунту." : "Выберите способ входа в Spotify:",
+            message: isAuth ? "Spotify подключен к вашему аккаунту." : "Выберите способ подключения:",
             preferredStyle: .actionSheet
         )
         
@@ -595,7 +648,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                 self?.tableView.reloadData()
             }))
         } else {
-            alert.addAction(UIAlertAction(title: "Войти через OAuth (Браузер)", style: .default, handler: { [weak self] _ in
+            alert.addAction(UIAlertAction(title: "Войти через OAuth", style: .default, handler: { [weak self] _ in
                 guard let self = self else { return }
                 if !SpotifyService.shared.hasCustomClientId {
                     self.presentSpotifyClientIdInput(promptBeforeOAuth: true)
@@ -613,11 +666,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                 }
             }))
             
-            alert.addAction(UIAlertAction(title: "Ввести Spotify Client ID", style: .default, handler: { [weak self] _ in
+            alert.addAction(UIAlertAction(title: "Ввести Client ID", style: .default, handler: { [weak self] _ in
                 self?.presentSpotifyClientIdInput(promptBeforeOAuth: false)
             }))
             
-            alert.addAction(UIAlertAction(title: "Вставить Access Token напрямую", style: .default, handler: { [weak self] _ in
+            alert.addAction(UIAlertAction(title: "Вставить Access Token", style: .default, handler: { [weak self] _ in
                 self?.presentSpotifyTokenInput()
             }))
         }
@@ -629,7 +682,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     private func presentSpotifyClientIdInput(promptBeforeOAuth: Bool) {
         let alert = UIAlertController(
             title: "Spotify Client ID",
-            message: "Создайте приложение на developer.spotify.com, добавьте Redirect URI tg://spotify-callback и вставьте Client ID сюда:",
+            message: "Введите Client ID приложения из developer.spotify.com (Redirect URI tg://spotify-callback):",
             preferredStyle: .alert
         )
         alert.addTextField { textField in
@@ -665,11 +718,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     private func presentSpotifyTokenInput() {
         let alert = UIAlertController(
             title: "Spotify Access Token",
-            message: "Вставьте действующий Bearer Access Token аккаунта Spotify:",
+            message: "Вставьте Access Token Spotify:",
             preferredStyle: .alert
         )
         alert.addTextField { textField in
-            textField.placeholder = "BQB... / Access Token"
+            textField.placeholder = "Token..."
             textField.clearButtonMode = .whileEditing
             textField.autocapitalizationType = .none
             textField.autocorrectionType = .no
@@ -686,7 +739,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     private func presentDiscordRpcDialog() {
         let alert = UIAlertController(
             title: "Discord Rich Presence",
-            message: "Введите User Token от Discord для отображения музыки в статусе профиля:",
+            message: "Введите User Token от Discord для отображения музыки в профиле:",
             preferredStyle: .alert
         )
         alert.addTextField { textField in

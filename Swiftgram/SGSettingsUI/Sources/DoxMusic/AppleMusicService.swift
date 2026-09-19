@@ -17,6 +17,10 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     private var avPlayer: AVPlayer?
+    private var systemPlayer: MPMusicPlayerController {
+        return MPMusicPlayerController.systemMusicPlayer
+    }
+    public private(set) var isUsingSystemPlayer = false
     
     private init() {}
     
@@ -41,18 +45,12 @@ public final class AppleMusicService: @unchecked Sendable {
                     completion(status == .authorized)
                 }
             }
-            #else
-            SKCloudServiceController.requestAuthorization { status in
-                DispatchQueue.main.async {
-                    completion(status == .authorized)
-                }
-            }
+            return
             #endif
-        } else {
-            SKCloudServiceController.requestAuthorization { status in
-                DispatchQueue.main.async {
-                    completion(status == .authorized)
-                }
+        }
+        SKCloudServiceController.requestAuthorization { status in
+            DispatchQueue.main.async {
+                completion(status == .authorized)
             }
         }
     }
@@ -64,61 +62,70 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
-        if self.isAuthorized {
-            #if canImport(MusicKit)
-            if #available(iOS 15.0, *) {
-                Task {
-                    do {
-                        var request = MusicCatalogSearchRequest(term: trimmed, types: [Song.self])
-                        request.limit = 25
-                        let response = try await request.response()
-                        
-                        let tracks: [SGDoxMusicTrack] = response.songs.map { song in
-                            let artworkUrl = song.artwork?.url(width: 600, height: 600)?.absoluteString
-                            let duration = song.duration ?? 0.0
-                            let previewUrl = song.previewAssets?.first?.url?.absoluteString
+        self.searchITunesPublic(query: trimmed) { [weak self] tracks, error in
+            if !tracks.isEmpty {
+                completion(tracks, nil)
+            } else if let self = self, self.isAuthorized {
+                #if canImport(MusicKit)
+                if #available(iOS 15.0, *) {
+                    Task {
+                        do {
+                            var request = MusicCatalogSearchRequest(term: trimmed, types: [Song.self])
+                            request.limit = 30
+                            let response = try await request.response()
                             
-                            return SGDoxMusicTrack(
-                                id: song.id.rawValue,
-                                title: song.title,
-                                artist: song.artistName,
-                                album: song.albumTitle ?? "",
-                                artworkUrl: artworkUrl,
-                                duration: duration,
-                                previewUrl: previewUrl,
-                                source: .appleMusic,
-                                appleMusicId: song.id.rawValue
-                            )
-                        }
-                        
-                        if !tracks.isEmpty {
-                            DispatchQueue.main.async {
-                                completion(tracks, nil)
+                            let musicKitTracks: [SGDoxMusicTrack] = response.songs.map { song in
+                                let artworkUrl = song.artwork?.url(width: 600, height: 600)?.absoluteString
+                                let duration = song.duration ?? 0.0
+                                let previewUrl = song.previewAssets?.first?.url?.absoluteString
+                                
+                                return SGDoxMusicTrack(
+                                    id: song.id.rawValue,
+                                    title: song.title,
+                                    artist: song.artistName,
+                                    album: song.albumTitle ?? "",
+                                    artworkUrl: artworkUrl,
+                                    duration: duration,
+                                    previewUrl: previewUrl,
+                                    source: .appleMusic,
+                                    appleMusicId: song.id.rawValue
+                                )
                             }
-                            return
+                            DispatchQueue.main.async {
+                                completion(musicKitTracks, nil)
+                            }
+                        } catch {
+                            DispatchQueue.main.async {
+                                completion([], error.localizedDescription)
+                            }
                         }
-                    } catch {
                     }
-                    self.searchITunesPublic(query: trimmed, completion: completion)
+                    return
                 }
-                return
+                #endif
+                completion([], error)
+            } else {
+                completion([], error)
             }
-            #endif
         }
-        
-        self.searchITunesPublic(query: trimmed, completion: completion)
     }
     
     public func searchITunesPublic(query: String, completion: @escaping @Sendable ([SGDoxMusicTrack], String?) -> Void) {
-        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed),
-              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=song&limit=25") else {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) else {
+            completion([], "Invalid search query")
+            return
+        }
+        
+        let country = Locale.current.regionCode ?? "RU"
+        let urlString = "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=song&limit=30&country=\(country)"
+        guard let url = URL(string: urlString) else {
             completion([], "Invalid URL")
             return
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 10.0
+        request.timeoutInterval = 12.0
         
         URLSession.shared.dataTask(with: request) { data, _, error in
             if let error = error {
@@ -140,9 +147,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 }
                 let album = item["collectionName"] as? String ?? ""
                 let artwork100 = item["artworkUrl100"] as? String
-                let artworkUrl = artwork100?
-                    .replacingOccurrences(of: "100x100bb.jpg", with: "600x600bb.jpg")
-                    .replacingOccurrences(of: "100x100bb.png", with: "600x600bb.png") ?? artwork100
+                let artworkUrl = artwork100?.replacingOccurrences(of: "100x100bb", with: "600x600bb") ?? artwork100
                 let previewUrl = item["previewUrl"] as? String
                 let durationMs = item["trackTimeMillis"] as? Double ?? 30000.0
                 let duration = durationMs / 1000.0
@@ -167,7 +172,7 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
-        let query = (track?.artist.isEmpty == false) ? track!.artist : "Hits"
+        let query = (track?.artist.isEmpty == false) ? track!.artist : "Top Hits"
         self.search(query: query) { tracks, _ in
             if let track = track {
                 completion(tracks.filter { $0.id != track.id })
@@ -177,46 +182,41 @@ public final class AppleMusicService: @unchecked Sendable {
         }
     }
     
+    // MARK: - Playback (Full Songs via MPMusicPlayerController or Preview)
+    
     public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
-        if #available(iOS 15.0, *) {
-            #if canImport(MusicKit)
-            guard let appleMusicId = track.appleMusicId else {
-                completion(false)
-                return
-            }
-            Task {
-                do {
-                    let songId = MusicItemID(appleMusicId)
-                    let songRequest = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: songId)
-                    let songResponse = try await songRequest.response()
-                    if let song = songResponse.items.first {
-                        let player = ApplicationMusicPlayer.shared
-                        player.queue = [song]
-                        try await player.play()
-                        DispatchQueue.main.async {
-                            completion(true)
-                        }
-                        return
-                    }
-                } catch {
-                    // Fallback to preview stream
-                    if let preview = track.previewUrl, let url = URL(string: preview) {
-                        self.playPreview(url: url, completion: completion)
-                        return
-                    }
+        // Attempt full playback via official Apple Music player first
+        if let appleMusicId = track.appleMusicId, !appleMusicId.isEmpty {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.avPlayer?.pause()
+                self.avPlayer = nil
+                
+                let player = self.systemPlayer
+                player.setQueue(withStoreIDs: [appleMusicId])
+                player.prepareToPlay { [weak self] error in
                     DispatchQueue.main.async {
-                        completion(false)
+                        if error == nil {
+                            player.play()
+                            self?.isUsingSystemPlayer = true
+                            completion(true)
+                        } else {
+                            // Fallback to preview stream
+                            self?.isUsingSystemPlayer = false
+                            if let preview = track.previewUrl, let url = URL(string: preview) {
+                                self?.playPreview(url: url, completion: completion)
+                            } else {
+                                completion(false)
+                            }
+                        }
                     }
                 }
             }
-            #else
-            if let preview = track.previewUrl, let url = URL(string: preview) {
-                self.playPreview(url: url, completion: completion)
-            } else {
-                completion(false)
-            }
-            #endif
-        } else if let preview = track.previewUrl, let url = URL(string: preview) {
+            return
+        }
+        
+        if let preview = track.previewUrl, let url = URL(string: preview) {
+            self.isUsingSystemPlayer = false
             self.playPreview(url: url, completion: completion)
         } else {
             completion(false)
@@ -224,6 +224,8 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     private func playPreview(url: URL, completion: @escaping @Sendable (Bool) -> Void) {
+        self.systemPlayer.stop()
+        self.isUsingSystemPlayer = false
         self.avPlayer?.pause()
         let playerItem = AVPlayerItem(url: url)
         let player = AVPlayer(playerItem: playerItem)
@@ -235,22 +237,34 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     public func pause() {
-        if #available(iOS 15.0, *) {
-            #if canImport(MusicKit)
-            ApplicationMusicPlayer.shared.pause()
-            #endif
+        if self.isUsingSystemPlayer {
+            self.systemPlayer.pause()
         }
         self.avPlayer?.pause()
     }
     
     public func resume() {
-        if #available(iOS 15.0, *) {
-            #if canImport(MusicKit)
-            Task {
-                try? await ApplicationMusicPlayer.shared.play()
-            }
-            #endif
+        if self.isUsingSystemPlayer {
+            self.systemPlayer.play()
+        } else {
+            self.avPlayer?.play()
         }
-        self.avPlayer?.play()
+    }
+    
+    public var currentPlaybackTime: Double {
+        if self.isUsingSystemPlayer {
+            let time = self.systemPlayer.currentPlaybackTime
+            return time.isNaN ? 0.0 : time
+        }
+        let seconds = self.avPlayer?.currentTime().seconds ?? 0.0
+        return seconds.isNaN ? 0.0 : seconds
+    }
+    
+    public var playbackDuration: Double {
+        if self.isUsingSystemPlayer, let duration = self.systemPlayer.nowPlayingItem?.playbackDuration, duration > 0 {
+            return duration
+        }
+        let seconds = self.avPlayer?.currentItem?.duration.seconds ?? 0.0
+        return seconds.isNaN ? 0.0 : seconds
     }
 }
