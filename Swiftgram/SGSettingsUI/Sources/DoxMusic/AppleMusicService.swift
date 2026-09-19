@@ -379,8 +379,8 @@ public final class AppleMusicService: @unchecked Sendable {
                     SGDoxImageLoader.shared.storeImage(art, for: localKey)
                 }
                 
-                let storeId = item.playbackStoreID ?? (item.value(forProperty: "playbackStoreID") as? String)
-                let effectiveId = (storeId != nil && storeId != "0" && !storeId!.isEmpty) ? storeId! : "local_\(id)"
+                let storeId = item.playbackStoreID
+                let effectiveId = (!storeId.isEmpty && storeId != "0") ? storeId : "local_\(id)"
                 
                 return SGDoxMusicTrack(
                     id: localKey,

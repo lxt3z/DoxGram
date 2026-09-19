@@ -95,7 +95,6 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         let size = CGSize(width: 80, height: 80)
         let renderer = UIGraphicsImageRenderer(size: size)
         let image = renderer.image { ctx in
-            let rect = CGRect(origin: .zero, size: size)
             let colors = [
                 UIColor(red: 0.18, green: 0.18, blue: 0.22, alpha: 1.0).cgColor,
                 UIColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1.0).cgColor
