@@ -17,9 +17,7 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     private var avPlayer: AVPlayer?
-    private var systemPlayer: MPMusicPlayerController {
-        return MPMusicPlayerController.systemMusicPlayer
-    }
+    private let player = MPMusicPlayerController.applicationMusicPlayer
     public private(set) var isUsingSystemPlayer = false
     
     private init() {}
@@ -441,11 +439,14 @@ public final class AppleMusicService: @unchecked Sendable {
         // Attempt full playback via official Apple Music player first
         if let appleMusicId = track.appleMusicId, !appleMusicId.isEmpty {
             DispatchQueue.main.async { [weak self] in
+                self?.avPlayer?.pause()
+                self?.avPlayer = nil
+            }
+            
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
-                self.avPlayer?.pause()
-                self.avPlayer = nil
                 
-                let player = self.systemPlayer
+                let player = self.player
                 if appleMusicId.hasPrefix("local_"), let pid = UInt64(appleMusicId.replacingOccurrences(of: "local_", with: "")) {
                     let query = MPMediaQuery.songs()
                     query.addFilterPredicate(MPMediaPropertyPredicate(value: pid, forProperty: MPMediaItemPropertyPersistentID))
@@ -484,7 +485,7 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     private func playPreview(url: URL, completion: @escaping @Sendable (Bool) -> Void) {
-        self.systemPlayer.stop()
+        self.player.stop()
         self.isUsingSystemPlayer = false
         self.avPlayer?.pause()
         let playerItem = AVPlayerItem(url: url)
@@ -498,33 +499,41 @@ public final class AppleMusicService: @unchecked Sendable {
     
     public func pause() {
         if self.isUsingSystemPlayer {
-            self.systemPlayer.pause()
+            self.player.pause()
         }
         self.avPlayer?.pause()
     }
     
     public func resume() {
         if self.isUsingSystemPlayer {
-            self.systemPlayer.play()
+            self.player.play()
         } else {
             self.avPlayer?.play()
         }
     }
     
+    public func seek(to seconds: Double) {
+        if self.isUsingSystemPlayer {
+            self.player.currentPlaybackTime = seconds
+        } else {
+            self.avPlayer?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+        }
+    }
+    
     public var currentPlaybackTime: Double {
         if self.isUsingSystemPlayer {
-            let time = self.systemPlayer.currentPlaybackTime
-            return time.isNaN ? 0.0 : time
+            let time = self.player.currentPlaybackTime
+            return (time.isFinite && !time.isNaN && time >= 0) ? time : 0.0
         }
         let seconds = self.avPlayer?.currentTime().seconds ?? 0.0
-        return seconds.isNaN ? 0.0 : seconds
+        return (seconds.isFinite && !seconds.isNaN && seconds >= 0) ? seconds : 0.0
     }
     
     public var playbackDuration: Double {
-        if self.isUsingSystemPlayer, let duration = self.systemPlayer.nowPlayingItem?.playbackDuration, duration > 0 {
-            return duration
+        if !self.isUsingSystemPlayer {
+            let seconds = self.avPlayer?.currentItem?.duration.seconds ?? 0.0
+            return (seconds.isFinite && !seconds.isNaN && seconds > 0) ? seconds : 0.0
         }
-        let seconds = self.avPlayer?.currentItem?.duration.seconds ?? 0.0
-        return seconds.isNaN ? 0.0 : seconds
+        return 0.0
     }
 }

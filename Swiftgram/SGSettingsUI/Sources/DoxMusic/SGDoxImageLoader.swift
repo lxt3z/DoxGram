@@ -46,30 +46,14 @@ public final class SGDoxImageLoader: @unchecked Sendable {
             return
         }
         
-        // Handle local Apple Music library persistent IDs
+        // Handle local Apple Music library persistent IDs (already pre-cached in fetchLibrarySongs)
         if trimmed.hasPrefix("am_local_") {
-            let pidString = trimmed.replacingOccurrences(of: "am_local_", with: "")
-            if let pid = UInt64(pidString) {
-                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                    let query = MPMediaQuery.songs()
-                    query.addFilterPredicate(MPMediaPropertyPredicate(value: pid, forProperty: MPMediaItemPropertyPersistentID))
-                    if let item = query.items?.first, let art = item.artwork?.image(at: targetSize ?? CGSize(width: 300, height: 300)) {
-                        self?.memoryCache.setObject(art, forKey: cacheKey)
-                        DispatchQueue.main.async {
-                            MainActor.assumeIsolated {
-                                completion(art)
-                            }
-                        }
-                    } else {
-                        DispatchQueue.main.async {
-                            MainActor.assumeIsolated {
-                                completion(nil)
-                            }
-                        }
-                    }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    completion(nil)
                 }
-                return
             }
+            return
         }
         
         guard let url = URL(string: trimmed) else {

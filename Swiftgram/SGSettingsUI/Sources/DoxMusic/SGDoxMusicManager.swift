@@ -168,6 +168,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private var timeObserver: Any?
     private var avPlayer: AVPlayer?
     private var playbackTimer: Foundation.Timer?
+    private var playbackStartTimestamp: Double = 0.0
+    private var playbackStartOffset: Double = 0.0
     private var stateListeners: [() -> Void] = []
     private var timeListeners: [(Double, Double) -> Void] = []
     private var lastReportedTrackId: String?
@@ -216,23 +218,30 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     private func startTimeTracking() {
         self.stopTimeTracking()
+        self.playbackStartTimestamp = CACurrentMediaTime()
+        self.playbackStartOffset = self.currentTime
+        
         self.playbackTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self = self, self.isPlaying else { return }
-            var current = self.currentTime
-            var total = self.duration
+            
+            let elapsed = CACurrentMediaTime() - self.playbackStartTimestamp
+            var current = self.playbackStartOffset + elapsed
+            let total = self.duration
             
             if let track = self.currentTrack {
                 switch track.source {
                 case .appleMusic:
-                    current = AppleMusicService.shared.currentPlaybackTime
-                    let d = AppleMusicService.shared.playbackDuration
-                    if d > 0 { total = d }
+                    // If playing 30s AVPlayer preview, AVPlayer has precise in-process seconds
+                    if !AppleMusicService.shared.isUsingSystemPlayer {
+                        let t = AppleMusicService.shared.currentPlaybackTime
+                        if t.isFinite && !t.isNaN && t > 0 { current = t }
+                    }
                 case .spotify:
-                    current += 0.5
+                    break
                 case .telegram:
                     if let p = self.avPlayer {
-                        current = p.currentTime().seconds
-                        if let d = p.currentItem?.duration.seconds, d > 0 { total = d }
+                        let t = p.currentTime().seconds
+                        if t.isFinite && !t.isNaN && t >= 0 { current = t }
                     }
                 }
             }
@@ -240,20 +249,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             if current.isFinite && !current.isNaN {
                 self.currentTime = current
             }
-            if total.isFinite && !total.isNaN && total > 0 {
-                self.duration = total
-                if abs(total - self.lastReportedDuration) > 1.0 {
-                    self.lastReportedDuration = total
-                    if self.isPlaying {
-                        DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: current, duration: total)
-                    }
-                }
-            }
             
-            DispatchQueue.main.async {
-                for listener in self.timeListeners {
-                    listener(self.currentTime, self.duration)
-                }
+            for listener in self.timeListeners {
+                listener(self.currentTime, self.duration)
             }
             
             // Check if track ended
@@ -277,6 +275,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.currentTrack = track
         self.duration = track.duration > 0 ? track.duration : 30.0
         self.currentTime = 0.0
+        self.playbackStartTimestamp = CACurrentMediaTime()
+        self.playbackStartOffset = 0.0
         
         if !queue.isEmpty {
             var q = queue.filter { $0.id != track.id }
@@ -362,6 +362,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     public func resume() {
         if let track = self.currentTrack {
             self.isPlaying = true
+            self.playbackStartTimestamp = CACurrentMediaTime()
+            self.playbackStartOffset = self.currentTime
             switch track.source {
             case .appleMusic:
                 AppleMusicService.shared.resume()
@@ -420,7 +422,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     public func seek(to seconds: Double) {
         self.currentTime = seconds
+        self.playbackStartTimestamp = CACurrentMediaTime()
+        self.playbackStartOffset = seconds
         self.avPlayer?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+        AppleMusicService.shared.seek(to: seconds)
         if self.isPlaying {
             DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: seconds, duration: self.duration)
         }

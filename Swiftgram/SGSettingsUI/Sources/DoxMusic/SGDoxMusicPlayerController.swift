@@ -336,13 +336,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.artistLabel.text = track.artist
             self.sourceLabel.text = "Играет из \(track.source.rawValue)"
             
+            self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
             if let artworkUrl = track.artworkUrl {
                 SGDoxImageLoader.shared.loadImage(urlString: artworkUrl, targetSize: CGSize(width: 320, height: 320)) { [weak self] image in
-                    self?.artworkImageView.image = image
-                    self?.backgroundImageView.image = image
+                    if self?.displayedTrackId == track.id, let image = image {
+                        self?.artworkImageView.image = image
+                        self?.backgroundImageView.image = image
+                    }
                 }
             } else {
-                self.artworkImageView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
                 self.backgroundImageView.image = nil
             }
         }

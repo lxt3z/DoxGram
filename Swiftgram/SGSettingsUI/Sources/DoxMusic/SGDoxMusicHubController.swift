@@ -330,8 +330,13 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.setupMiniPlayer()
         
         SGDoxMusicManager.shared.addStateListener { [weak self] in
-            self?.updateMiniPlayer()
-            self?.tableView.reloadData()
+            guard let self = self else { return }
+            self.updateMiniPlayer()
+            if let visible = self.tableView.indexPathsForVisibleRows {
+                self.tableView.reloadRows(at: visible, with: .none)
+            } else {
+                self.tableView.reloadData()
+            }
         }
         
         SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
@@ -341,7 +346,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         
         DiscordRPCService.shared.onStatusChanged = { [weak self] _ in
-            self?.tableView.reloadData()
+            guard let self = self else { return }
+            let serviceIndex = IndexPath(row: 2, section: 0)
+            if self.tableView.numberOfSections > 0 && self.tableView.numberOfRows(inSection: 0) > 2 {
+                self.tableView.reloadRows(at: [serviceIndex], with: .none)
+            }
         }
         
         SGDoxMusicManager.shared.syncFavoritesWithServices()
