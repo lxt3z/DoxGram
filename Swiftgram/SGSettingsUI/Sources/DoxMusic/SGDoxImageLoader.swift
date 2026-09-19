@@ -24,6 +24,20 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         self.session = URLSession(configuration: config)
     }
     
+    private func dispatchMain(image: UIImage?, completion: @escaping @MainActor (UIImage?) -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                completion(image)
+            }
+        } else {
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    completion(image)
+                }
+            }
+        }
+    }
+    
     public func storeImage(_ image: UIImage, for key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -36,20 +50,16 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         return self.memoryCache.object(forKey: trimmed as NSString)
     }
     
-    public func loadImage(urlString: String, targetSize: CGSize? = nil, scale: CGFloat = 2.0, completion: @escaping @Sendable (UIImage?) -> Void) {
+    public func loadImage(urlString: String, targetSize: CGSize? = nil, scale: CGFloat = 2.0, completion: @escaping @MainActor (UIImage?) -> Void) {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            DispatchQueue.main.async {
-                completion(nil)
-            }
+            self.dispatchMain(image: nil, completion: completion)
             return
         }
         
         let cacheKey = trimmed as NSString
         if let cached = self.memoryCache.object(forKey: cacheKey) {
-            DispatchQueue.main.async {
-                completion(cached)
-            }
+            self.dispatchMain(image: cached, completion: completion)
             return
         }
         
@@ -66,9 +76,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                         self.memoryCache.setObject(art, forKey: cacheKey)
                         loadedImg = art
                     }
-                    DispatchQueue.main.async {
-                        completion(loadedImg)
-                    }
+                    self.dispatchMain(image: loadedImg, completion: completion)
                 }
                 return
             }
@@ -83,9 +91,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         }
         
         guard let url = URL(string: effectiveUrl) else {
-            DispatchQueue.main.async {
-                completion(nil)
-            }
+            self.dispatchMain(image: nil, completion: completion)
             return
         }
         
@@ -98,32 +104,25 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                 if effectiveUrl.contains("600x600") {
                     let fallbackStr = effectiveUrl.replacingOccurrences(of: "600x600", with: "100x100")
                     if let fallbackUrl = URL(string: fallbackStr) {
-                        self?.session.dataTask(with: URLRequest(url: fallbackUrl)) { fbData, _, _ in
+                        self?.session.dataTask(with: URLRequest(url: fallbackUrl)) { [weak self] fbData, _, _ in
+                            guard let self = self else { return }
                             if let fbData = fbData, let fbImg = UIImage(data: fbData) {
-                                self?.memoryCache.setObject(fbImg, forKey: cacheKey, cost: fbData.count)
-                                DispatchQueue.main.async {
-                                    completion(fbImg)
-                                }
+                                self.memoryCache.setObject(fbImg, forKey: cacheKey, cost: fbData.count)
+                                self.dispatchMain(image: fbImg, completion: completion)
                             } else {
-                                DispatchQueue.main.async {
-                                    completion(nil)
-                                }
+                                self.dispatchMain(image: nil, completion: completion)
                             }
                         }.resume()
                         return
                     }
                 }
                 
-                DispatchQueue.main.async {
-                    completion(nil)
-                }
+                self?.dispatchMain(image: nil, completion: completion)
                 return
             }
             
             self.memoryCache.setObject(image, forKey: cacheKey, cost: data.count)
-            DispatchQueue.main.async {
-                completion(image)
-            }
+            self.dispatchMain(image: image, completion: completion)
         }.resume()
     }
     
