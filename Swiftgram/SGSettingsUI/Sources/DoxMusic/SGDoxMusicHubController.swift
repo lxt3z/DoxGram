@@ -407,12 +407,24 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     }
     
     private func loadDefaultRecommendations() {
-        AppleMusicService.shared.fetchWaveTracks(basedOn: nil) { [weak self] tracks in
-            DispatchQueue.main.async {
-                self?.searchResults = tracks
-                self?.tableView.reloadData()
-            }
+        if !SGDoxMusicManager.shared.history.isEmpty {
+            self.searchResults = Array(SGDoxMusicManager.shared.history.suffix(20).reversed())
+            self.tableView.reloadData()
+            return
         }
+        
+        if AppleMusicService.shared.isAuthorized {
+            AppleMusicService.shared.fetchUserPersonalMusic { [weak self] tracks in
+                DispatchQueue.main.async {
+                    self?.searchResults = tracks
+                    self?.tableView.reloadData()
+                }
+            }
+            return
+        }
+        
+        self.searchResults = []
+        self.tableView.reloadData()
     }
     
     // MARK: - Debounced Search
@@ -433,27 +445,30 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     }
     
     private func performSearch(query: String) {
-        if SpotifyService.shared.isAuthorized {
+        if SpotifyService.shared.isAuthorized && !AppleMusicService.shared.isAuthorized {
             SpotifyService.shared.search(query: query) { [weak self] tracks, _ in
-                DispatchQueue.main.async {
-                    if !tracks.isEmpty {
-                        self?.searchResults = tracks
-                        self?.tableView.reloadData()
-                    } else {
-                        AppleMusicService.shared.search(query: query) { appleTracks, _ in
-                            DispatchQueue.main.async {
-                                self?.searchResults = appleTracks
-                                self?.tableView.reloadData()
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            AppleMusicService.shared.search(query: query) { [weak self] tracks, _ in
                 DispatchQueue.main.async {
                     self?.searchResults = tracks
                     self?.tableView.reloadData()
+                }
+            }
+        } else {
+            AppleMusicService.shared.search(query: query) { [weak self] appleTracks, _ in
+                DispatchQueue.main.async {
+                    if !appleTracks.isEmpty {
+                        self?.searchResults = appleTracks
+                        self?.tableView.reloadData()
+                    } else if SpotifyService.shared.isAuthorized {
+                        SpotifyService.shared.search(query: query) { spotifyTracks, _ in
+                            DispatchQueue.main.async {
+                                self?.searchResults = spotifyTracks
+                                self?.tableView.reloadData()
+                            }
+                        }
+                    } else {
+                        self?.searchResults = []
+                        self?.tableView.reloadData()
+                    }
                 }
             }
         }
@@ -471,7 +486,10 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     // MARK: - TableView
     
     public func numberOfSections(in tableView: UITableView) -> Int {
-        return self.isSearching ? 1 : 3
+        if self.isSearching {
+            return 1
+        }
+        return self.searchResults.isEmpty ? 2 : 3
     }
     
     public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -495,12 +513,12 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     public func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         if self.isSearching {
-            return "Результаты поиска"
+            return self.searchResults.isEmpty ? "Ничего не найдено" : "Результаты поиска (\(self.searchResults.count))"
         }
         switch section {
         case 0: return "Сервисы и интеграции"
         case 1: return "Умный поток"
-        case 2: return "Рекомендации"
+        case 2: return self.searchResults.isEmpty ? nil : "Недавно прослушано"
         default: return nil
         }
     }
