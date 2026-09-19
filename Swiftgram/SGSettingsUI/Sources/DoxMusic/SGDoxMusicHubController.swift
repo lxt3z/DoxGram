@@ -314,7 +314,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     private var searchResults: [SGDoxMusicTrack] = []
     private var isSearching = false
-    private var searchTimer: Timer?
+    private var searchTimer: Foundation.Timer?
     private var activeSearchTask: URLSessionDataTask?
     
     public init(context: AccountContext) {
@@ -522,7 +522,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         
         self.isSearching = true
-        self.searchTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
+        self.searchTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
             self?.performSearch(query: trimmed)
         }
     }
@@ -655,7 +655,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             cell.backgroundColor = theme.list.itemBlocksBackgroundColor
             cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
             cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
-            cell.chevronImageView.tintColor = theme.list.itemArrowColor
+            cell.chevronImageView.tintColor = theme.list.disclosureArrowColor
             cell.separatorView.backgroundColor = theme.list.itemBlocksSeparatorColor
             cell.separatorView.isHidden = indexPath.row == 2
             

@@ -167,7 +167,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     private var timeObserver: Any?
     private var avPlayer: AVPlayer?
-    private var playbackTimer: Timer?
+    private var playbackTimer: Foundation.Timer?
     private var stateListeners: [() -> Void] = []
     private var timeListeners: [(Double, Double) -> Void] = []
     private var lastReportedTrackId: String?
@@ -216,7 +216,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     private func startTimeTracking() {
         self.stopTimeTracking()
-        self.playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        self.playbackTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self = self, self.isPlaying else { return }
             var current = self.currentTime
             var total = self.duration
@@ -376,7 +376,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     public func next() {
-        if self.repeatMode == .one, let current = self.currentTrack {
+        if self.repeatMode == .one, self.currentTrack != nil {
             self.seek(to: 0.0)
             self.resume()
             return

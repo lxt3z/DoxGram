@@ -244,7 +244,7 @@ public final class AppleMusicService: @unchecked Sendable {
     
     public func fetchUserPersonalMusic(completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
         #if canImport(MusicKit)
-        if #available(iOS 15.0, *) {
+        if #available(iOS 16.0, *) {
             if self.isAuthorized {
                 Task {
                     do {
@@ -327,7 +327,7 @@ public final class AppleMusicService: @unchecked Sendable {
     
     public func fetchLibrarySongs(limit: Int = 100, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
         #if canImport(MusicKit)
-        if #available(iOS 15.0, *) {
+        if #available(iOS 16.0, *) {
             if self.isAuthorized {
                 Task {
                     do {
@@ -363,7 +363,7 @@ public final class AppleMusicService: @unchecked Sendable {
         #endif
         
         DispatchQueue.global(qos: .userInitiated).async {
-            let query = MPMediaQuery.songsQuery()
+            let query = MPMediaQuery.songs()
             let items = query.items ?? []
             let tracks: [SGDoxMusicTrack] = Array(items.prefix(limit)).compactMap { item in
                 guard let title = item.title, let artist = item.artist else { return nil }
@@ -395,7 +395,7 @@ public final class AppleMusicService: @unchecked Sendable {
         }
         
         #if canImport(MusicKit)
-        if #available(iOS 15.0, *) {
+        if #available(iOS 16.0, *) {
             Task {
                 do {
                     let request = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(appleId))
@@ -432,7 +432,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 self.avPlayer = nil
                 
                 let player = self.systemPlayer
-                player.setQueue(withStoreIDs: [appleMusicId])
+                player.setQueue(with: [appleMusicId])
                 player.prepareToPlay { [weak self] error in
                     DispatchQueue.main.async {
                         if error == nil {
