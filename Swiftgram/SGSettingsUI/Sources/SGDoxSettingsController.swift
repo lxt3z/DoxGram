@@ -209,10 +209,10 @@ private final class SGDoxPresentationContext: @unchecked Sendable {
 
 public func doxSettingsController(context: AccountContext) -> ViewController {
     let presentationContext = SGDoxPresentationContext()
-    let presentControllerImpl: (ViewController, ViewControllerPresentationArguments?) -> Void = { c, a in
+    let presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)? = { c, a in
         presentationContext.present?(c, a)
     }
-    let pushControllerImpl: (ViewController) -> Void = { c in
+    let pushControllerImpl: ((ViewController) -> Void)? = { c in
         presentationContext.push?(c)
     }
 
@@ -392,16 +392,16 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
                 simplePromise.set(true)
                 if !newToken.isEmpty {
                     let hud = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
-                    presentControllerImpl(hud, nil)
+                    presentControllerImpl?(hud, nil)
                     DiscordRPCService.shared.validateToken(newToken) { success, usernameOrError in
                         hud.dismiss()
                         if success {
                             DiscordRPCService.shared.connect()
                             let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Discord подключен: \(usernameOrError ?? "")" : "Discord connected: \(usernameOrError ?? "")", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
-                            presentControllerImpl(overlay, nil)
+                            presentControllerImpl?(overlay, nil)
                         } else {
                             let errOverlay = UndoOverlayController(presentationData: presentationData, content: .info(title: isRu ? "Ошибка" : "Error", text: usernameOrError ?? "Неверный токен", timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
-                            presentControllerImpl(errOverlay, nil)
+                            presentControllerImpl?(errOverlay, nil)
                         }
                     }
                 } else {
