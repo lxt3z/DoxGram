@@ -1798,6 +1798,8 @@ plist_fragment(
     </dict>
     <key>NSCameraUsageDescription</key>
     <string>We need this so that you can take and share photos and videos.</string>
+    <key>NSAppleMusicUsageDescription</key>
+    <string>DoxGram uses Apple Music to play tracks, discover music with Wave, and pin tracks to your profile.</string>
     <key>NSContactsUsageDescription</key>
     <string>DoxGram stores your contacts heavily encrypted in the Telegram cloud to let you connect with your friends across all your devices.</string>
     <key>NSFaceIDUsageDescription</key>

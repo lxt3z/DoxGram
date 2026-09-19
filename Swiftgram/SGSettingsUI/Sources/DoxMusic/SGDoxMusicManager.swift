@@ -208,18 +208,35 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         if SpotifyService.shared.isAuthorized {
             SpotifyService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
-                guard let self = self, !tracks.isEmpty else { return }
-                var list = tracks
-                let first = list.removeFirst()
-                self.play(track: first, queue: list)
+                guard let self = self else { return }
+                if !tracks.isEmpty {
+                    var list = tracks
+                    let first = list.removeFirst()
+                    self.play(track: first, queue: list)
+                } else {
+                    self.fallbackStartWaveWithPublicMusic(seedTrack: track)
+                }
             }
         } else {
-            AppleMusicService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
-                guard let self = self, !tracks.isEmpty else { return }
-                var list = tracks
-                let first = list.removeFirst()
-                self.play(track: first, queue: list)
+            self.fallbackStartWaveWithPublicMusic(seedTrack: track)
+        }
+    }
+    
+    private func fallbackStartWaveWithPublicMusic(seedTrack: SGDoxMusicTrack?) {
+        AppleMusicService.shared.fetchWaveTracks(basedOn: seedTrack) { [weak self] tracks in
+            guard let self = self else { return }
+            var list = tracks
+            if list.isEmpty {
+                AppleMusicService.shared.searchITunesPublic(query: "Top Hits") { [weak self] fallbackTracks, _ in
+                    guard let self = self, !fallbackTracks.isEmpty else { return }
+                    var fallbackList = fallbackTracks
+                    let first = fallbackList.removeFirst()
+                    self.play(track: first, queue: fallbackList)
+                }
+                return
             }
+            let first = list.removeFirst()
+            self.play(track: first, queue: list)
         }
     }
     
@@ -234,16 +251,24 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             SpotifyService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
                 guard let self = self else { return }
                 let uniqueTracks = tracks.filter { t in !self.queue.contains(where: { $0.id == t.id }) && t.id != self.currentTrack?.id }
-                self.queue.append(contentsOf: uniqueTracks)
-                self.notifyStateChanged()
+                if !uniqueTracks.isEmpty {
+                    self.queue.append(contentsOf: uniqueTracks)
+                    self.notifyStateChanged()
+                } else {
+                    self.replenishWaveQueueWithPublicMusic(track: track)
+                }
             }
         } else {
-            AppleMusicService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
-                guard let self = self else { return }
-                let uniqueTracks = tracks.filter { t in !self.queue.contains(where: { $0.id == t.id }) && t.id != self.currentTrack?.id }
-                self.queue.append(contentsOf: uniqueTracks)
-                self.notifyStateChanged()
-            }
+            self.replenishWaveQueueWithPublicMusic(track: track)
+        }
+    }
+    
+    private func replenishWaveQueueWithPublicMusic(track: SGDoxMusicTrack?) {
+        AppleMusicService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
+            guard let self = self else { return }
+            let uniqueTracks = tracks.filter { t in !self.queue.contains(where: { $0.id == t.id }) && t.id != self.currentTrack?.id }
+            self.queue.append(contentsOf: uniqueTracks)
+            self.notifyStateChanged()
         }
     }
     
@@ -251,16 +276,24 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         let track = self.currentTrack
         if SpotifyService.shared.isAuthorized {
             SpotifyService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
-                guard let self = self, let next = tracks.first else { return }
-                self.queue = Array(tracks.dropFirst())
-                self.play(track: next, queue: self.queue)
+                guard let self = self else { return }
+                if let next = tracks.first {
+                    self.queue = Array(tracks.dropFirst())
+                    self.play(track: next, queue: self.queue)
+                } else {
+                    self.fetchWaveAndPlayNextPublic(track: track)
+                }
             }
         } else {
-            AppleMusicService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
-                guard let self = self, let next = tracks.first else { return }
-                self.queue = Array(tracks.dropFirst())
-                self.play(track: next, queue: self.queue)
-            }
+            self.fetchWaveAndPlayNextPublic(track: track)
+        }
+    }
+    
+    private func fetchWaveAndPlayNextPublic(track: SGDoxMusicTrack?) {
+        AppleMusicService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
+            guard let self = self, let next = tracks.first else { return }
+            self.queue = Array(tracks.dropFirst())
+            self.play(track: next, queue: self.queue)
         }
     }
     

@@ -43,6 +43,13 @@ public final class SGDoxMusicPlayerController: ViewController {
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
         self.modalPresentationStyle = .overFullScreen
+        self.statusBar.statusBarStyle = .White
+        self.ready.set(.single(true))
+    }
+    
+    public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+        self.view.setNeedsLayout()
     }
     
     required init(coder aDecoder: NSCoder) {

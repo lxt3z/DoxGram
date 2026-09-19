@@ -46,6 +46,13 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
         }
     }
     
+    public var hasCustomClientId: Bool {
+        guard let custom = UserDefaults.standard.string(forKey: "dox_spotify_custom_client_id"), !custom.isEmpty else {
+            return false
+        }
+        return custom != self.defaultClientId
+    }
+    
     public var isAuthorized: Bool {
         return self.accessToken != nil
     }
@@ -56,7 +63,7 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
                 return nil
             }
             let expiry = UserDefaults.standard.double(forKey: self.tokenExpiryKey)
-            if Date().timeIntervalSince1970 > expiry {
+            if expiry > 0 && Date().timeIntervalSince1970 > expiry {
                 self.refreshAccessToken()
             }
             return token
@@ -64,6 +71,22 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
         set {
             UserDefaults.standard.set(newValue, forKey: self.tokenKey)
         }
+    }
+    
+    public func setManualAccessToken(_ token: String) {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            self.logout()
+        } else {
+            self.accessToken = trimmed
+            UserDefaults.standard.set(Date().timeIntervalSince1970 + 365.0 * 86400.0, forKey: self.tokenExpiryKey)
+        }
+    }
+    
+    public func logout() {
+        UserDefaults.standard.removeObject(forKey: self.tokenKey)
+        UserDefaults.standard.removeObject(forKey: self.refreshTokenKey)
+        UserDefaults.standard.removeObject(forKey: self.tokenExpiryKey)
     }
     
     private var refreshToken: String? {
