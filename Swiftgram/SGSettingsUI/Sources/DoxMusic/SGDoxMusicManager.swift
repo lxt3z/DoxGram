@@ -35,6 +35,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private var timeListeners: [(Double, Double) -> Void] = []
     private var lastReportedTrackId: String?
     private var lastReportedIsPlaying: Bool?
+    private var lastReportedDuration: Double = 0.0
     
     private override init() {
         super.init()
@@ -65,7 +66,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             if self.lastReportedTrackId != self.currentTrack?.id || self.lastReportedIsPlaying != self.isPlaying {
                 self.lastReportedTrackId = self.currentTrack?.id
                 self.lastReportedIsPlaying = self.isPlaying
-                DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying)
+                self.lastReportedDuration = self.duration
+                DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
             }
             for listener in self.stateListeners {
                 listener()
@@ -101,6 +103,12 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             }
             if total.isFinite && !total.isNaN && total > 0 {
                 self.duration = total
+                if abs(total - self.lastReportedDuration) > 1.0 {
+                    self.lastReportedDuration = total
+                    if self.isPlaying {
+                        DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: current, duration: total)
+                    }
+                }
             }
             
             DispatchQueue.main.async {
@@ -253,6 +261,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     public func seek(to seconds: Double) {
         self.currentTime = seconds
         self.avPlayer?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+        if self.isPlaying {
+            DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: seconds, duration: self.duration)
+        }
         self.notifyStateChanged()
     }
     

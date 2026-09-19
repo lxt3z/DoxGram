@@ -31,6 +31,10 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     
     private var currentPlayingTrack: SGDoxMusicTrack?
     private var currentIsPlaying: Bool = false
+    private var currentPlaybackTime: Double = 0.0
+    private var currentTrackDuration: Double = 0.0
+    private var externalAssetCache: [String: String] = [:]
+    private var resolvingUrls: Set<String> = []
     
     private override init() {
         super.init()
@@ -229,9 +233,12 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     
     // MARK: - Presence Update
     
-    public func updatePlayback(track: SGDoxMusicTrack?, isPlaying: Bool) {
+    public func updatePlayback(track: SGDoxMusicTrack?, isPlaying: Bool, currentTime: Double = 0.0, duration: Double = 0.0) {
+        let dur = duration > 0 ? duration : (track?.duration ?? 0.0)
         self.currentPlayingTrack = track
         self.currentIsPlaying = isPlaying
+        self.currentPlaybackTime = currentTime
+        self.currentTrackDuration = dur
         
         guard SGSimpleSettings.shared.discordRpcEnabled else { return }
         
@@ -268,29 +275,137 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     private func buildActivity(track: SGDoxMusicTrack?, isPlaying: Bool) -> [String: Any]? {
         guard isPlaying, let track = track else { return nil }
         
-        var activity: [String: Any] = [
-            "name": "DoxGram Music",
-            "type": 2, // 2 = Listening to
-            "details": track.title,
-            "state": "by \(track.artist)",
-            "timestamps": [
-                "start": Int64(Date().timeIntervalSince1970 * 1000)
-            ]
-        ]
-        
-        var assets: [String: String] = [
-            "large_text": "\(track.title) — \(track.artist)"
-        ]
-        
-        if let artwork = track.artworkUrl, !artwork.isEmpty {
-            assets["large_image"] = artwork
+        let appName: String
+        let appId: String?
+        switch track.source {
+        case .appleMusic:
+            appName = "Apple Music"
+            appId = "773825528921849856"
+        case .spotify:
+            appName = "Spotify"
+            appId = nil
+        case .telegram:
+            appName = "DoxGram Music"
+            appId = nil
         }
         
-        let sourceName = track.source == .appleMusic ? "Apple Music" : (track.source == .spotify ? "Spotify" : "Telegram")
-        assets["small_text"] = "via \(sourceName)"
+        var activity: [String: Any] = [
+            "name": appName,
+            "type": 2, // 2 = Listening to
+            "details": track.title,
+            "state": track.artist
+        ]
         
-        activity["assets"] = assets
+        if let appId = appId {
+            activity["application_id"] = appId
+        }
+        
+        let now = Date().timeIntervalSince1970
+        let startTimestamp = Int64(max(0.0, now - self.currentPlaybackTime) * 1000)
+        var timestamps: [String: Any] = [
+            "start": startTimestamp
+        ]
+        if self.currentTrackDuration > 0 {
+            let endTimestamp = Int64((max(0.0, now - self.currentPlaybackTime) + self.currentTrackDuration) * 1000)
+            if endTimestamp > startTimestamp {
+                timestamps["end"] = endTimestamp
+            }
+        }
+        activity["timestamps"] = timestamps
+        
+        var assets: [String: String] = [:]
+        
+        let trimmedAlbum = track.album.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedAlbum.isEmpty {
+            assets["large_text"] = trimmedAlbum
+        }
+        
+        if let artwork = track.artworkUrl, !artwork.isEmpty {
+            if let cachedMp = self.externalAssetCache[artwork] {
+                assets["large_image"] = cachedMp
+            } else if track.source == .spotify && artwork.contains("i.scdn.co/image/") {
+                let id = artwork.components(separatedBy: "/").last ?? ""
+                if !id.isEmpty {
+                    assets["large_image"] = "spotify:\(id)"
+                }
+                self.resolveExternalAsset(imageUrl: artwork)
+            } else if track.source == .appleMusic {
+                // Use official appicon as placeholder so question mark icon is never displayed
+                assets["large_image"] = "appicon"
+                self.resolveExternalAsset(imageUrl: artwork)
+            } else {
+                self.resolveExternalAsset(imageUrl: artwork)
+            }
+        } else if track.source == .appleMusic {
+            assets["large_image"] = "appicon"
+        }
+        
+        switch track.source {
+        case .appleMusic:
+            assets["small_image"] = "appicon"
+            assets["small_text"] = "Apple Music"
+        case .spotify:
+            assets["small_image"] = "spotify"
+            assets["small_text"] = "Spotify"
+        case .telegram:
+            break
+        }
+        
+        if !assets.isEmpty {
+            activity["assets"] = assets
+        }
+        
         return activity
+    }
+    
+    private func resolveExternalAsset(imageUrl: String) {
+        guard !imageUrl.isEmpty, !imageUrl.hasPrefix("mp:"), self.externalAssetCache[imageUrl] == nil, !self.resolvingUrls.contains(imageUrl) else {
+            return
+        }
+        
+        let token = SGSimpleSettings.shared.discordRpcToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return }
+        
+        self.resolvingUrls.insert(imageUrl)
+        
+        let appId = "773825528921849856"
+        guard let url = URL(string: "https://discord.com/api/v9/applications/\(appId)/external-assets") else {
+            self.resolvingUrls.remove(imageUrl)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(token, forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let payload: [String: Any] = ["urls": [imageUrl]]
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            self.resolvingUrls.remove(imageUrl)
+            return
+        }
+        request.httpBody = body
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            self.resolvingUrls.remove(imageUrl)
+            
+            guard let data = data, error == nil,
+                  let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+                  let first = array.first,
+                  let path = first["external_asset_path"] as? String else {
+                return
+            }
+            
+            let mpUrl = path.hasPrefix("mp:") ? path : "mp:\(path)"
+            self.externalAssetCache[imageUrl] = mpUrl
+            
+            DispatchQueue.main.async {
+                if self.currentIsPlaying, self.currentPlayingTrack?.artworkUrl == imageUrl {
+                    self.sendPresenceUpdate(track: self.currentPlayingTrack, isPlaying: self.currentIsPlaying)
+                }
+            }
+        }.resume()
     }
     
     private func sendJson(_ dict: [String: Any]) {
