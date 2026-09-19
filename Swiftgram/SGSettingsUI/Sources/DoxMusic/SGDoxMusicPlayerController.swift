@@ -7,7 +7,7 @@ import TelegramPresentationData
 import UndoUI
 import AppBundle
 
-public final class SGDoxMusicPlayerController: ViewController {
+public final class SGDoxMusicPlayerController: ViewController, UIGestureRecognizerDelegate {
     private let context: AccountContext
     private var presentationData: PresentationData
     
@@ -80,7 +80,19 @@ public final class SGDoxMusicPlayerController: ViewController {
         }
         
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
+        panGesture.delegate = self
         self.view.addGestureRecognizer(panGesture)
+    }
+    
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        var current = touch.view
+        while let view = current {
+            if view is UIControl {
+                return false
+            }
+            current = view.superview
+        }
+        return true
     }
     
     @objc private func handlePanGesture(_ recognizer: UIPanGestureRecognizer) {

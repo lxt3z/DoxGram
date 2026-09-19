@@ -16,7 +16,6 @@ private final class SGDoxServiceCell: UITableViewCell {
     let iconImageView = UIImageView()
     let titleLabel = UILabel()
     let statusLabel = UILabel()
-    let badgeLabel = UILabel()
     let chevronImageView = UIImageView()
     let separatorView = UIView()
     
@@ -39,12 +38,6 @@ private final class SGDoxServiceCell: UITableViewCell {
         self.statusLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         self.contentView.addSubview(self.statusLabel)
         
-        self.badgeLabel.layer.cornerRadius = 11
-        self.badgeLabel.clipsToBounds = true
-        self.badgeLabel.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-        self.badgeLabel.textAlignment = .center
-        self.contentView.addSubview(self.badgeLabel)
-        
         self.chevronImageView.image = UIImage(systemName: "chevron.right")
         self.chevronImageView.contentMode = .scaleAspectFit
         self.contentView.addSubview(self.chevronImageView)
@@ -60,35 +53,27 @@ private final class SGDoxServiceCell: UITableViewCell {
         super.layoutSubviews()
         let bounds = self.contentView.bounds
         
-        self.iconContainer.frame = CGRect(x: 16, y: 11, width: 38, height: 38)
+        self.iconContainer.frame = CGRect(x: 16, y: 8, width: 38, height: 38)
         self.iconImageView.frame = CGRect(x: 7, y: 7, width: 24, height: 24)
         
-        let hasBadge = !(self.badgeLabel.text?.isEmpty ?? true)
-        let rightMargin: CGFloat = hasBadge ? 110 : 36
-        let titleWidth = bounds.width - 66 - rightMargin
+        let textWidth = bounds.width - 66 - 36
+        self.titleLabel.frame = CGRect(x: 66, y: 8, width: textWidth, height: 20)
+        self.statusLabel.frame = CGRect(x: 66, y: 28, width: textWidth, height: 18)
         
-        self.titleLabel.frame = CGRect(x: 66, y: 10, width: titleWidth, height: 20)
-        self.statusLabel.frame = CGRect(x: 66, y: 31, width: titleWidth, height: 18)
-        
-        if hasBadge {
-            self.badgeLabel.frame = CGRect(x: bounds.width - 98, y: 18, width: 62, height: 24)
-            self.chevronImageView.frame = CGRect(x: bounds.width - 28, y: 22, width: 14, height: 16)
-        } else {
-            self.badgeLabel.frame = .zero
-            self.chevronImageView.frame = CGRect(x: bounds.width - 28, y: 22, width: 14, height: 16)
-        }
-        
+        self.chevronImageView.frame = CGRect(x: bounds.width - 26, y: 19, width: 12, height: 16)
         self.separatorView.frame = CGRect(x: 66, y: bounds.height - 0.5, width: bounds.width - 66, height: 0.5)
     }
 }
 
 private final class SGDoxWaveHeroCell: UITableViewCell {
     let containerCard = UIView()
-    let gradientLayer = CAGradientLayer()
+    let blurView = UIVisualEffectView()
+    let ambientGradient = CAGradientLayer()
+    let iconBadge = UIView()
     let iconImageView = UIImageView()
     let titleLabel = UILabel()
     let subtitleLabel = UILabel()
-    let playPill = UIView()
+    let playCircle = UIView()
     let playIcon = UIImageView()
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -97,42 +82,51 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
         self.selectionStyle = .none
         
         self.containerCard.layer.cornerRadius = 18
+        self.containerCard.layer.borderWidth = 0.5
+        self.containerCard.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
         self.containerCard.clipsToBounds = true
         self.contentView.addSubview(self.containerCard)
         
-        self.gradientLayer.colors = [
-            UIColor(red: 0.95, green: 0.18, blue: 0.52, alpha: 0.92).cgColor,
-            UIColor(red: 0.55, green: 0.15, blue: 0.95, alpha: 0.92).cgColor,
-            UIColor(red: 0.12, green: 0.58, blue: 0.98, alpha: 0.90).cgColor
+        self.ambientGradient.colors = [
+            UIColor(red: 0.42, green: 0.12, blue: 0.82, alpha: 0.85).cgColor,
+            UIColor(red: 0.12, green: 0.42, blue: 0.95, alpha: 0.85).cgColor
         ]
-        self.gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
-        self.gradientLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
-        self.containerCard.layer.insertSublayer(self.gradientLayer, at: 0)
+        self.ambientGradient.startPoint = CGPoint(x: 0.0, y: 0.0)
+        self.ambientGradient.endPoint = CGPoint(x: 1.0, y: 1.0)
+        self.containerCard.layer.insertSublayer(self.ambientGradient, at: 0)
         
-        self.iconImageView.image = UIImage(systemName: "dot.radiowaves.left.and.right")
+        self.blurView.effect = UIBlurEffect(style: .systemThinMaterialDark)
+        self.containerCard.addSubview(self.blurView)
+        
+        self.iconBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+        self.iconBadge.layer.cornerRadius = 20
+        self.iconBadge.clipsToBounds = true
+        self.containerCard.addSubview(self.iconBadge)
+        
+        self.iconImageView.image = UIImage(systemName: "waveform.path.ecg") ?? UIImage(systemName: "dot.radiowaves.left.and.right")
         self.iconImageView.tintColor = .white
         self.iconImageView.contentMode = .scaleAspectFit
-        self.containerCard.addSubview(self.iconImageView)
+        self.iconBadge.addSubview(self.iconImageView)
         
-        self.titleLabel.text = "⚡ Запустить «Мою волну»"
+        self.titleLabel.text = "Моя волна"
         self.titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .bold)
         self.titleLabel.textColor = .white
         self.containerCard.addSubview(self.titleLabel)
         
-        self.subtitleLabel.text = "Умный бесконечный поток под ваш вкус"
+        self.subtitleLabel.text = "Умный бесконечный поток музыки"
         self.subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.85)
         self.containerCard.addSubview(self.subtitleLabel)
         
-        self.playPill.backgroundColor = UIColor(white: 1.0, alpha: 0.25)
-        self.playPill.layer.cornerRadius = 18
-        self.playPill.clipsToBounds = true
-        self.containerCard.addSubview(self.playPill)
+        self.playCircle.backgroundColor = UIColor(white: 1.0, alpha: 0.22)
+        self.playCircle.layer.cornerRadius = 19
+        self.playCircle.clipsToBounds = true
+        self.containerCard.addSubview(self.playCircle)
         
         self.playIcon.image = UIImage(systemName: "play.fill")
         self.playIcon.tintColor = .white
         self.playIcon.contentMode = .scaleAspectFit
-        self.playPill.addSubview(self.playIcon)
+        self.playCircle.addSubview(self.playIcon)
     }
     
     required init?(coder: NSCoder) {
@@ -143,60 +137,60 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
         super.layoutSubviews()
         let bounds = self.contentView.bounds
         self.containerCard.frame = CGRect(x: 16, y: 4, width: bounds.width - 32, height: bounds.height - 8)
-        self.gradientLayer.frame = self.containerCard.bounds
+        self.ambientGradient.frame = self.containerCard.bounds
+        self.blurView.frame = self.containerCard.bounds
         
-        self.iconImageView.frame = CGRect(x: 16, y: 20, width: 36, height: 36)
+        self.iconBadge.frame = CGRect(x: 14, y: (self.containerCard.bounds.height - 40) * 0.5, width: 40, height: 40)
+        self.iconImageView.frame = CGRect(x: 8, y: 8, width: 24, height: 24)
         
-        let textWidth = self.containerCard.bounds.width - 64 - 56
-        self.titleLabel.frame = CGRect(x: 62, y: 16, width: textWidth, height: 22)
-        self.subtitleLabel.frame = CGRect(x: 62, y: 40, width: textWidth, height: 18)
+        let textWidth = self.containerCard.bounds.width - 64 - 54
+        self.titleLabel.frame = CGRect(x: 64, y: 15, width: textWidth, height: 22)
+        self.subtitleLabel.frame = CGRect(x: 64, y: 38, width: textWidth, height: 18)
         
-        self.playPill.frame = CGRect(x: self.containerCard.bounds.width - 48, y: 20, width: 36, height: 36)
-        self.playIcon.frame = CGRect(x: 10, y: 9, width: 18, height: 18)
+        let playY = (self.containerCard.bounds.height - 38) * 0.5
+        self.playCircle.frame = CGRect(x: self.containerCard.bounds.width - 50, y: playY, width: 38, height: 38)
+        self.playIcon.frame = CGRect(x: 12, y: 10, width: 16, height: 18)
     }
 }
 
 private final class SGDoxLibraryHeaderCell: UITableViewCell {
-    let containerCard = UIView()
     let titleLabel = UILabel()
     let countLabel = UILabel()
     let playAllButton = UIButton(type: .system)
     let shuffleButton = UIButton(type: .system)
+    let separatorView = UIView()
     
     var onPlayAllTapped: (() -> Void)?
     var onShuffleTapped: (() -> Void)?
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
-        self.backgroundColor = .clear
         self.selectionStyle = .none
         
-        self.containerCard.layer.cornerRadius = 16
-        self.containerCard.clipsToBounds = true
-        self.contentView.addSubview(self.containerCard)
-        
-        self.titleLabel.text = "💖 Моя медиатека"
+        self.titleLabel.text = "Моя медиатека"
         self.titleLabel.font = UIFont.systemFont(ofSize: 17, weight: .bold)
-        self.containerCard.addSubview(self.titleLabel)
+        self.contentView.addSubview(self.titleLabel)
         
         self.countLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
-        self.containerCard.addSubview(self.countLabel)
+        self.contentView.addSubview(self.countLabel)
         
         self.playAllButton.setTitle(" Слушать всё", for: .normal)
         self.playAllButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
         self.playAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        self.playAllButton.layer.cornerRadius = 16
+        self.playAllButton.layer.cornerRadius = 18
         self.playAllButton.clipsToBounds = true
         self.playAllButton.addTarget(self, action: #selector(self.playAllPressed), for: .touchUpInside)
-        self.containerCard.addSubview(self.playAllButton)
+        self.contentView.addSubview(self.playAllButton)
         
         self.shuffleButton.setTitle(" Перемешать", for: .normal)
         self.shuffleButton.setImage(UIImage(systemName: "shuffle"), for: .normal)
         self.shuffleButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        self.shuffleButton.layer.cornerRadius = 16
+        self.shuffleButton.layer.cornerRadius = 18
         self.shuffleButton.clipsToBounds = true
         self.shuffleButton.addTarget(self, action: #selector(self.shufflePressed), for: .touchUpInside)
-        self.containerCard.addSubview(self.shuffleButton)
+        self.contentView.addSubview(self.shuffleButton)
+        
+        self.contentView.addSubview(self.separatorView)
     }
     
     required init?(coder: NSCoder) {
@@ -214,38 +208,43 @@ private final class SGDoxLibraryHeaderCell: UITableViewCell {
     override func layoutSubviews() {
         super.layoutSubviews()
         let bounds = self.contentView.bounds
-        self.containerCard.frame = CGRect(x: 16, y: 4, width: bounds.width - 32, height: bounds.height - 8)
         
-        self.titleLabel.frame = CGRect(x: 16, y: 12, width: self.containerCard.bounds.width - 32, height: 20)
-        self.countLabel.frame = CGRect(x: 16, y: 33, width: self.containerCard.bounds.width - 32, height: 16)
+        self.titleLabel.frame = CGRect(x: 16, y: 10, width: bounds.width - 32, height: 20)
+        self.countLabel.frame = CGRect(x: 16, y: 30, width: bounds.width - 32, height: 16)
         
-        let buttonWidth = (self.containerCard.bounds.width - 32 - 12) * 0.5
-        self.playAllButton.frame = CGRect(x: 16, y: 56, width: buttonWidth, height: 34)
-        self.shuffleButton.frame = CGRect(x: 16 + buttonWidth + 12, y: 56, width: buttonWidth, height: 34)
+        let buttonWidth = (bounds.width - 32 - 10) * 0.5
+        self.playAllButton.frame = CGRect(x: 16, y: 50, width: buttonWidth, height: 36)
+        self.shuffleButton.frame = CGRect(x: 16 + buttonWidth + 10, y: 50, width: buttonWidth, height: 36)
+        
+        self.separatorView.frame = CGRect(x: 16, y: bounds.height - 0.5, width: bounds.width - 16, height: 0.5)
     }
 }
 
 private final class SGDoxTrackCell: UITableViewCell {
     let artworkView = UIImageView()
+    let playingIndicator = UIImageView()
     let titleLabel = UILabel()
     let artistLabel = UILabel()
-    let sourceBadge = UILabel()
     let likeButton = UIButton(type: .system)
-    let playIcon = UIImageView()
     let separatorView = UIView()
     var currentTrackId: String?
     var onLikeTapped: (() -> Void)?
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
-        self.backgroundColor = .clear
-        self.selectionStyle = .none
+        self.selectionStyle = .default
         
-        self.artworkView.layer.cornerRadius = 8
+        self.artworkView.layer.cornerRadius = 9
         self.artworkView.clipsToBounds = true
         self.artworkView.contentMode = .scaleAspectFill
         self.artworkView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
         self.contentView.addSubview(self.artworkView)
+        
+        self.playingIndicator.image = UIImage(systemName: "waveform")
+        self.playingIndicator.tintColor = .white
+        self.playingIndicator.contentMode = .scaleAspectFit
+        self.playingIndicator.isHidden = true
+        self.artworkView.addSubview(self.playingIndicator)
         
         self.titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         self.contentView.addSubview(self.titleLabel)
@@ -253,18 +252,8 @@ private final class SGDoxTrackCell: UITableViewCell {
         self.artistLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         self.contentView.addSubview(self.artistLabel)
         
-        self.sourceBadge.font = UIFont.systemFont(ofSize: 10, weight: .bold)
-        self.sourceBadge.layer.cornerRadius = 4
-        self.sourceBadge.clipsToBounds = true
-        self.sourceBadge.textAlignment = .center
-        self.contentView.addSubview(self.sourceBadge)
-        
         self.likeButton.addTarget(self, action: #selector(self.likePressed), for: .touchUpInside)
         self.contentView.addSubview(self.likeButton)
-        
-        self.playIcon.image = UIImage(systemName: "play.circle.fill")
-        self.playIcon.contentMode = .scaleAspectFit
-        self.contentView.addSubview(self.playIcon)
         
         self.contentView.addSubview(self.separatorView)
     }
@@ -281,16 +270,14 @@ private final class SGDoxTrackCell: UITableViewCell {
         super.layoutSubviews()
         let bounds = self.contentView.bounds
         
-        self.artworkView.frame = CGRect(x: 16, y: 9, width: 44, height: 44)
+        self.artworkView.frame = CGRect(x: 16, y: 7, width: 44, height: 44)
+        self.playingIndicator.frame = CGRect(x: 12, y: 12, width: 20, height: 20)
         
-        let textWidth = bounds.width - 70 - 90
-        self.titleLabel.frame = CGRect(x: 70, y: 12, width: textWidth, height: 19)
-        self.artistLabel.frame = CGRect(x: 70, y: 32, width: textWidth - 46, height: 17)
+        let textWidth = bounds.width - 70 - 48
+        self.titleLabel.frame = CGRect(x: 70, y: 10, width: textWidth, height: 20)
+        self.artistLabel.frame = CGRect(x: 70, y: 30, width: textWidth, height: 18)
         
-        self.sourceBadge.frame = CGRect(x: bounds.width - 128, y: 32, width: 44, height: 16)
-        self.likeButton.frame = CGRect(x: bounds.width - 78, y: 15, width: 34, height: 30)
-        self.playIcon.frame = CGRect(x: bounds.width - 38, y: 19, width: 22, height: 22)
-        
+        self.likeButton.frame = CGRect(x: bounds.width - 44, y: 7, width: 36, height: 44)
         self.separatorView.frame = CGRect(x: 70, y: bounds.height - 0.5, width: bounds.width - 70, height: 0.5)
     }
 }
@@ -619,14 +606,17 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         if !self.isSearching {
+            if indexPath.section == 0 {
+                return 54.0
+            }
             if indexPath.section == 1 {
-                return 88.0
+                return 82.0
             }
             if self.hasFavorites && indexPath.section == 2 && indexPath.row == 0 {
-                return 102.0
+                return 96.0
             }
         }
-        return 60.0
+        return 58.0
     }
     
     public func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -665,11 +655,8 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                 cell.iconImageView.image = UIImage(systemName: "music.note")
                 cell.titleLabel.text = "Apple Music"
                 let isAuth = AppleMusicService.shared.isAuthorized
-                cell.statusLabel.text = isAuth ? "Подключено (Полное воспроизведение)" : "Нажмите для входа"
+                cell.statusLabel.text = isAuth ? "Подключено (вся медиатека)" : "Нажмите для подключения"
                 cell.statusLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
-                cell.badgeLabel.text = isAuth ? "Вкл" : "Войти"
-                cell.badgeLabel.backgroundColor = isAuth ? theme.list.itemAccentColor.withAlphaComponent(0.2) : theme.list.itemBlocksSeparatorColor
-                cell.badgeLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemPrimaryTextColor
             } else if indexPath.row == 1 {
                 // Spotify
                 cell.iconContainer.backgroundColor = UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 1.0)
@@ -678,9 +665,6 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                 let isAuth = SpotifyService.shared.isAuthorized
                 cell.statusLabel.text = isAuth ? "Подключено к аккаунту" : (SpotifyService.shared.hasCustomClientId ? "Client ID настроен" : "Нажмите для настройки")
                 cell.statusLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
-                cell.badgeLabel.text = isAuth ? "Вкл" : "Вход"
-                cell.badgeLabel.backgroundColor = isAuth ? theme.list.itemAccentColor.withAlphaComponent(0.2) : theme.list.itemBlocksSeparatorColor
-                cell.badgeLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemPrimaryTextColor
             } else {
                 // Discord RPC
                 cell.iconContainer.backgroundColor = UIColor(red: 0.35, green: 0.40, blue: 0.95, alpha: 1.0)
@@ -701,9 +685,6 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                     cell.statusLabel.text = isEnabled ? "Включен" : "Настроить токен"
                     cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
                 }
-                cell.badgeLabel.text = isEnabled ? "Вкл" : "Токен"
-                cell.badgeLabel.backgroundColor = isEnabled ? theme.list.itemAccentColor.withAlphaComponent(0.2) : theme.list.itemBlocksSeparatorColor
-                cell.badgeLabel.textColor = isEnabled ? theme.list.itemAccentColor : theme.list.itemPrimaryTextColor
             }
             return cell
         }
@@ -716,17 +697,19 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         if !self.isSearching && self.hasFavorites && indexPath.section == 2 {
             if indexPath.row == 0 {
                 let cell = tableView.dequeueReusableCell(withIdentifier: "LibraryHeaderCell", for: indexPath) as! SGDoxLibraryHeaderCell
-                cell.containerCard.backgroundColor = theme.list.itemBlocksBackgroundColor
+                cell.backgroundColor = theme.list.itemBlocksBackgroundColor
+                cell.contentView.backgroundColor = theme.list.itemBlocksBackgroundColor
                 cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
                 cell.countLabel.textColor = theme.list.itemSecondaryTextColor
+                cell.separatorView.backgroundColor = theme.list.itemBlocksSeparatorColor
                 
                 let count = SGDoxMusicManager.shared.favorites.count
                 cell.countLabel.text = "\(count) трек\(self.pluralEnding(count)) • Синхронизировано"
                 
                 cell.playAllButton.backgroundColor = theme.list.itemAccentColor
                 cell.playAllButton.tintColor = .white
-                cell.shuffleButton.backgroundColor = theme.list.itemBlocksSeparatorColor
-                cell.shuffleButton.tintColor = theme.list.itemPrimaryTextColor
+                cell.shuffleButton.backgroundColor = theme.list.itemAccentColor.withAlphaComponent(0.12)
+                cell.shuffleButton.tintColor = theme.list.itemAccentColor
                 
                 cell.onPlayAllTapped = { [weak self] in
                     guard let self = self else { return }
@@ -768,39 +751,48 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     private func configureTrackCell(_ cell: SGDoxTrackCell, track: SGDoxMusicTrack, isLast: Bool) {
         let theme = self.presentationData.theme
+        let isCurrent = SGDoxMusicManager.shared.currentTrack?.id == track.id
+        let isPlaying = isCurrent && SGDoxMusicManager.shared.isPlaying
+        
         cell.backgroundColor = theme.list.itemBlocksBackgroundColor
         cell.titleLabel.text = track.title
-        cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
+        cell.titleLabel.textColor = isCurrent ? theme.list.itemAccentColor : theme.list.itemPrimaryTextColor
         cell.artistLabel.text = track.artist
         cell.artistLabel.textColor = theme.list.itemSecondaryTextColor
-        cell.playIcon.tintColor = theme.list.itemAccentColor
         cell.separatorView.backgroundColor = theme.list.itemBlocksSeparatorColor
         cell.separatorView.isHidden = isLast
         
-        cell.sourceBadge.text = track.source == .appleMusic ? "Apple" : "Spotify"
-        cell.sourceBadge.backgroundColor = track.source == .appleMusic ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.15) : UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 0.15)
-        cell.sourceBadge.textColor = track.source == .appleMusic ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 1.0)
+        cell.playingIndicator.isHidden = !isPlaying
+        cell.playingIndicator.tintColor = theme.list.itemAccentColor
         
         let isFav = SGDoxMusicManager.shared.isFavorite(track: track)
         let heartConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
         let heartIcon = isFav ? "suit.heart.fill" : "suit.heart"
         cell.likeButton.setImage(UIImage(systemName: heartIcon, withConfiguration: heartConfig), for: .normal)
-        cell.likeButton.tintColor = isFav ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : theme.list.itemSecondaryTextColor
-        cell.onLikeTapped = { [weak self] in
+        cell.likeButton.tintColor = isFav ? UIColor(red: 1.0, green: 0.18, blue: 0.33, alpha: 1.0) : theme.list.itemSecondaryTextColor.withAlphaComponent(0.4)
+        cell.onLikeTapped = { [weak self, weak cell] in
+            guard let cell = cell else { return }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             SGDoxMusicManager.shared.toggleFavorite(track: track)
+            
+            UIView.animate(withDuration: 0.12, animations: {
+                cell.likeButton.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+            }) { _ in
+                UIView.animate(withDuration: 0.12) {
+                    cell.likeButton.transform = .identity
+                }
+            }
             self?.tableView.reloadData()
         }
         
         cell.currentTrackId = track.id
+        cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
         if let artwork = track.artworkUrl {
             SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak cell] image in
-                if cell?.currentTrackId == track.id {
+                if cell?.currentTrackId == track.id, let image = image {
                     cell?.artworkView.image = image
                 }
             }
-        } else {
-            cell.artworkView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
         }
     }
     

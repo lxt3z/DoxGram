@@ -144,7 +144,12 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
-        let country = Locale.current.regionCode ?? "US"
+        let country: String
+        if #available(iOS 16, *) {
+            country = Locale.current.region?.identifier ?? "US"
+        } else {
+            country = Locale.current.regionCode ?? "US"
+        }
         let songUrlString = "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=song&limit=30&country=\(country)"
         let artistUrlString = "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=musicArtist&limit=1&country=\(country)"
         
@@ -370,16 +375,25 @@ public final class AppleMusicService: @unchecked Sendable {
                 let album = item.albumTitle ?? ""
                 let duration = item.playbackDuration
                 let id = "\(item.persistentID)"
+                let localKey = "am_local_\(id)"
+                
+                if let art = item.artwork?.image(at: CGSize(width: 300, height: 300)) {
+                    SGDoxImageLoader.shared.storeImage(art, for: localKey)
+                }
+                
+                let storeId = item.playbackStoreID ?? (item.value(forProperty: "playbackStoreID") as? String)
+                let effectiveId = (storeId != nil && storeId != "0" && !storeId!.isEmpty) ? storeId! : "local_\(id)"
+                
                 return SGDoxMusicTrack(
-                    id: "am_local_\(id)",
+                    id: localKey,
                     title: title,
                     artist: artist,
                     album: album,
-                    artworkUrl: nil,
+                    artworkUrl: localKey,
                     duration: duration,
                     previewUrl: nil,
                     source: .appleMusic,
-                    appleMusicId: id
+                    appleMusicId: effectiveId
                 )
             }
             DispatchQueue.main.async {
@@ -432,7 +446,14 @@ public final class AppleMusicService: @unchecked Sendable {
                 self.avPlayer = nil
                 
                 let player = self.systemPlayer
-                player.setQueue(with: [appleMusicId])
+                if appleMusicId.hasPrefix("local_"), let pid = UInt64(appleMusicId.replacingOccurrences(of: "local_", with: "")) {
+                    let query = MPMediaQuery.songs()
+                    query.addFilterPredicate(MPMediaPropertyPredicate(value: pid, forProperty: MPMediaItemPropertyPersistentID))
+                    player.setQueue(with: query)
+                } else {
+                    player.setQueue(with: [appleMusicId])
+                }
+                
                 player.prepareToPlay { [weak self] error in
                     DispatchQueue.main.async {
                         if error == nil {
