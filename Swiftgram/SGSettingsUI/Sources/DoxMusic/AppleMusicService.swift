@@ -325,6 +325,102 @@ public final class AppleMusicService: @unchecked Sendable {
         }
     }
     
+    public func fetchLibrarySongs(limit: Int = 100, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
+        #if canImport(MusicKit)
+        if #available(iOS 15.0, *) {
+            if self.isAuthorized {
+                Task {
+                    do {
+                        var libraryRequest = MusicLibraryRequest<Song>()
+                        libraryRequest.limit = min(limit, 100)
+                        let libraryResponse = try await libraryRequest.response()
+                        let librarySongs = libraryResponse.items
+                        let tracks: [SGDoxMusicTrack] = librarySongs.compactMap { song in
+                            let artworkUrl = song.artwork?.url(width: 600, height: 600)?.absoluteString
+                            return SGDoxMusicTrack(
+                                id: song.id.rawValue,
+                                title: song.title,
+                                artist: song.artistName,
+                                album: song.albumTitle ?? "",
+                                artworkUrl: artworkUrl,
+                                duration: song.duration ?? 0.0,
+                                previewUrl: song.previewAssets?.first?.url?.absoluteString,
+                                source: .appleMusic,
+                                appleMusicId: song.id.rawValue
+                            )
+                        }
+                        if !tracks.isEmpty {
+                            DispatchQueue.main.async {
+                                completion(tracks)
+                            }
+                            return
+                        }
+                    } catch {
+                    }
+                }
+            }
+        }
+        #endif
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            let query = MPMediaQuery.songsQuery()
+            let items = query.items ?? []
+            let tracks: [SGDoxMusicTrack] = Array(items.prefix(limit)).compactMap { item in
+                guard let title = item.title, let artist = item.artist else { return nil }
+                let album = item.albumTitle ?? ""
+                let duration = item.playbackDuration
+                let id = "\(item.persistentID)"
+                return SGDoxMusicTrack(
+                    id: "am_local_\(id)",
+                    title: title,
+                    artist: artist,
+                    album: album,
+                    artworkUrl: nil,
+                    duration: duration,
+                    previewUrl: nil,
+                    source: .appleMusic,
+                    appleMusicId: id
+                )
+            }
+            DispatchQueue.main.async {
+                completion(tracks)
+            }
+        }
+    }
+    
+    public func addToLibrary(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
+        guard let appleId = track.appleMusicId, !appleId.isEmpty else {
+            completion(false)
+            return
+        }
+        
+        #if canImport(MusicKit)
+        if #available(iOS 15.0, *) {
+            Task {
+                do {
+                    let request = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(appleId))
+                    let response = try await request.response()
+                    if let song = response.items.first {
+                        try await MusicLibrary.shared.add(song)
+                        DispatchQueue.main.async { completion(true) }
+                        return
+                    }
+                } catch {
+                }
+                
+                MPMediaLibrary.default().addItem(withProductID: appleId) { _, error in
+                    DispatchQueue.main.async { completion(error == nil) }
+                }
+            }
+            return
+        }
+        #endif
+        
+        MPMediaLibrary.default().addItem(withProductID: appleId) { _, error in
+            DispatchQueue.main.async { completion(error == nil) }
+        }
+    }
+    
     // MARK: - Playback (Full Songs via MPMusicPlayerController or Preview)
     
     public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {

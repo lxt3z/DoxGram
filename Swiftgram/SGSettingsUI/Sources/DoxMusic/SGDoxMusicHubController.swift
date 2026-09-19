@@ -156,14 +156,85 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
     }
 }
 
+private final class SGDoxLibraryHeaderCell: UITableViewCell {
+    let containerCard = UIView()
+    let titleLabel = UILabel()
+    let countLabel = UILabel()
+    let playAllButton = UIButton(type: .system)
+    let shuffleButton = UIButton(type: .system)
+    
+    var onPlayAllTapped: (() -> Void)?
+    var onShuffleTapped: (() -> Void)?
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+        
+        self.containerCard.layer.cornerRadius = 16
+        self.containerCard.clipsToBounds = true
+        self.contentView.addSubview(self.containerCard)
+        
+        self.titleLabel.text = "💖 Моя медиатека"
+        self.titleLabel.font = UIFont.systemFont(ofSize: 17, weight: .bold)
+        self.containerCard.addSubview(self.titleLabel)
+        
+        self.countLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+        self.containerCard.addSubview(self.countLabel)
+        
+        self.playAllButton.setTitle(" Слушать всё", for: .normal)
+        self.playAllButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
+        self.playAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        self.playAllButton.layer.cornerRadius = 16
+        self.playAllButton.clipsToBounds = true
+        self.playAllButton.addTarget(self, action: #selector(self.playAllPressed), for: .touchUpInside)
+        self.containerCard.addSubview(self.playAllButton)
+        
+        self.shuffleButton.setTitle(" Перемешать", for: .normal)
+        self.shuffleButton.setImage(UIImage(systemName: "shuffle"), for: .normal)
+        self.shuffleButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        self.shuffleButton.layer.cornerRadius = 16
+        self.shuffleButton.clipsToBounds = true
+        self.shuffleButton.addTarget(self, action: #selector(self.shufflePressed), for: .touchUpInside)
+        self.containerCard.addSubview(self.shuffleButton)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    @objc private func playAllPressed() {
+        self.onPlayAllTapped?()
+    }
+    
+    @objc private func shufflePressed() {
+        self.onShuffleTapped?()
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let bounds = self.contentView.bounds
+        self.containerCard.frame = CGRect(x: 16, y: 4, width: bounds.width - 32, height: bounds.height - 8)
+        
+        self.titleLabel.frame = CGRect(x: 16, y: 12, width: self.containerCard.bounds.width - 32, height: 20)
+        self.countLabel.frame = CGRect(x: 16, y: 33, width: self.containerCard.bounds.width - 32, height: 16)
+        
+        let buttonWidth = (self.containerCard.bounds.width - 32 - 12) * 0.5
+        self.playAllButton.frame = CGRect(x: 16, y: 56, width: buttonWidth, height: 34)
+        self.shuffleButton.frame = CGRect(x: 16 + buttonWidth + 12, y: 56, width: buttonWidth, height: 34)
+    }
+}
+
 private final class SGDoxTrackCell: UITableViewCell {
     let artworkView = UIImageView()
     let titleLabel = UILabel()
     let artistLabel = UILabel()
     let sourceBadge = UILabel()
+    let likeButton = UIButton(type: .system)
     let playIcon = UIImageView()
     let separatorView = UIView()
     var currentTrackId: String?
+    var onLikeTapped: (() -> Void)?
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -188,11 +259,18 @@ private final class SGDoxTrackCell: UITableViewCell {
         self.sourceBadge.textAlignment = .center
         self.contentView.addSubview(self.sourceBadge)
         
+        self.likeButton.addTarget(self, action: #selector(self.likePressed), for: .touchUpInside)
+        self.contentView.addSubview(self.likeButton)
+        
         self.playIcon.image = UIImage(systemName: "play.circle.fill")
         self.playIcon.contentMode = .scaleAspectFit
         self.contentView.addSubview(self.playIcon)
         
         self.contentView.addSubview(self.separatorView)
+    }
+    
+    @objc private func likePressed() {
+        self.onLikeTapped?()
     }
     
     required init?(coder: NSCoder) {
@@ -205,12 +283,13 @@ private final class SGDoxTrackCell: UITableViewCell {
         
         self.artworkView.frame = CGRect(x: 16, y: 9, width: 44, height: 44)
         
-        let textWidth = bounds.width - 70 - 46
+        let textWidth = bounds.width - 70 - 90
         self.titleLabel.frame = CGRect(x: 70, y: 12, width: textWidth, height: 19)
-        self.artistLabel.frame = CGRect(x: 70, y: 32, width: textWidth - 50, height: 17)
+        self.artistLabel.frame = CGRect(x: 70, y: 32, width: textWidth - 46, height: 17)
         
-        self.sourceBadge.frame = CGRect(x: bounds.width - 80, y: 32, width: 44, height: 16)
-        self.playIcon.frame = CGRect(x: bounds.width - 34, y: 19, width: 22, height: 22)
+        self.sourceBadge.frame = CGRect(x: bounds.width - 128, y: 32, width: 44, height: 16)
+        self.likeButton.frame = CGRect(x: bounds.width - 78, y: 15, width: 34, height: 30)
+        self.playIcon.frame = CGRect(x: bounds.width - 38, y: 19, width: 22, height: 22)
         
         self.separatorView.frame = CGRect(x: 70, y: bounds.height - 0.5, width: bounds.width - 70, height: 0.5)
     }
@@ -265,6 +344,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         
         SGDoxMusicManager.shared.addStateListener { [weak self] in
             self?.updateMiniPlayer()
+            self?.tableView.reloadData()
         }
         
         SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
@@ -276,6 +356,8 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         DiscordRPCService.shared.onStatusChanged = { [weak self] _ in
             self?.tableView.reloadData()
         }
+        
+        SGDoxMusicManager.shared.syncFavoritesWithServices()
         
         if self.searchResults.isEmpty {
             self.loadDefaultRecommendations()
@@ -305,6 +387,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.tableView.showsVerticalScrollIndicator = false
         self.tableView.register(SGDoxServiceCell.self, forCellReuseIdentifier: "ServiceCell")
         self.tableView.register(SGDoxWaveHeroCell.self, forCellReuseIdentifier: "WaveHeroCell")
+        self.tableView.register(SGDoxLibraryHeaderCell.self, forCellReuseIdentifier: "LibraryHeaderCell")
         self.tableView.register(SGDoxTrackCell.self, forCellReuseIdentifier: "TrackCell")
         self.view.addSubview(self.tableView)
     }
@@ -485,11 +568,31 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     // MARK: - TableView
     
+    private var hasFavorites: Bool {
+        return !SGDoxMusicManager.shared.favorites.isEmpty
+    }
+    
+    private func pluralEnding(_ count: Int) -> String {
+        let mod10 = count % 10
+        let mod100 = count % 100
+        if mod100 >= 11 && mod100 <= 19 { return "ов" }
+        if mod10 == 1 { return "" }
+        if mod10 >= 2 && mod10 <= 4 { return "а" }
+        return "ов"
+    }
+    
     public func numberOfSections(in tableView: UITableView) -> Int {
         if self.isSearching {
             return 1
         }
-        return self.searchResults.isEmpty ? 2 : 3
+        var count = 2
+        if self.hasFavorites {
+            count += 1
+        }
+        if !self.searchResults.isEmpty {
+            count += 1
+        }
+        return count
     }
     
     public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -497,16 +600,31 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             return self.searchResults.count
         }
         switch section {
-        case 0: return 3
-        case 1: return 1
-        case 2: return self.searchResults.count
-        default: return 0
+        case 0:
+            return 3
+        case 1:
+            return 1
+        case 2:
+            if self.hasFavorites {
+                return 1 + min(50, SGDoxMusicManager.shared.favorites.count)
+            } else {
+                return self.searchResults.count
+            }
+        case 3:
+            return self.searchResults.count
+        default:
+            return 0
         }
     }
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        if !self.isSearching && indexPath.section == 1 {
-            return 88.0
+        if !self.isSearching {
+            if indexPath.section == 1 {
+                return 88.0
+            }
+            if self.hasFavorites && indexPath.section == 2 && indexPath.row == 0 {
+                return 102.0
+            }
         }
         return 60.0
     }
@@ -516,10 +634,16 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             return self.searchResults.isEmpty ? "Ничего не найдено" : "Результаты поиска (\(self.searchResults.count))"
         }
         switch section {
-        case 0: return "Сервисы и интеграции"
-        case 1: return "Умный поток"
-        case 2: return self.searchResults.isEmpty ? nil : "Недавно прослушано"
-        default: return nil
+        case 0:
+            return "Сервисы и интеграции"
+        case 1:
+            return "Умный поток"
+        case 2:
+            return self.hasFavorites ? "Моя медиатека" : "Недавно прослушано"
+        case 3:
+            return "Недавно прослушано"
+        default:
+            return nil
         }
     }
     
@@ -589,10 +713,61 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             return cell
         }
         
+        if !self.isSearching && self.hasFavorites && indexPath.section == 2 {
+            if indexPath.row == 0 {
+                let cell = tableView.dequeueReusableCell(withIdentifier: "LibraryHeaderCell", for: indexPath) as! SGDoxLibraryHeaderCell
+                cell.containerCard.backgroundColor = theme.list.itemBlocksBackgroundColor
+                cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
+                cell.countLabel.textColor = theme.list.itemSecondaryTextColor
+                
+                let count = SGDoxMusicManager.shared.favorites.count
+                cell.countLabel.text = "\(count) трек\(self.pluralEnding(count)) • Синхронизировано"
+                
+                cell.playAllButton.backgroundColor = theme.list.itemAccentColor
+                cell.playAllButton.tintColor = .white
+                cell.shuffleButton.backgroundColor = theme.list.itemBlocksSeparatorColor
+                cell.shuffleButton.tintColor = theme.list.itemPrimaryTextColor
+                
+                cell.onPlayAllTapped = { [weak self] in
+                    guard let self = self else { return }
+                    let favs = SGDoxMusicManager.shared.favorites
+                    guard let first = favs.first else { return }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    SGDoxMusicManager.shared.play(track: first, queue: Array(favs.dropFirst()))
+                    self.openPlayer()
+                }
+                
+                cell.onShuffleTapped = { [weak self] in
+                    guard let self = self else { return }
+                    var shuffled = SGDoxMusicManager.shared.favorites.shuffled()
+                    guard !shuffled.isEmpty else { return }
+                    let first = shuffled.removeFirst()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    SGDoxMusicManager.shared.play(track: first, queue: shuffled)
+                    self.openPlayer()
+                }
+                return cell
+            }
+            
+            let trackIndex = indexPath.row - 1
+            let favs = SGDoxMusicManager.shared.favorites
+            guard trackIndex < favs.count else { return UITableViewCell() }
+            let track = favs[trackIndex]
+            
+            let cell = tableView.dequeueReusableCell(withIdentifier: "TrackCell", for: indexPath) as! SGDoxTrackCell
+            self.configureTrackCell(cell, track: track, isLast: trackIndex == min(favs.count - 1, 49))
+            return cell
+        }
+        
         let cell = tableView.dequeueReusableCell(withIdentifier: "TrackCell", for: indexPath) as! SGDoxTrackCell
         guard indexPath.row < self.searchResults.count else { return cell }
         let track = self.searchResults[indexPath.row]
-        
+        self.configureTrackCell(cell, track: track, isLast: indexPath.row == self.searchResults.count - 1)
+        return cell
+    }
+    
+    private func configureTrackCell(_ cell: SGDoxTrackCell, track: SGDoxMusicTrack, isLast: Bool) {
+        let theme = self.presentationData.theme
         cell.backgroundColor = theme.list.itemBlocksBackgroundColor
         cell.titleLabel.text = track.title
         cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
@@ -600,11 +775,22 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         cell.artistLabel.textColor = theme.list.itemSecondaryTextColor
         cell.playIcon.tintColor = theme.list.itemAccentColor
         cell.separatorView.backgroundColor = theme.list.itemBlocksSeparatorColor
-        cell.separatorView.isHidden = indexPath.row == self.searchResults.count - 1
+        cell.separatorView.isHidden = isLast
         
         cell.sourceBadge.text = track.source == .appleMusic ? "Apple" : "Spotify"
         cell.sourceBadge.backgroundColor = track.source == .appleMusic ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.15) : UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 0.15)
         cell.sourceBadge.textColor = track.source == .appleMusic ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 1.0)
+        
+        let isFav = SGDoxMusicManager.shared.isFavorite(track: track)
+        let heartConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
+        let heartIcon = isFav ? "suit.heart.fill" : "suit.heart"
+        cell.likeButton.setImage(UIImage(systemName: heartIcon, withConfiguration: heartConfig), for: .normal)
+        cell.likeButton.tintColor = isFav ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : theme.list.itemSecondaryTextColor
+        cell.onLikeTapped = { [weak self] in
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            SGDoxMusicManager.shared.toggleFavorite(track: track)
+            self?.tableView.reloadData()
+        }
         
         cell.currentTrackId = track.id
         if let artwork = track.artworkUrl {
@@ -616,8 +802,6 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         } else {
             cell.artworkView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
         }
-        
-        return cell
     }
     
     public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -640,6 +824,20 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             SGDoxMusicManager.shared.startWave()
             self.openPlayer()
+            return
+        }
+        
+        if !self.isSearching && self.hasFavorites && indexPath.section == 2 {
+            if indexPath.row > 0 {
+                let trackIndex = indexPath.row - 1
+                let favs = SGDoxMusicManager.shared.favorites
+                guard trackIndex < favs.count else { return }
+                let track = favs[trackIndex]
+                let remaining = Array(favs.suffix(from: trackIndex + 1))
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                SGDoxMusicManager.shared.play(track: track, queue: remaining)
+                self.openPlayer()
+            }
             return
         }
         

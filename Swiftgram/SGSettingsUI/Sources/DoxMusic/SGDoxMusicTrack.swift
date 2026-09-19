@@ -16,7 +16,7 @@ public enum SGDoxMusicSource: String, Codable, CaseIterable, Sendable {
     }
 }
 
-public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, @unchecked Sendable {
+public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unchecked Sendable {
     public let id: String
     public let title: String
     public let artist: String
@@ -62,5 +62,38 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, @unchecked Sen
     public func hash(into hasher: inout Hasher) {
         hasher.combine(self.id)
         hasher.combine(self.source)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, title, artist, album, artworkUrl, duration, previewUrl, source, spotifyUri, appleMusicId
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.artist = try container.decode(String.self, forKey: .artist)
+        self.album = try container.decodeIfPresent(String.self, forKey: .album) ?? ""
+        self.artworkUrl = try container.decodeIfPresent(String.self, forKey: .artworkUrl)
+        self.duration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? 0.0
+        self.previewUrl = try container.decodeIfPresent(String.self, forKey: .previewUrl)
+        self.source = try container.decode(SGDoxMusicSource.self, forKey: .source)
+        self.spotifyUri = try container.decodeIfPresent(String.self, forKey: .spotifyUri)
+        self.appleMusicId = try container.decodeIfPresent(String.self, forKey: .appleMusicId)
+        self.telegramFile = nil
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.title, forKey: .title)
+        try container.encode(self.artist, forKey: .artist)
+        try container.encode(self.album, forKey: .album)
+        try container.encodeIfPresent(self.artworkUrl, forKey: .artworkUrl)
+        try container.encode(self.duration, forKey: .duration)
+        try container.encodeIfPresent(self.previewUrl, forKey: .previewUrl)
+        try container.encode(self.source, forKey: .source)
+        try container.encodeIfPresent(self.spotifyUri, forKey: .spotifyUri)
+        try container.encodeIfPresent(self.appleMusicId, forKey: .appleMusicId)
     }
 }

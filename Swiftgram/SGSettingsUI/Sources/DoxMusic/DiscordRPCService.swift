@@ -340,20 +340,31 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
             assets["large_image"] = "appicon"
         }
         
-        switch track.source {
-        case .appleMusic:
-            assets["small_image"] = "appicon"
-            assets["small_text"] = "Apple Music"
-        case .spotify:
-            assets["small_image"] = "spotify"
-            assets["small_text"] = "Spotify"
-        case .telegram:
-            break
+        let doxgramIconUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Telegram/Telegram-iOS/SGDefault.alticon/SGDefault%403x.png"
+        if let cachedDox = self.externalAssetCache[doxgramIconUrl] {
+            assets["small_image"] = cachedDox
+        } else {
+            self.resolveExternalAsset(imageUrl: doxgramIconUrl)
+            if track.source == .appleMusic {
+                assets["small_image"] = "appicon"
+            } else if track.source == .spotify {
+                assets["small_image"] = "spotify"
+            }
         }
+        assets["small_text"] = "DoxGram iOS"
         
         if !assets.isEmpty {
             activity["assets"] = assets
         }
+        
+        activity["buttons"] = [
+            "DoxGram GitHub"
+        ]
+        activity["metadata"] = [
+            "button_urls": [
+                "https://github.com/lxt3z/DoxGram"
+            ]
+        ]
         
         return activity
     }
@@ -401,7 +412,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
             self.externalAssetCache[imageUrl] = mpUrl
             
             DispatchQueue.main.async {
-                if self.currentIsPlaying, self.currentPlayingTrack?.artworkUrl == imageUrl {
+                if self.currentIsPlaying, (self.currentPlayingTrack?.artworkUrl == imageUrl || imageUrl.contains("SGDefault")) {
                     self.sendPresenceUpdate(track: self.currentPlayingTrack, isPlaying: self.currentIsPlaying)
                 }
             }

@@ -125,7 +125,7 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
         let challenge = self.generateCodeChallenge(from: verifier)
         
         let clientId = self.customClientId
-        let scopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing user-top-read user-library-read"
+        let scopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing user-top-read user-library-read user-library-modify"
         
         guard let encodedScopes = scopes.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed),
               let authUrl = URL(string: "https://accounts.spotify.com/authorize?client_id=\(clientId)&response_type=code&redirect_uri=\(self.redirectUri)&code_challenge_method=S256&code_challenge=\(challenge)&scope=\(encodedScopes)") else {
@@ -346,20 +346,21 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
         return result
     }
     
-    private func makeAuthenticatedRequest(url: URL, completion: @escaping @Sendable (Data?, String?) -> Void) {
+    private func makeAuthenticatedRequest(url: URL, method: String = "GET", completion: @escaping @Sendable (Data?, String?) -> Void) {
         guard let token = self.accessToken else {
             completion(nil, "Not logged in to Spotify")
             return
         }
         
         var request = URLRequest(url: url)
+        request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
                 self.refreshAccessToken { success in
                     if success {
-                        self.makeAuthenticatedRequest(url: url, completion: completion)
+                        self.makeAuthenticatedRequest(url: url, method: method, completion: completion)
                     } else {
                         DispatchQueue.main.async { completion(nil, "Session expired, please log in again") }
                     }
@@ -373,6 +374,45 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
             }
             DispatchQueue.main.async { completion(data, nil) }
         }.resume()
+    }
+    
+    public func fetchLikedTracks(limit: Int = 50, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
+        guard let url = URL(string: "https://api.spotify.com/v1/me/tracks?limit=\(min(limit, 50))") else {
+            completion([])
+            return
+        }
+        self.makeAuthenticatedRequest(url: url) { [weak self] data, _ in
+            guard let self = self,
+                  let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let items = json["items"] as? [[String: Any]] else {
+                completion([])
+                return
+            }
+            let trackObjs = items.compactMap { $0["track"] as? [String: Any] }
+            let tracks = self.parseTracks(from: trackObjs)
+            completion(tracks)
+        }
+    }
+    
+    public func saveTrack(id: String, completion: @escaping @Sendable (Bool) -> Void) {
+        guard let url = URL(string: "https://api.spotify.com/v1/me/tracks?ids=\(id)") else {
+            completion(false)
+            return
+        }
+        self.makeAuthenticatedRequest(url: url, method: "PUT") { _, error in
+            completion(error == nil)
+        }
+    }
+    
+    public func removeTrack(id: String, completion: @escaping @Sendable (Bool) -> Void) {
+        guard let url = URL(string: "https://api.spotify.com/v1/me/tracks?ids=\(id)") else {
+            completion(false)
+            return
+        }
+        self.makeAuthenticatedRequest(url: url, method: "DELETE") { _, error in
+            completion(error == nil)
+        }
     }
     
     public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {

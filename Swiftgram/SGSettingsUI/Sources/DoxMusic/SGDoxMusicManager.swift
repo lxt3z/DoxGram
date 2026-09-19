@@ -28,6 +28,143 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
     }
     
+    public enum RepeatMode: Int {
+        case off = 0
+        case all = 1
+        case one = 2
+    }
+    
+    public var repeatMode: RepeatMode {
+        get {
+            let raw = UserDefaults.standard.integer(forKey: "dox_music_repeat_mode")
+            return RepeatMode(rawValue: raw) ?? .off
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "dox_music_repeat_mode")
+            self.notifyStateChanged()
+        }
+    }
+    
+    public func toggleRepeatMode() -> RepeatMode {
+        let next: RepeatMode
+        switch self.repeatMode {
+        case .off: next = .all
+        case .all: next = .one
+        case .one: next = .off
+        }
+        self.repeatMode = next
+        return next
+    }
+    
+    public var isShuffleEnabled: Bool {
+        get {
+            return UserDefaults.standard.bool(forKey: "dox_music_shuffle_enabled")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "dox_music_shuffle_enabled")
+            if newValue && !self.queue.isEmpty {
+                self.queue.shuffle()
+            }
+            self.notifyStateChanged()
+        }
+    }
+    
+    public func toggleShuffle() {
+        self.isShuffleEnabled.toggle()
+    }
+    
+    public var isAutoplayEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: "dox_music_autoplay_enabled") == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: "dox_music_autoplay_enabled")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "dox_music_autoplay_enabled")
+            self.notifyStateChanged()
+        }
+    }
+    
+    public func toggleAutoplay() {
+        self.isAutoplayEnabled.toggle()
+    }
+    
+    public private(set) var favorites: [SGDoxMusicTrack] = []
+    
+    private func loadFavorites() {
+        guard let data = UserDefaults.standard.data(forKey: "dox_music_favorites"),
+              let list = try? JSONDecoder().decode([SGDoxMusicTrack].self, from: data) else {
+            return
+        }
+        self.favorites = list
+    }
+    
+    private func saveFavorites() {
+        if let data = try? JSONEncoder().encode(self.favorites) {
+            UserDefaults.standard.set(data, forKey: "dox_music_favorites")
+        }
+    }
+    
+    public func isFavorite(track: SGDoxMusicTrack) -> Bool {
+        return self.favorites.contains(where: { $0.id == track.id || ($0.title == track.title && $0.artist == track.artist) })
+    }
+    
+    public func toggleFavorite(track: SGDoxMusicTrack) {
+        if let index = self.favorites.firstIndex(where: { $0.id == track.id || ($0.title == track.title && $0.artist == track.artist) }) {
+            self.favorites.remove(at: index)
+            self.saveFavorites()
+            if track.source == .spotify {
+                SpotifyService.shared.removeTrack(id: track.id) { _ in }
+            }
+        } else {
+            self.favorites.insert(track, at: 0)
+            self.saveFavorites()
+            if track.source == .appleMusic {
+                AppleMusicService.shared.addToLibrary(track: track) { _ in }
+            } else if track.source == .spotify {
+                SpotifyService.shared.saveTrack(id: track.id) { _ in }
+            }
+        }
+        self.notifyStateChanged()
+    }
+    
+    public func syncFavoritesWithServices() {
+        if AppleMusicService.shared.isAuthorized {
+            AppleMusicService.shared.fetchLibrarySongs { [weak self] amTracks in
+                guard let self = self, !amTracks.isEmpty else { return }
+                var updated = self.favorites
+                for t in amTracks {
+                    if !updated.contains(where: { $0.id == t.id || ($0.title == t.title && $0.artist == t.artist) }) {
+                        updated.append(t)
+                    }
+                }
+                DispatchQueue.main.async {
+                    self.favorites = updated
+                    self.saveFavorites()
+                    self.notifyStateChanged()
+                }
+            }
+        }
+        
+        if SpotifyService.shared.isAuthorized {
+            SpotifyService.shared.fetchLikedTracks { [weak self] spTracks in
+                guard let self = self, !spTracks.isEmpty else { return }
+                var updated = self.favorites
+                for t in spTracks {
+                    if !updated.contains(where: { $0.id == t.id || ($0.title == t.title && $0.artist == t.artist) }) {
+                        updated.append(t)
+                    }
+                }
+                DispatchQueue.main.async {
+                    self.favorites = updated
+                    self.saveFavorites()
+                    self.notifyStateChanged()
+                }
+            }
+        }
+    }
+    
     private var timeObserver: Any?
     private var avPlayer: AVPlayer?
     private var playbackTimer: Timer?
@@ -40,6 +177,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private override init() {
         super.init()
         self.setupAudioSession()
+        self.loadFavorites()
+        self.syncFavoritesWithServices()
     }
     
     private func setupAudioSession() {
@@ -140,7 +279,11 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.currentTime = 0.0
         
         if !queue.isEmpty {
-            self.queue = queue.filter { $0.id != track.id }
+            var q = queue.filter { $0.id != track.id }
+            if self.isShuffleEnabled {
+                q.shuffle()
+            }
+            self.queue = q
         }
         
         self.stopCurrentAudio()
@@ -233,10 +376,27 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     public func next() {
+        if self.repeatMode == .one, let current = self.currentTrack {
+            self.seek(to: 0.0)
+            self.resume()
+            return
+        }
+        
         if !self.queue.isEmpty {
             let nextTrack = self.queue.removeFirst()
             self.play(track: nextTrack, queue: self.queue)
-        } else if self.isWaveEnabled {
+        } else if self.repeatMode == .all, !self.history.isEmpty {
+            var fullList = self.history
+            if let current = self.currentTrack {
+                fullList.append(current)
+            }
+            if self.isShuffleEnabled {
+                fullList.shuffle()
+            }
+            self.history = []
+            let first = fullList.removeFirst()
+            self.play(track: first, queue: fullList)
+        } else if self.isAutoplayEnabled || self.isWaveEnabled {
             self.fetchWaveAndPlayNext()
         } else {
             self.pause()

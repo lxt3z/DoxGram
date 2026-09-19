@@ -27,14 +27,17 @@ public final class SGDoxMusicPlayerController: ViewController {
     private let currentTimeLabel = UILabel()
     private let remainingTimeLabel = UILabel()
     
+    private let favoriteButton = UIButton(type: .system)
     private let shuffleButton = UIButton(type: .system)
     private let previousButton = UIButton(type: .system)
     private let playPauseButton = UIButton(type: .system)
     private let nextButton = UIButton(type: .system)
     private let repeatButton = UIButton(type: .system)
     
+    private let autoplayButton = UIButton(type: .system)
     private let waveButton = UIButton(type: .system)
     private let pinToProfileButton = UIButton(type: .system)
+    private let queueButton = UIButton(type: .system)
     
     private var isDraggingSlider = false
     private var displayedTrackId: String?
@@ -149,6 +152,12 @@ public final class SGDoxMusicPlayerController: ViewController {
         self.artistLabel.textAlignment = .left
         self.view.addSubview(self.artistLabel)
         
+        let heartConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: .medium)
+        self.favoriteButton.setImage(UIImage(systemName: "suit.heart", withConfiguration: heartConfig), for: .normal)
+        self.favoriteButton.tintColor = .white
+        self.favoriteButton.addTarget(self, action: #selector(self.favoritePressed), for: .touchUpInside)
+        self.view.addSubview(self.favoriteButton)
+        
         // Scrubber
         self.progressSlider.tintColor = .white
         self.progressSlider.maximumTrackTintColor = UIColor.white.withAlphaComponent(0.2)
@@ -170,7 +179,7 @@ public final class SGDoxMusicPlayerController: ViewController {
         // Playback Buttons
         self.setupControlButtons()
         
-        // Bottom Action Bar: Wave & Pin to Profile
+        // Bottom Action Bar: Wave, Autoplay, Queue, Pin to Profile
         self.setupActionButtons()
     }
     
@@ -179,6 +188,7 @@ public final class SGDoxMusicPlayerController: ViewController {
         
         self.shuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: config), for: .normal)
         self.shuffleButton.tintColor = UIColor.white.withAlphaComponent(0.6)
+        self.shuffleButton.addTarget(self, action: #selector(self.shufflePressed), for: .touchUpInside)
         self.view.addSubview(self.shuffleButton)
         
         self.previousButton.setImage(UIImage(systemName: "backward.fill", withConfiguration: config), for: .normal)
@@ -201,15 +211,25 @@ public final class SGDoxMusicPlayerController: ViewController {
         
         self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: config), for: .normal)
         self.repeatButton.tintColor = UIColor.white.withAlphaComponent(0.6)
+        self.repeatButton.addTarget(self, action: #selector(self.repeatPressed), for: .touchUpInside)
         self.view.addSubview(self.repeatButton)
     }
     
     private func setupActionButtons() {
+        // Autoplay button (Apple Music infinity button)
+        let infinityConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        self.autoplayButton.setImage(UIImage(systemName: "infinity", withConfiguration: infinityConfig), for: .normal)
+        self.autoplayButton.tintColor = .white
+        self.autoplayButton.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+        self.autoplayButton.layer.cornerRadius = 20
+        self.autoplayButton.addTarget(self, action: #selector(self.autoplayPressed), for: .touchUpInside)
+        self.view.addSubview(self.autoplayButton)
+        
         // Wave button
-        self.waveButton.setTitle(" Моя волна", for: .normal)
+        self.waveButton.setTitle(" Волна", for: .normal)
         self.waveButton.setImage(UIImage(systemName: "dot.radiowaves.left.and.right"), for: .normal)
         self.waveButton.tintColor = .white
-        self.waveButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        self.waveButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         self.waveButton.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
         self.waveButton.layer.cornerRadius = 20
         self.waveButton.addTarget(self, action: #selector(self.wavePressed), for: .touchUpInside)
@@ -219,11 +239,20 @@ public final class SGDoxMusicPlayerController: ViewController {
         self.pinToProfileButton.setTitle(" В профиль", for: .normal)
         self.pinToProfileButton.setImage(UIImage(systemName: "pin.fill"), for: .normal)
         self.pinToProfileButton.tintColor = .white
-        self.pinToProfileButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        self.pinToProfileButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         self.pinToProfileButton.backgroundColor = UIColor(red: 0.0, green: 0.55, blue: 1.0, alpha: 0.8)
         self.pinToProfileButton.layer.cornerRadius = 20
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
         self.view.addSubview(self.pinToProfileButton)
+        
+        // Queue button
+        let queueConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        self.queueButton.setImage(UIImage(systemName: "list.bullet", withConfiguration: queueConfig), for: .normal)
+        self.queueButton.tintColor = .white
+        self.queueButton.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+        self.queueButton.layer.cornerRadius = 20
+        self.queueButton.addTarget(self, action: #selector(self.queuePressed), for: .touchUpInside)
+        self.view.addSubview(self.queueButton)
     }
     
     public override func viewDidLayoutSubviews() {
@@ -245,17 +274,21 @@ public final class SGDoxMusicPlayerController: ViewController {
         self.vinylDiskView.frame = CGRect(x: artworkSide * 0.15, y: -20, width: artworkSide * 0.7, height: artworkSide * 0.7)
         self.vinylDiskView.layer.cornerRadius = (artworkSide * 0.7) * 0.5
         
-        let titleY = artworkY + artworkSide + 32
-        self.titleLabel.frame = CGRect(x: 32, y: titleY, width: bounds.width - 64, height: 28)
-        self.artistLabel.frame = CGRect(x: 32, y: titleY + 30, width: bounds.width - 64, height: 22)
+        let titleY = artworkY + artworkSide + 28
+        let favoriteSize: CGFloat = 40
+        self.favoriteButton.frame = CGRect(x: bounds.width - 32 - favoriteSize, y: titleY + 4, width: favoriteSize, height: favoriteSize)
+        
+        let titleWidth = bounds.width - 64 - favoriteSize - 8
+        self.titleLabel.frame = CGRect(x: 32, y: titleY, width: titleWidth, height: 28)
+        self.artistLabel.frame = CGRect(x: 32, y: titleY + 30, width: titleWidth, height: 22)
         
         let sliderY = titleY + 68
         self.progressSlider.frame = CGRect(x: 32, y: sliderY, width: bounds.width - 64, height: 30)
         self.currentTimeLabel.frame = CGRect(x: 32, y: sliderY + 28, width: 60, height: 16)
         self.remainingTimeLabel.frame = CGRect(x: bounds.width - 92, y: sliderY + 28, width: 60, height: 16)
         
-        let controlsY = sliderY + 64
-        let controlSpacing = (bounds.width - 64 - 70 - 180) / 4.0
+        let controlsY = sliderY + 62
+        let controlSpacing = (bounds.width - 64 - 70 - 176) / 4.0
         
         self.shuffleButton.frame = CGRect(x: 32, y: controlsY + 13, width: 44, height: 44)
         self.previousButton.frame = CGRect(x: 32 + 44 + controlSpacing, y: controlsY + 13, width: 44, height: 44)
@@ -263,10 +296,15 @@ public final class SGDoxMusicPlayerController: ViewController {
         self.nextButton.frame = CGRect(x: bounds.width - 32 - 44 - controlSpacing - 44, y: controlsY + 13, width: 44, height: 44)
         self.repeatButton.frame = CGRect(x: bounds.width - 32 - 44, y: controlsY + 13, width: 44, height: 44)
         
-        let actionsY = controlsY + 92
-        let actionWidth = (bounds.width - 64 - 16) * 0.5
-        self.waveButton.frame = CGRect(x: 32, y: actionsY, width: actionWidth, height: 44)
-        self.pinToProfileButton.frame = CGRect(x: 32 + actionWidth + 16, y: actionsY, width: actionWidth, height: 44)
+        let actionsY = controlsY + 86
+        let sideBtnSize: CGFloat = 40
+        let totalSpacing: CGFloat = 10 * 3
+        let mainActionWidth = max(70, (bounds.width - 64 - (sideBtnSize * 2) - totalSpacing) * 0.5)
+        
+        self.autoplayButton.frame = CGRect(x: 32, y: actionsY + 2, width: sideBtnSize, height: sideBtnSize)
+        self.waveButton.frame = CGRect(x: 32 + sideBtnSize + 10, y: actionsY, width: mainActionWidth, height: 44)
+        self.pinToProfileButton.frame = CGRect(x: 32 + sideBtnSize + 10 + mainActionWidth + 10, y: actionsY, width: mainActionWidth, height: 44)
+        self.queueButton.frame = CGRect(x: bounds.width - 32 - sideBtnSize, y: actionsY + 2, width: sideBtnSize, height: sideBtnSize)
     }
     
     private func updateContent() {
@@ -297,15 +335,47 @@ public final class SGDoxMusicPlayerController: ViewController {
             }
         }
         
+        // Favorite state
+        let isFav = manager.isFavorite(track: track)
+        let heartIcon = isFav ? "suit.heart.fill" : "suit.heart"
+        let heartConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: .medium)
+        self.favoriteButton.setImage(UIImage(systemName: heartIcon, withConfiguration: heartConfig), for: .normal)
+        self.favoriteButton.tintColor = isFav ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : .white
+        
+        // Play/Pause icon
         let playConfig = UIImage.SymbolConfiguration(pointSize: 34, weight: .bold)
         let iconName = manager.isPlaying ? "pause.fill" : "play.fill"
         self.playPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: playConfig), for: .normal)
         
+        // Shuffle state
+        self.shuffleButton.tintColor = manager.isShuffleEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : UIColor.white.withAlphaComponent(0.6)
+        
+        // Repeat state
+        let repeatConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+        switch manager.repeatMode {
+        case .off:
+            self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: repeatConfig), for: .normal)
+            self.repeatButton.tintColor = UIColor.white.withAlphaComponent(0.6)
+        case .all:
+            self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: repeatConfig), for: .normal)
+            self.repeatButton.tintColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
+        case .one:
+            self.repeatButton.setImage(UIImage(systemName: "repeat.1", withConfiguration: repeatConfig), for: .normal)
+            self.repeatButton.tintColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
+        }
+        
+        // Wave state
         if manager.isWaveEnabled {
             self.waveButton.backgroundColor = UIColor(red: 0.95, green: 0.25, blue: 0.5, alpha: 0.85)
         } else {
             self.waveButton.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
         }
+        
+        // Autoplay state
+        self.autoplayButton.backgroundColor = manager.isAutoplayEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.15)
+        
+        // Queue state
+        self.queueButton.backgroundColor = !manager.queue.isEmpty ? UIColor(white: 1.0, alpha: 0.3) : UIColor(white: 1.0, alpha: 0.15)
     }
     
     private func formatTime(_ seconds: Double) -> String {
@@ -319,6 +389,37 @@ public final class SGDoxMusicPlayerController: ViewController {
     
     @objc private func dismissPressed() {
         self.dismiss()
+    }
+    
+    @objc private func favoritePressed() {
+        guard let track = SGDoxMusicManager.shared.currentTrack else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        SGDoxMusicManager.shared.toggleFavorite(track: track)
+        self.updateContent()
+    }
+    
+    @objc private func shufflePressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        SGDoxMusicManager.shared.toggleShuffle()
+        self.updateContent()
+    }
+    
+    @objc private func repeatPressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let _ = SGDoxMusicManager.shared.toggleRepeatMode()
+        self.updateContent()
+    }
+    
+    @objc private func autoplayPressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        SGDoxMusicManager.shared.toggleAutoplay()
+        self.updateContent()
+    }
+    
+    @objc private func queuePressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let queueController = SGDoxMusicQueueController(context: self.context)
+        self.present(queueController, in: .window(.root))
     }
     
     @objc private func playPausePressed() {
