@@ -45,6 +45,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
     }
     
+    @discardableResult
     public func toggleRepeatMode() -> RepeatMode {
         let next: RepeatMode
         switch self.repeatMode {
