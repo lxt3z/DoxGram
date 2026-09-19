@@ -83,12 +83,6 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
         }
     }
     
-    public func logout() {
-        UserDefaults.standard.removeObject(forKey: self.tokenKey)
-        UserDefaults.standard.removeObject(forKey: self.refreshTokenKey)
-        UserDefaults.standard.removeObject(forKey: self.tokenExpiryKey)
-    }
-    
     private var refreshToken: String? {
         get {
             return UserDefaults.standard.string(forKey: self.refreshTokenKey)
