@@ -7,10 +7,21 @@ public final class SGDoxImageLoader: @unchecked Sendable {
     
     private let memoryCache = NSCache<NSString, UIImage>()
     private var placeholderCache: UIImage?
+    private let session: URLSession
     
     private init() {
-        self.memoryCache.countLimit = 300
-        self.memoryCache.totalCostLimit = 80 * 1024 * 1024 // 80 MB
+        self.memoryCache.countLimit = 500
+        self.memoryCache.totalCostLimit = 120 * 1024 * 1024 // 120 MB
+        
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15.0
+        config.timeoutIntervalForResource = 30.0
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.httpAdditionalHeaders = [
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+            "Accept": "image/webp,image/png,image/jpeg,image/*;q=0.8"
+        ]
+        self.session = URLSession(configuration: config)
     }
     
     public func storeImage(_ image: UIImage, for key: String) {
@@ -25,13 +36,11 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         return self.memoryCache.object(forKey: trimmed as NSString)
     }
     
-    public func loadImage(urlString: String, targetSize: CGSize? = nil, scale: CGFloat = 2.0, completion: @escaping @MainActor (UIImage?) -> Void) {
+    public func loadImage(urlString: String, targetSize: CGSize? = nil, scale: CGFloat = 2.0, completion: @escaping @Sendable (UIImage?) -> Void) {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    completion(nil)
-                }
+                completion(nil)
             }
             return
         }
@@ -39,28 +48,43 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         let cacheKey = trimmed as NSString
         if let cached = self.memoryCache.object(forKey: cacheKey) {
             DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    completion(cached)
-                }
+                completion(cached)
             }
             return
         }
         
-        // Handle local Apple Music library persistent IDs (already pre-cached in fetchLibrarySongs)
+        // Handle local Apple Music library persistent IDs
         if trimmed.hasPrefix("am_local_") {
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    completion(nil)
+            let pidStr = trimmed.replacingOccurrences(of: "am_local_", with: "")
+            if let pid = UInt64(pidStr) {
+                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                    guard let self = self else { return }
+                    let query = MPMediaQuery.songs()
+                    query.addFilterPredicate(MPMediaPropertyPredicate(value: pid, forProperty: MPMediaItemPropertyPersistentID))
+                    var loadedImg: UIImage?
+                    if let item = query.items?.first, let art = item.artwork?.image(at: targetSize ?? CGSize(width: 300, height: 300)) {
+                        self.memoryCache.setObject(art, forKey: cacheKey)
+                        loadedImg = art
+                    }
+                    DispatchQueue.main.async {
+                        completion(loadedImg)
+                    }
                 }
+                return
             }
-            return
         }
         
-        guard let url = URL(string: trimmed) else {
+        // Handle template URLs ({w}x{h} or {f}) from Apple Music / MusicKit
+        var effectiveUrl = trimmed
+        if effectiveUrl.contains("{w}") || effectiveUrl.contains("{h}") {
+            effectiveUrl = effectiveUrl.replacingOccurrences(of: "{w}", with: "600")
+                .replacingOccurrences(of: "{h}", with: "600")
+                .replacingOccurrences(of: "{f}", with: "jpg")
+        }
+        
+        guard let url = URL(string: effectiveUrl) else {
             DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    completion(nil)
-                }
+                completion(nil)
             }
             return
         }
@@ -68,22 +92,37 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15.0
         
-        URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
+        self.session.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self, let data = data, error == nil, let image = UIImage(data: data) else {
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        completion(nil)
+                // If 600x600 failed, fallback to 100x100 if applicable
+                if effectiveUrl.contains("600x600") {
+                    let fallbackStr = effectiveUrl.replacingOccurrences(of: "600x600", with: "100x100")
+                    if let fallbackUrl = URL(string: fallbackStr) {
+                        self?.session.dataTask(with: URLRequest(url: fallbackUrl)) { fbData, _, _ in
+                            if let fbData = fbData, let fbImg = UIImage(data: fbData) {
+                                self?.memoryCache.setObject(fbImg, forKey: cacheKey, cost: fbData.count)
+                                DispatchQueue.main.async {
+                                    completion(fbImg)
+                                }
+                            } else {
+                                DispatchQueue.main.async {
+                                    completion(nil)
+                                }
+                            }
+                        }.resume()
+                        return
                     }
+                }
+                
+                DispatchQueue.main.async {
+                    completion(nil)
                 }
                 return
             }
             
             self.memoryCache.setObject(image, forKey: cacheKey, cost: data.count)
-            
             DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    completion(image)
-                }
+                completion(image)
             }
         }.resume()
     }

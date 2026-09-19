@@ -307,8 +307,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     public init(context: AccountContext) {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        super.init(navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData))
+        super.init(navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData, style: .glass))
+        self._hasGlassStyle = true
+        self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
         self.title = "DoxMusic"
+        self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
         self.ready.set(.single(true))
     }
     
@@ -319,6 +322,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     deinit {
         self.searchTimer?.invalidate()
         self.activeSearchTask?.cancel()
+    }
+    
+    public override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
     }
     
     public override func viewDidLoad() {
@@ -456,9 +464,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.miniProgressView.frame = CGRect(x: 0, y: self.miniPlayerBlurView.bounds.height - 2, width: self.miniPlayerBlurView.bounds.width, height: 2)
         
         let tableY = self.searchBar.frame.maxY + 4
-        let tableBottom = self.miniPlayerContainer.isHidden ? (bounds.height - layout.intrinsicInsets.bottom) : miniPlayerY
-        let tableHeight = max(0, tableBottom - tableY)
-        self.tableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: tableHeight)
+        self.tableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: max(0, bounds.height - tableY))
+        
+        let bottomContentInset = layout.intrinsicInsets.bottom + (miniPlayerHeight > 0 ? (miniPlayerHeight + 16) : 16)
+        self.tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: bottomContentInset, right: 0)
+        self.tableView.scrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: layout.intrinsicInsets.bottom + (miniPlayerHeight > 0 ? (miniPlayerHeight + 8) : 0), right: 0)
     }
     
     private func updateMiniPlayer() {
@@ -469,6 +479,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         
         self.miniPlayerContainer.isHidden = false
+        self.view.bringSubviewToFront(self.miniPlayerContainer)
         self.miniTitleLabel.text = track.title
         self.miniArtistLabel.text = track.artist
         
@@ -477,11 +488,18 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.miniPlayPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
         
         if let artwork = track.artworkUrl {
-            SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak self] image in
-                self?.miniArtworkImageView.image = image
+            if let cached = SGDoxImageLoader.shared.cachedImage(for: artwork) {
+                self.miniArtworkImageView.image = cached
+            } else {
+                self.miniArtworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
+                SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak self] image in
+                    if let image = image {
+                        self?.miniArtworkImageView.image = image
+                    }
+                }
             }
         } else {
-            self.miniArtworkImageView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
+            self.miniArtworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
         }
     }
     
@@ -795,11 +813,15 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         
         cell.currentTrackId = track.id
-        cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
-        if let artwork = track.artworkUrl {
-            SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak cell] image in
-                if cell?.currentTrackId == track.id, let image = image {
-                    cell?.artworkView.image = image
+        if let artwork = track.artworkUrl, let cached = SGDoxImageLoader.shared.cachedImage(for: artwork) {
+            cell.artworkView.image = cached
+        } else {
+            cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
+            if let artwork = track.artworkUrl {
+                SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak cell] image in
+                    if cell?.currentTrackId == track.id, let image = image {
+                        cell?.artworkView.image = image
+                    }
                 }
             }
         }
@@ -1007,6 +1029,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     private func openPlayer() {
         let playerController = SGDoxMusicPlayerController(context: self.context)
-        self.present(playerController, in: .window(.root))
+        playerController.navigationPresentation = .modal
+        self.push(playerController)
     }
 }

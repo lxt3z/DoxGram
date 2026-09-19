@@ -46,7 +46,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
-        self.modalPresentationStyle = .overFullScreen
+        self.navigationPresentation = .modal
         self.statusBar.statusBarStyle = .White
         self.ready.set(.single(true))
     }
@@ -103,8 +103,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             }
         } else if recognizer.state == .ended || recognizer.state == .cancelled {
             let velocity = recognizer.velocity(in: self.view)
-            if translation.y > 150 || velocity.y > 800 {
-                self.dismiss()
+            if translation.y > 140 || velocity.y > 700 {
+                UIView.animate(withDuration: 0.2, animations: {
+                    self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
+                }) { [weak self] _ in
+                    self?.dismiss()
+                }
             } else {
                 UIView.animate(withDuration: 0.25) {
                     self.view.transform = .identity
@@ -336,15 +340,21 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.artistLabel.text = track.artist
             self.sourceLabel.text = "Играет из \(track.source.rawValue)"
             
-            self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
             if let artworkUrl = track.artworkUrl {
-                SGDoxImageLoader.shared.loadImage(urlString: artworkUrl, targetSize: CGSize(width: 320, height: 320)) { [weak self] image in
-                    if self?.displayedTrackId == track.id, let image = image {
-                        self?.artworkImageView.image = image
-                        self?.backgroundImageView.image = image
+                if let cached = SGDoxImageLoader.shared.cachedImage(for: artworkUrl) {
+                    self.artworkImageView.image = cached
+                    self.backgroundImageView.image = cached
+                } else {
+                    self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
+                    SGDoxImageLoader.shared.loadImage(urlString: artworkUrl, targetSize: CGSize(width: 320, height: 320)) { [weak self] image in
+                        if self?.displayedTrackId == track.id, let image = image {
+                            self?.artworkImageView.image = image
+                            self?.backgroundImageView.image = image
+                        }
                     }
                 }
             } else {
+                self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
                 self.backgroundImageView.image = nil
             }
         }
@@ -433,7 +443,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     @objc private func queuePressed() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let queueController = SGDoxMusicQueueController(context: self.context)
-        self.present(queueController, in: .window(.root))
+        queueController.navigationPresentation = .modal
+        self.push(queueController)
     }
     
     @objc private func playPausePressed() {

@@ -23,7 +23,8 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
-        self.modalPresentationStyle = .pageSheet
+        self.navigationPresentation = .modal
+        self.statusBar.statusBarStyle = .White
     }
     
     required init(coder aDecoder: NSCoder) {
@@ -142,11 +143,18 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
         cell.indexLabel.text = "\(indexPath.row + 1)"
         
         if let artwork = track.artworkUrl {
-            SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak cell] img in
-                cell?.artworkView.image = img
+            if let cached = SGDoxImageLoader.shared.cachedImage(for: artwork) {
+                cell.artworkView.image = cached
+            } else {
+                cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
+                SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak cell] img in
+                    if let img = img {
+                        cell?.artworkView.image = img
+                    }
+                }
             }
         } else {
-            cell.artworkView.image = UIImage(bundleImageName: "Media Editor/SmallAudio")
+            cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
         }
         
         return cell

@@ -225,8 +225,8 @@ public final class AppleMusicService: @unchecked Sendable {
                 return nil
             }
             let album = item["collectionName"] as? String ?? ""
-            let artwork100 = item["artworkUrl100"] as? String
-            let artworkUrl = artwork100?.replacingOccurrences(of: "100x100bb", with: "600x600bb") ?? artwork100
+            let rawArtwork = (item["artworkUrl100"] as? String) ?? (item["artworkUrl60"] as? String)
+            let artworkUrl = rawArtwork?.replacingOccurrences(of: "100x100bb", with: "600x600bb") ?? rawArtwork
             let previewUrl = item["previewUrl"] as? String
             let durationMs = item["trackTimeMillis"] as? Double ?? 30000.0
             let duration = durationMs / 1000.0
