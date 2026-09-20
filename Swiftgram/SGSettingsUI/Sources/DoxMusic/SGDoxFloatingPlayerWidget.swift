@@ -12,15 +12,17 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     
     public var openPlayer: (() -> Void)?
     
+    private let containerView = UIView()
     private let blurView = UIVisualEffectView()
+    private let tintOverlayView = UIView()
     private let glossLayer = CAGradientLayer()
     
     private let artworkImageView = UIImageView()
-    private let textStackView = UIStackView()
+    private let textContainerView = UIView()
     private let titleLabel = UILabel()
     private let artistLabel = UILabel()
     
-    private let controlsStackView = UIStackView()
+    private let playPauseContainer = UIView()
     private let playPauseButton = UIButton(type: .system)
     private let nextButton = UIButton(type: .system)
     
@@ -35,6 +37,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         super.init(frame: .zero)
         
         self.setupViews()
+        self.applyTheme()
         self.setupListeners()
         self.updateContent(animated: false)
     }
@@ -46,37 +49,30 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     private func setupViews() {
         self.backgroundColor = .clear
         
-        // Shadow for floating elevation
-        self.layer.shadowColor = UIColor.black.cgColor
-        self.layer.shadowOpacity = 0.35
-        self.layer.shadowRadius = 14
-        self.layer.shadowOffset = CGSize(width: 0, height: 6)
+        self.containerView.clipsToBounds = true
+        self.containerView.layer.cornerRadius = 26
+        self.containerView.layer.borderWidth = 0.5
+        self.addSubview(self.containerView)
         
-        // Blur / Glass Effect
-        let blurStyle: UIBlurEffect.Style = self.theme.overallDarkAppearance ? .systemMaterialDark : .systemMaterialLight
-        self.blurView.effect = UIBlurEffect(style: blurStyle)
-        self.blurView.clipsToBounds = true
-        self.blurView.layer.cornerRadius = 27
-        self.blurView.layer.borderWidth = 0.5
-        self.blurView.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
-        self.addSubview(self.blurView)
+        self.containerView.addSubview(self.blurView)
+        self.containerView.addSubview(self.tintOverlayView)
         
-        // Specular glass highlight gradient on top
+        // Specular glass highlight
         self.glossLayer.colors = [
-            UIColor.white.withAlphaComponent(0.16).cgColor,
-            UIColor.white.withAlphaComponent(0.02).cgColor,
+            UIColor.white.withAlphaComponent(0.18).cgColor,
+            UIColor.white.withAlphaComponent(0.04).cgColor,
             UIColor.clear.cgColor
         ]
-        self.glossLayer.locations = [0.0, 0.5, 1.0]
+        self.glossLayer.locations = [0.0, 0.45, 1.0]
         self.glossLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
         self.glossLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
-        self.blurView.contentView.layer.addSublayer(self.glossLayer)
+        self.containerView.layer.addSublayer(self.glossLayer)
         
         // Tap gesture to open player
         let tap = UITapGestureRecognizer(target: self, action: #selector(self.widgetTapped))
         self.addGestureRecognizer(tap)
         
-        // Swipe down to stop / dismiss
+        // Swipe down to stop
         let swipe = UISwipeGestureRecognizer(target: self, action: #selector(self.handleSwipeDown))
         swipe.direction = .down
         self.addGestureRecognizer(swipe)
@@ -85,51 +81,88 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.artworkImageView.contentMode = .scaleAspectFill
         self.artworkImageView.clipsToBounds = true
         self.artworkImageView.layer.cornerRadius = 10
-        self.artworkImageView.backgroundColor = UIColor(white: 0.2, alpha: 1.0)
-        self.blurView.contentView.addSubview(self.artworkImageView)
+        self.artworkImageView.layer.borderWidth = 0.5
+        self.containerView.addSubview(self.artworkImageView)
         
-        // Text Stack: Title & Artist
-        self.textStackView.axis = .vertical
-        self.textStackView.alignment = .leading
-        self.textStackView.distribution = .fillProportionally
-        self.textStackView.spacing = 1
-        
+        // Labels
+        self.textContainerView.isUserInteractionEnabled = false
         self.titleLabel.font = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
-        self.titleLabel.textColor = .white
         self.titleLabel.lineBreakMode = .byTruncatingTail
-        self.textStackView.addArrangedSubview(self.titleLabel)
+        self.textContainerView.addSubview(self.titleLabel)
         
         self.artistLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .regular)
-        self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.72)
         self.artistLabel.lineBreakMode = .byTruncatingTail
-        self.textStackView.addArrangedSubview(self.artistLabel)
+        self.textContainerView.addSubview(self.artistLabel)
         
-        self.blurView.contentView.addSubview(self.textStackView)
+        self.containerView.addSubview(self.textContainerView)
         
-        // Play/Pause button
-        let playConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .bold)
+        // Play / Pause Button with circular background
+        self.playPauseContainer.layer.cornerRadius = 17
+        self.playPauseContainer.clipsToBounds = true
+        self.containerView.addSubview(self.playPauseContainer)
+        
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
         self.playPauseButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playConfig), for: .normal)
-        self.playPauseButton.tintColor = .white
         self.playPauseButton.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
+        self.playPauseContainer.addSubview(self.playPauseButton)
         
-        // Next button
+        // Next Button
         let nextConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         self.nextButton.setImage(UIImage(systemName: "forward.fill", withConfiguration: nextConfig), for: .normal)
-        self.nextButton.tintColor = UIColor.white.withAlphaComponent(0.85)
         self.nextButton.addTarget(self, action: #selector(self.nextPressed), for: .touchUpInside)
+        self.containerView.addSubview(self.nextButton)
         
-        self.controlsStackView.axis = .horizontal
-        self.controlsStackView.alignment = .center
-        self.controlsStackView.distribution = .equalSpacing
-        self.controlsStackView.spacing = 6
-        self.controlsStackView.addArrangedSubview(self.playPauseButton)
-        self.controlsStackView.addArrangedSubview(self.nextButton)
-        self.blurView.contentView.addSubview(self.controlsStackView)
+        // Progress View
+        self.containerView.addSubview(self.progressView)
+    }
+    
+    private func applyTheme() {
+        let isDark = self.theme.overallDarkAppearance
         
-        // Bottom subtle progress line
-        self.progressView.progressTintColor = UIColor(red: 0.12, green: 0.55, blue: 1.0, alpha: 0.9)
-        self.progressView.trackTintColor = UIColor.white.withAlphaComponent(0.12)
-        self.blurView.contentView.addSubview(self.progressView)
+        self.blurView.effect = UIBlurEffect(style: isDark ? .systemMaterialDark : .systemMaterialLight)
+        
+        if isDark {
+            self.tintOverlayView.backgroundColor = UIColor(white: 0.12, alpha: 0.65)
+            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.15).cgColor
+            self.layer.shadowColor = UIColor.black.cgColor
+            self.layer.shadowOpacity = 0.45
+            self.layer.shadowRadius = 16
+            self.layer.shadowOffset = CGSize(width: 0, height: 6)
+            
+            self.titleLabel.textColor = .white
+            self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.70)
+            
+            self.playPauseContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+            self.playPauseButton.tintColor = .white
+            self.nextButton.tintColor = UIColor.white.withAlphaComponent(0.85)
+            
+            self.artworkImageView.backgroundColor = UIColor(white: 0.20, alpha: 1.0)
+            self.artworkImageView.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
+            
+            self.progressView.trackTintColor = UIColor(white: 1.0, alpha: 0.12)
+        } else {
+            self.tintOverlayView.backgroundColor = UIColor(white: 0.98, alpha: 0.85)
+            self.containerView.layer.borderColor = UIColor(white: 0.0, alpha: 0.10).cgColor
+            self.layer.shadowColor = UIColor.black.cgColor
+            self.layer.shadowOpacity = 0.15
+            self.layer.shadowRadius = 12
+            self.layer.shadowOffset = CGSize(width: 0, height: 4)
+            
+            let darkText = UIColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 1.0)
+            self.titleLabel.textColor = darkText
+            self.artistLabel.textColor = UIColor(red: 0.44, green: 0.46, blue: 0.50, alpha: 1.0)
+            
+            self.playPauseContainer.backgroundColor = UIColor(white: 0.0, alpha: 0.06)
+            self.playPauseButton.tintColor = darkText
+            self.nextButton.tintColor = UIColor(red: 0.32, green: 0.34, blue: 0.38, alpha: 1.0)
+            
+            self.artworkImageView.backgroundColor = UIColor(white: 0.90, alpha: 1.0)
+            self.artworkImageView.layer.borderColor = UIColor(white: 0.0, alpha: 0.08).cgColor
+            
+            self.progressView.trackTintColor = UIColor(white: 0.0, alpha: 0.08)
+        }
+        
+        self.progressView.progressTintColor = UIColor(red: 0.12, green: 0.55, blue: 1.0, alpha: 1.0)
     }
     
     private func setupListeners() {
@@ -150,9 +183,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     
     public func updateTheme(_ theme: PresentationTheme) {
         self.theme = theme
-        let blurStyle: UIBlurEffect.Style = theme.overallDarkAppearance ? .systemMaterialDark : .systemMaterialLight
-        self.blurView.effect = UIBlurEffect(style: blurStyle)
-        self.progressView.progressTintColor = theme.list.itemAccentColor
+        self.applyTheme()
     }
     
     public func setHiddenForSubscreens(_ hidden: Bool) {
@@ -162,14 +193,15 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     }
     
     public func updateLayout(size: CGSize, insets: UIEdgeInsets, transition: ContainedViewLayoutTransition) {
-        let widgetHeight: CGFloat = 54.0
-        let horizontalMargin: CGFloat = 14.0
+        let widgetHeight: CGFloat = 52.0
+        let horizontalMargin: CGFloat = 16.0
         let widgetWidth = min(size.width - horizontalMargin * 2.0, 420.0)
-        let x = (size.width - widgetWidth) * 0.5
+        let x = floor((size.width - widgetWidth) * 0.5)
         
-        // Tab bar height in Telegram is typically 49pt + insets.bottom
-        let bottomTabOffset = insets.bottom + 49.0 + 8.0
-        let y = size.height - bottomTabOffset - widgetHeight
+        // Floating tab bar clearance:
+        // Tab bar height (~56pt) + bottom inset + 12pt gap
+        let bottomOffset = max(insets.bottom, 16.0) + 72.0 + 12.0
+        let y = size.height - bottomOffset - widgetHeight
         
         let targetFrame = CGRect(x: x, y: y, width: widgetWidth, height: widgetHeight)
         
@@ -179,21 +211,34 @@ public final class SGDoxFloatingPlayerWidget: UIView {
             self.frame = targetFrame
         }
         
+        self.containerView.frame = self.bounds
         self.blurView.frame = self.bounds
-        self.glossLayer.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: 26)
+        self.tintOverlayView.frame = self.bounds
+        self.glossLayer.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: 24)
         
-        let artSide: CGFloat = 40.0
+        let artSide: CGFloat = 38.0
         self.artworkImageView.frame = CGRect(x: 7, y: (widgetHeight - artSide) * 0.5, width: artSide, height: artSide)
         
-        let controlsWidth: CGFloat = 76.0
-        let controlsX = widgetWidth - controlsWidth - 8.0
-        self.controlsStackView.frame = CGRect(x: controlsX, y: (widgetHeight - 36.0) * 0.5, width: controlsWidth, height: 36.0)
+        let nextWidth: CGFloat = 34.0
+        let playWidth: CGFloat = 34.0
+        let nextX = widgetWidth - nextWidth - 8.0
+        let playX = nextX - playWidth - 6.0
+        
+        self.nextButton.frame = CGRect(x: nextX, y: (widgetHeight - nextWidth) * 0.5, width: nextWidth, height: nextWidth)
+        self.playPauseContainer.frame = CGRect(x: playX, y: (widgetHeight - playWidth) * 0.5, width: playWidth, height: playWidth)
+        self.playPauseButton.frame = self.playPauseContainer.bounds
         
         let textX = self.artworkImageView.frame.maxX + 10.0
-        let textWidth = max(0, controlsX - textX - 8.0)
-        self.textStackView.frame = CGRect(x: textX, y: (widgetHeight - 34.0) * 0.5, width: textWidth, height: 34.0)
+        let textWidth = max(0, playX - textX - 8.0)
+        let textHeight: CGFloat = 34.0
+        self.textContainerView.frame = CGRect(x: textX, y: (widgetHeight - textHeight) * 0.5, width: textWidth, height: textHeight)
+        self.titleLabel.frame = CGRect(x: 0, y: 0, width: textWidth, height: 18)
+        self.artistLabel.frame = CGRect(x: 0, y: 17, width: textWidth, height: 16)
         
-        self.progressView.frame = CGRect(x: 16.0, y: widgetHeight - 2.5, width: widgetWidth - 32.0, height: 2.0)
+        self.progressView.frame = CGRect(x: 18.0, y: widgetHeight - 2.0, width: widgetWidth - 36.0, height: 2.0)
+        
+        // Ensure kept in front of tab bar controllers
+        self.superview?.bringSubviewToFront(self)
     }
     
     private func updateContent(animated: Bool) {
@@ -218,7 +263,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         }
         
         let iconName = manager.isPlaying ? "pause.fill" : "play.fill"
-        let playConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .bold)
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
         self.playPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: playConfig), for: .normal)
         
         self.updateVisibility(animated: animated)
@@ -227,11 +272,13 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     private func updateVisibility(animated: Bool) {
         let shouldShow = SGDoxMusicManager.shared.currentTrack != nil && !self.isHiddenForSubscreens
         
+        self.superview?.bringSubviewToFront(self)
+        
         if !shouldShow {
             if animated && !self.isHidden {
                 UIView.animate(withDuration: 0.25, animations: {
                     self.alpha = 0.0
-                    self.transform = CGAffineTransform(translationX: 0, y: 30)
+                    self.transform = CGAffineTransform(translationX: 0, y: 25)
                 }) { [weak self] _ in
                     self?.isHidden = true
                 }
@@ -243,10 +290,10 @@ public final class SGDoxFloatingPlayerWidget: UIView {
             if self.isHidden {
                 self.isHidden = false
                 self.alpha = 0.0
-                self.transform = CGAffineTransform(translationX: 0, y: 30)
+                self.transform = CGAffineTransform(translationX: 0, y: 25)
             }
             if animated {
-                UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+                UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.82, initialSpringVelocity: 0.4, options: [.allowUserInteraction], animations: {
                     self.alpha = 1.0
                     self.transform = .identity
                 })
@@ -272,7 +319,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     @objc private func playPausePressed() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         UIView.animate(withDuration: 0.1, animations: {
-            self.playPauseButton.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
+            self.playPauseButton.transform = CGAffineTransform(scaleX: 0.86, y: 0.86)
         }) { _ in
             UIView.animate(withDuration: 0.12) {
                 self.playPauseButton.transform = .identity
@@ -284,7 +331,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     @objc private func nextPressed() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         UIView.animate(withDuration: 0.1, animations: {
-            self.nextButton.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
+            self.nextButton.transform = CGAffineTransform(scaleX: 0.86, y: 0.86)
         }) { _ in
             UIView.animate(withDuration: 0.12) {
                 self.nextButton.transform = .identity

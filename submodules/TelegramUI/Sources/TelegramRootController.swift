@@ -204,12 +204,16 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         if let floatingWidget = self.floatingMusicWidget {
             floatingWidget.updateLayout(size: layout.size, insets: layout.intrinsicInsets, transition: transition)
             floatingWidget.setHiddenForSubscreens(self.viewControllers.count > 1)
+            self.rootTabController?.view.bringSubviewToFront(floatingWidget)
         }
     }
     
     override public func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        self.floatingMusicWidget?.setHiddenForSubscreens(self.viewControllers.count > 1)
+        if let floatingWidget = self.floatingMusicWidget {
+            floatingWidget.setHiddenForSubscreens(self.viewControllers.count > 1)
+            self.rootTabController?.view.bringSubviewToFront(floatingWidget)
+        }
     }
     
     public func addRootControllers(hidePhoneInSettings: Bool, showContactsTab: Bool, showCallsTab: Bool) {
@@ -269,7 +273,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             guard let self = self else { return }
             let playerController = SGDoxMusicPlayerController(context: self.context)
             playerController.navigationPresentation = .modal
-            self.pushViewController(playerController)
+            self.present(playerController, in: .window(.root))
         }
         self.floatingMusicWidget = floatingWidget
         tabBarController.view.addSubview(floatingWidget)

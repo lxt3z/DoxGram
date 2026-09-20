@@ -339,6 +339,12 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 q.shuffle()
             }
             self.queue = q
+        } else if self.queue.isEmpty {
+            var q = self.favorites.filter { $0.id != track.id }
+            if self.isShuffleEnabled {
+                q.shuffle()
+            }
+            self.queue = q
         }
         
         self.stopCurrentAudio()
@@ -440,6 +446,20 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
     }
     
+    public func effectiveQueue() -> [SGDoxMusicTrack] {
+        if !self.queue.isEmpty {
+            return self.queue
+        }
+        guard let current = self.currentTrack else {
+            return self.favorites
+        }
+        let favs = self.favorites.filter { $0.id != current.id }
+        if !favs.isEmpty {
+            return favs
+        }
+        return []
+    }
+    
     public func next() {
         if self.repeatMode == .one, self.currentTrack != nil {
             self.seek(to: 0.0)
@@ -450,7 +470,18 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         if !self.queue.isEmpty {
             let nextTrack = self.queue.removeFirst()
             self.play(track: nextTrack, queue: self.queue)
-        } else if self.repeatMode == .all, !self.history.isEmpty {
+            return
+        }
+        
+        let eff = self.effectiveQueue()
+        if !eff.isEmpty {
+            var remaining = eff
+            let nextTrack = remaining.removeFirst()
+            self.play(track: nextTrack, queue: remaining)
+            return
+        }
+        
+        if self.repeatMode == .all, !self.history.isEmpty {
             var fullList = self.history
             if let current = self.currentTrack {
                 fullList.append(current)

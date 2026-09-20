@@ -869,7 +869,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                 let favs = SGDoxMusicManager.shared.favorites
                 guard trackIndex < favs.count else { return }
                 let track = favs[trackIndex]
-                let remaining = Array(favs.suffix(from: trackIndex + 1))
+                let remaining = Array(favs.suffix(from: trackIndex + 1)) + Array(favs.prefix(upTo: trackIndex))
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 SGDoxMusicManager.shared.play(track: track, queue: remaining)
                 self.openPlayer()
@@ -879,8 +879,9 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         
         guard indexPath.row < self.searchResults.count else { return }
         let track = self.searchResults[indexPath.row]
+        let searchQueue = Array(self.searchResults.suffix(from: indexPath.row + 1)) + Array(self.searchResults.prefix(upTo: indexPath.row))
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        SGDoxMusicManager.shared.play(track: track, queue: self.searchResults)
+        SGDoxMusicManager.shared.play(track: track, queue: searchQueue)
         self.openPlayer()
     }
     

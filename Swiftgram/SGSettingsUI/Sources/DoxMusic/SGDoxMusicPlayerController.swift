@@ -7,39 +7,75 @@ import TelegramPresentationData
 import UndoUI
 import AppBundle
 
-public final class SGDoxMusicPlayerController: ViewController, UIGestureRecognizerDelegate {
+public final class SGDoxMusicPlayerController: ViewController, UIGestureRecognizerDelegate, UITableViewDataSource, UITableViewDelegate {
     private let context: AccountContext
     private var presentationData: PresentationData
     
-    private let grabberView = UIView()
-    private let backgroundBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+    // Background
     private let backgroundImageView = UIImageView()
     private let ambientGradientLayer = CAGradientLayer()
+    private let backgroundBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+    private let darkDimOverlay = UIView()
+    
+    // Header
+    private let grabberView = UIView()
     private let dismissButton = UIButton(type: .system)
+    private let segmentContainerView = UIView()
+    private let segmentIndicatorView = UIView()
+    private let nowPlayingSegmentButton = UIButton(type: .system)
+    private let queueSegmentButton = UIButton(type: .system)
+    private let sourceBadgeContainer = UIView()
+    private let sourceIconView = UIImageView()
     private let sourceLabel = UILabel()
     
+    // Content Containers (All-in-One: Now Playing vs Queue)
+    private let nowPlayingContainerView = UIView()
+    private let queueContainerView = UIView()
+    private var isQueueMode = false
+    
+    // --- Now Playing Pane ---
     private let artworkContainerView = UIView()
     private let artworkImageView = UIImageView()
     
+    private let infoContainerView = UIView()
     private let titleLabel = UILabel()
     private let artistLabel = UILabel()
+    private let favoriteButton = UIButton(type: .system)
     
     private let progressSlider = UISlider()
     private let currentTimeLabel = UILabel()
     private let remainingTimeLabel = UILabel()
     
-    private let favoriteButton = UIButton(type: .system)
+    private let controlsStackView = UIStackView()
     private let shuffleButton = UIButton(type: .system)
     private let previousButton = UIButton(type: .system)
+    private let playPauseContainer = UIView()
     private let playPauseButton = UIButton(type: .system)
     private let nextButton = UIButton(type: .system)
     private let repeatButton = UIButton(type: .system)
     
-    private let autoplayButton = UIButton(type: .system)
-    private let waveButton = UIButton(type: .system)
+    private let actionsStackView = UIStackView()
     private let pinToProfileButton = UIButton(type: .system)
-    private let queueButton = UIButton(type: .system)
+    private let waveButton = UIButton(type: .system)
+    private let autoplayButton = UIButton(type: .system)
+    private let queueToggleButton = UIButton(type: .system)
     
+    // --- Queue Pane ---
+    private let queueHeaderView = UIView()
+    private let queueTitleLabel = UILabel()
+    private let queueCountLabel = UILabel()
+    private let queueShuffleButton = UIButton(type: .system)
+    private let queueClearButton = UIButton(type: .system)
+    private let queueTableView = UITableView(frame: .zero, style: .plain)
+    
+    private let queueMiniBar = UIView()
+    private let queueMiniArtwork = UIImageView()
+    private let queueMiniTitle = UILabel()
+    private let queueMiniArtist = UILabel()
+    private let queueMiniPlayPause = UIButton(type: .system)
+    private let queueMiniNext = UIButton(type: .system)
+    
+    private var cachedQueue: [SGDoxMusicTrack] = []
     private var isDraggingSlider = false
     private var displayedTrackId: String?
     
@@ -52,9 +88,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.ready.set(.single(true))
     }
     
+    required init(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
     public override func loadDisplayNode() {
         super.loadDisplayNode()
-        self.displayNode.backgroundColor = UIColor(red: 0.06, green: 0.06, blue: 0.09, alpha: 1.0)
+        self.displayNode.backgroundColor = UIColor(red: 0.05, green: 0.05, blue: 0.08, alpha: 1.0)
     }
     
     public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
@@ -62,27 +102,29 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.view.setNeedsLayout()
     }
     
-    required init(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = UIColor(red: 0.06, green: 0.06, blue: 0.09, alpha: 1.0)
+        self.view.backgroundColor = UIColor(red: 0.05, green: 0.05, blue: 0.08, alpha: 1.0)
         
         self.setupViews()
         self.updateContent()
+        self.reloadQueueData()
         
         SGDoxMusicManager.shared.addStateListener { [weak self] in
-            self?.updateContent()
+            DispatchQueue.main.async {
+                self?.updateContent()
+                self?.reloadQueueData()
+            }
         }
         
         SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
-            guard let self = self, !self.isDraggingSlider else { return }
-            let d = duration > 0 ? duration : 30.0
-            self.progressSlider.value = Float(current / d)
-            self.currentTimeLabel.text = self.formatTime(current)
-            self.remainingTimeLabel.text = "-\(self.formatTime(max(0, d - current)))"
+            DispatchQueue.main.async {
+                guard let self = self, !self.isDraggingSlider else { return }
+                let d = duration > 0 ? duration : 30.0
+                self.progressSlider.value = Float(current / d)
+                self.currentTimeLabel.text = self.formatTime(current)
+                self.remainingTimeLabel.text = "-\(self.formatTime(max(0, d - current)))"
+            }
         }
         
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
@@ -92,11 +134,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         var current = touch.view
-        while let view = current {
-            if view is UIControl {
+        while let v = current {
+            if v is UIControl || v is UITableView || v is UITableViewCell {
                 return false
             }
-            current = view.superview
+            current = v.superview
         }
         return true
     }
@@ -110,317 +152,328 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         } else if recognizer.state == .ended || recognizer.state == .cancelled {
             let velocity = recognizer.velocity(in: self.view)
             if translation.y > 140 || velocity.y > 700 {
-                UIView.animate(withDuration: 0.2, animations: {
+                UIView.animate(withDuration: 0.22, animations: {
                     self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
                 }) { [weak self] _ in
                     self?.dismiss()
                 }
             } else {
-                UIView.animate(withDuration: 0.25) {
+                UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
                     self.view.transform = .identity
-                }
+                })
             }
         }
     }
     
     private func setupViews() {
-        self.backgroundImageView.frame = self.view.bounds
+        // 1. Background Layers
         self.backgroundImageView.contentMode = .scaleAspectFill
         self.backgroundImageView.clipsToBounds = true
-        self.backgroundImageView.alpha = 0.35
         self.view.addSubview(self.backgroundImageView)
         
-        self.ambientGradientLayer.frame = self.view.bounds
-        self.ambientGradientLayer.startPoint = CGPoint(x: 0.15, y: 0.0)
-        self.ambientGradientLayer.endPoint = CGPoint(x: 0.85, y: 1.0)
-        self.ambientGradientLayer.colors = [
-            UIColor(red: 0.22, green: 0.12, blue: 0.38, alpha: 0.95).cgColor,
-            UIColor(red: 0.08, green: 0.09, blue: 0.16, alpha: 0.98).cgColor
-        ]
+        self.ambientGradientLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+        self.ambientGradientLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
         self.view.layer.addSublayer(self.ambientGradientLayer)
         
-        self.backgroundBlurView.frame = self.view.bounds
-        self.backgroundBlurView.alpha = 0.65
+        self.backgroundBlurView.effect = UIBlurEffect(style: .dark)
         self.view.addSubview(self.backgroundBlurView)
         
-        // Grabber
+        self.darkDimOverlay.backgroundColor = UIColor(red: 0.04, green: 0.04, blue: 0.07, alpha: 0.55)
+        self.view.addSubview(self.darkDimOverlay)
+        
+        // 2. Header
         self.grabberView.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
         self.grabberView.layer.cornerRadius = 2.5
         self.view.addSubview(self.grabberView)
         
-        // Header
-        let chevronDownImage = UIImage(systemName: "chevron.down") ?? UIImage()
-        self.dismissButton.setImage(chevronDownImage, for: .normal)
+        // Dismiss Chevron Button
+        let chevronConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+        self.dismissButton.setImage(UIImage(systemName: "chevron.down", withConfiguration: chevronConfig), for: .normal)
         self.dismissButton.tintColor = .white
+        self.dismissButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.dismissButton.layer.cornerRadius = 18
+        self.dismissButton.clipsToBounds = true
         self.dismissButton.addTarget(self, action: #selector(self.dismissPressed), for: .touchUpInside)
         self.view.addSubview(self.dismissButton)
         
-        self.sourceLabel.textColor = UIColor.white.withAlphaComponent(0.7)
-        self.sourceLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-        self.sourceLabel.textAlignment = .center
-        self.view.addSubview(self.sourceLabel)
+        // Segmented Mode Switcher: [ Сейчас | Очередь ]
+        self.segmentContainerView.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.segmentContainerView.layer.cornerRadius = 16
+        self.segmentContainerView.layer.borderWidth = 0.5
+        self.segmentContainerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
+        self.segmentContainerView.clipsToBounds = true
+        self.view.addSubview(self.segmentContainerView)
         
+        self.segmentIndicatorView.backgroundColor = UIColor(white: 1.0, alpha: 0.28)
+        self.segmentIndicatorView.layer.cornerRadius = 13
+        self.segmentContainerView.addSubview(self.segmentIndicatorView)
+        
+        self.nowPlayingSegmentButton.setTitle("Сейчас", for: .normal)
+        self.nowPlayingSegmentButton.setTitleColor(.white, for: .normal)
+        self.nowPlayingSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.nowPlayingSegmentButton.addTarget(self, action: #selector(self.nowPlayingSegmentPressed), for: .touchUpInside)
+        self.segmentContainerView.addSubview(self.nowPlayingSegmentButton)
+        
+        self.queueSegmentButton.setTitle("Очередь", for: .normal)
+        self.queueSegmentButton.setTitleColor(.white, for: .normal)
+        self.queueSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.queueSegmentButton.addTarget(self, action: #selector(self.queueSegmentPressed), for: .touchUpInside)
+        self.segmentContainerView.addSubview(self.queueSegmentButton)
+        
+        // Source Badge Pill (Right)
+        self.sourceBadgeContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
+        self.sourceBadgeContainer.layer.cornerRadius = 14
+        self.sourceBadgeContainer.layer.borderWidth = 0.5
+        self.sourceBadgeContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.14).cgColor
+        self.sourceBadgeContainer.clipsToBounds = true
+        self.view.addSubview(self.sourceBadgeContainer)
+        
+        self.sourceIconView.contentMode = .scaleAspectFit
+        self.sourceIconView.tintColor = UIColor(white: 1.0, alpha: 0.85)
+        self.sourceBadgeContainer.addSubview(self.sourceIconView)
+        
+        self.sourceLabel.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.sourceLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .medium)
+        self.sourceBadgeContainer.addSubview(self.sourceLabel)
+        
+        // 3. Content Panes
+        self.view.addSubview(self.nowPlayingContainerView)
+        self.view.addSubview(self.queueContainerView)
+        self.queueContainerView.alpha = 0.0
+        self.queueContainerView.isHidden = true
+        
+        self.setupNowPlayingPane()
+        self.setupQueuePane()
+    }
+    
+    private func setupNowPlayingPane() {
         // Artwork
-        self.artworkContainerView.layer.shadowColor = UIColor(red: 0.22, green: 0.12, blue: 0.38, alpha: 1.0).cgColor
-        self.artworkContainerView.layer.shadowOpacity = 0.60
-        self.artworkContainerView.layer.shadowRadius = 28
-        self.artworkContainerView.layer.shadowOffset = CGSize(width: 0, height: 14)
-        self.view.addSubview(self.artworkContainerView)
+        self.artworkContainerView.layer.cornerRadius = 24
+        self.artworkContainerView.layer.shadowOffset = CGSize(width: 0, height: 16)
+        self.artworkContainerView.layer.shadowOpacity = 0.45
+        self.artworkContainerView.layer.shadowRadius = 24
+        self.artworkContainerView.layer.shadowColor = UIColor.black.cgColor
+        self.nowPlayingContainerView.addSubview(self.artworkContainerView)
         
         self.artworkImageView.contentMode = .scaleAspectFill
         self.artworkImageView.clipsToBounds = true
         self.artworkImageView.layer.cornerRadius = 24
-        self.artworkImageView.backgroundColor = UIColor(white: 0.2, alpha: 1.0)
+        self.artworkImageView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
         self.artworkContainerView.addSubview(self.artworkImageView)
         
-        // Title & Artist
+        // Info Area: Title, Artist, Favorite
+        self.nowPlayingContainerView.addSubview(self.infoContainerView)
+        
         self.titleLabel.textColor = .white
         self.titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
-        self.titleLabel.textAlignment = .left
-        self.view.addSubview(self.titleLabel)
+        self.titleLabel.lineBreakMode = .byTruncatingTail
+        self.infoContainerView.addSubview(self.titleLabel)
         
-        self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.75)
-        self.artistLabel.font = UIFont.systemFont(ofSize: 17, weight: .medium)
-        self.artistLabel.textAlignment = .left
-        self.view.addSubview(self.artistLabel)
+        self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.72)
+        self.artistLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        self.artistLabel.lineBreakMode = .byTruncatingTail
+        self.infoContainerView.addSubview(self.artistLabel)
         
-        let heartConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: .medium)
-        self.favoriteButton.setImage(UIImage(systemName: "suit.heart", withConfiguration: heartConfig), for: .normal)
-        self.favoriteButton.tintColor = .white
+        let heartConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
+        self.favoriteButton.setImage(UIImage(systemName: "heart", withConfiguration: heartConfig), for: .normal)
+        self.favoriteButton.tintColor = UIColor.white.withAlphaComponent(0.8)
         self.favoriteButton.addTarget(self, action: #selector(self.favoritePressed), for: .touchUpInside)
-        self.view.addSubview(self.favoriteButton)
+        self.infoContainerView.addSubview(self.favoriteButton)
         
-        // Sleek Apple Music Scrubber Slider
-        let minTrack = self.createTrackImage(color: .white, height: 3.5)
-        let maxTrack = self.createTrackImage(color: UIColor.white.withAlphaComponent(0.22), height: 3.5)
-        let normalThumb = self.createThumbImage(size: 11.0)
-        let activeThumb = self.createThumbImage(size: 14.0)
-        self.progressSlider.setMinimumTrackImage(minTrack, for: .normal)
-        self.progressSlider.setMaximumTrackImage(maxTrack, for: .normal)
-        self.progressSlider.setThumbImage(normalThumb, for: .normal)
-        self.progressSlider.setThumbImage(activeThumb, for: .highlighted)
+        // Slider & Time
+        self.progressSlider.minimumValue = 0.0
+        self.progressSlider.maximumValue = 1.0
+        self.progressSlider.minimumTrackTintColor = .white
+        self.progressSlider.maximumTrackTintColor = UIColor(white: 1.0, alpha: 0.22)
+        self.progressSlider.setThumbImage(self.generateSliderThumb(), for: .normal)
         self.progressSlider.addTarget(self, action: #selector(self.sliderValueChanged), for: .valueChanged)
-        self.progressSlider.addTarget(self, action: #selector(self.sliderTouchEnded), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-        self.view.addSubview(self.progressSlider)
+        self.progressSlider.addTarget(self, action: #selector(self.sliderTouchEnded), for: [.touchUpInside, .touchUpOutside])
+        self.nowPlayingContainerView.addSubview(self.progressSlider)
         
-        self.currentTimeLabel.textColor = UIColor.white.withAlphaComponent(0.6)
+        self.currentTimeLabel.textColor = UIColor(white: 1.0, alpha: 0.55)
         self.currentTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         self.currentTimeLabel.text = "0:00"
-        self.view.addSubview(self.currentTimeLabel)
+        self.nowPlayingContainerView.addSubview(self.currentTimeLabel)
         
-        self.remainingTimeLabel.textColor = UIColor.white.withAlphaComponent(0.6)
+        self.remainingTimeLabel.textColor = UIColor(white: 1.0, alpha: 0.55)
         self.remainingTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         self.remainingTimeLabel.text = "-0:00"
         self.remainingTimeLabel.textAlignment = .right
-        self.view.addSubview(self.remainingTimeLabel)
+        self.nowPlayingContainerView.addSubview(self.remainingTimeLabel)
         
-        // Playback Buttons
-        self.setupControlButtons()
+        // Controls Row: Shuffle | Prev | Play/Pause | Next | Repeat
+        self.controlsStackView.axis = .horizontal
+        self.controlsStackView.distribution = .equalSpacing
+        self.controlsStackView.alignment = .center
         
-        // Bottom Action Bar: Wave, Autoplay, Queue, Pin to Profile
-        self.setupActionButtons()
-    }
-    
-    private func setupControlButtons() {
-        let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
-        
-        self.shuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: config), for: .normal)
+        let subConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        self.shuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: subConfig), for: .normal)
         self.shuffleButton.tintColor = UIColor.white.withAlphaComponent(0.6)
         self.shuffleButton.addTarget(self, action: #selector(self.shufflePressed), for: .touchUpInside)
-        self.view.addSubview(self.shuffleButton)
+        self.controlsStackView.addArrangedSubview(self.shuffleButton)
         
-        self.previousButton.setImage(UIImage(systemName: "backward.fill", withConfiguration: config), for: .normal)
+        let skipConfig = UIImage.SymbolConfiguration(pointSize: 26, weight: .bold)
+        self.previousButton.setImage(UIImage(systemName: "backward.fill", withConfiguration: skipConfig), for: .normal)
         self.previousButton.tintColor = .white
         self.previousButton.addTarget(self, action: #selector(self.previousPressed), for: .touchUpInside)
-        self.view.addSubview(self.previousButton)
+        self.controlsStackView.addArrangedSubview(self.previousButton)
         
-        let playConfig = UIImage.SymbolConfiguration(pointSize: 34, weight: .bold)
+        // Play/Pause Big Glass Circle
+        self.playPauseContainer.layer.cornerRadius = 34
+        self.playPauseContainer.clipsToBounds = true
+        self.playPauseContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.22)
+        self.playPauseContainer.layer.borderWidth = 0.5
+        self.playPauseContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
+        
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
         self.playPauseButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playConfig), for: .normal)
-        self.playPauseButton.tintColor = .black
-        self.playPauseButton.backgroundColor = .white
-        self.playPauseButton.layer.cornerRadius = 35
+        self.playPauseButton.tintColor = .white
         self.playPauseButton.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
-        self.view.addSubview(self.playPauseButton)
+        self.playPauseContainer.addSubview(self.playPauseButton)
+        self.controlsStackView.addArrangedSubview(self.playPauseContainer)
         
-        self.nextButton.setImage(UIImage(systemName: "forward.fill", withConfiguration: config), for: .normal)
+        self.nextButton.setImage(UIImage(systemName: "forward.fill", withConfiguration: skipConfig), for: .normal)
         self.nextButton.tintColor = .white
         self.nextButton.addTarget(self, action: #selector(self.nextPressed), for: .touchUpInside)
-        self.view.addSubview(self.nextButton)
+        self.controlsStackView.addArrangedSubview(self.nextButton)
         
-        self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: config), for: .normal)
+        self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: subConfig), for: .normal)
         self.repeatButton.tintColor = UIColor.white.withAlphaComponent(0.6)
         self.repeatButton.addTarget(self, action: #selector(self.repeatPressed), for: .touchUpInside)
-        self.view.addSubview(self.repeatButton)
-    }
-    
-    private func setupActionButtons() {
-        let glassBorderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
-        let glassBgColor = UIColor(white: 1.0, alpha: 0.12)
+        self.controlsStackView.addArrangedSubview(self.repeatButton)
         
-        // Autoplay button (Apple Music infinity button)
-        let infinityConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        self.autoplayButton.setImage(UIImage(systemName: "infinity", withConfiguration: infinityConfig), for: .normal)
-        self.autoplayButton.tintColor = .white
-        self.autoplayButton.backgroundColor = glassBgColor
-        self.autoplayButton.layer.borderWidth = 0.5
-        self.autoplayButton.layer.borderColor = glassBorderColor
-        self.autoplayButton.layer.cornerRadius = 20
-        self.autoplayButton.addTarget(self, action: #selector(self.autoplayPressed), for: .touchUpInside)
-        self.view.addSubview(self.autoplayButton)
+        self.nowPlayingContainerView.addSubview(self.controlsStackView)
         
-        // Wave button
-        self.waveButton.setTitle(" Волна", for: .normal)
-        self.waveButton.setImage(UIImage(systemName: "dot.radiowaves.left.and.right"), for: .normal)
-        self.waveButton.tintColor = .white
-        self.waveButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        self.waveButton.backgroundColor = glassBgColor
-        self.waveButton.layer.borderWidth = 0.5
-        self.waveButton.layer.borderColor = glassBorderColor
-        self.waveButton.layer.cornerRadius = 20
-        self.waveButton.addTarget(self, action: #selector(self.wavePressed), for: .touchUpInside)
-        self.view.addSubview(self.waveButton)
+        // Bottom Action Buttons: Pin to Profile | Wave | Autoplay | Queue Toggle
+        self.actionsStackView.axis = .horizontal
+        self.actionsStackView.distribution = .equalSpacing
+        self.actionsStackView.alignment = .center
+        self.actionsStackView.spacing = 8
         
-        // Pin to Profile button
-        self.pinToProfileButton.setTitle(" В профиль", for: .normal)
-        self.pinToProfileButton.setImage(UIImage(systemName: "pin.fill"), for: .normal)
-        self.pinToProfileButton.tintColor = .white
-        self.pinToProfileButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        self.pinToProfileButton.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
-        self.pinToProfileButton.layer.borderWidth = 0.5
-        self.pinToProfileButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
-        self.pinToProfileButton.layer.cornerRadius = 20
+        self.styleCapsuleButton(self.pinToProfileButton, title: "В профиль", icon: "person.crop.circle.badge.plus")
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
-        self.view.addSubview(self.pinToProfileButton)
+        self.actionsStackView.addArrangedSubview(self.pinToProfileButton)
         
-        // Queue button
-        let queueConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        self.queueButton.setImage(UIImage(systemName: "list.bullet", withConfiguration: queueConfig), for: .normal)
-        self.queueButton.tintColor = .white
-        self.queueButton.backgroundColor = glassBgColor
-        self.queueButton.layer.borderWidth = 0.5
-        self.queueButton.layer.borderColor = glassBorderColor
-        self.queueButton.layer.cornerRadius = 20
-        self.queueButton.addTarget(self, action: #selector(self.queuePressed), for: .touchUpInside)
-        self.view.addSubview(self.queueButton)
+        self.styleCapsuleButton(self.waveButton, title: "Моя волна", icon: "waveform")
+        self.waveButton.addTarget(self, action: #selector(self.wavePressed), for: .touchUpInside)
+        self.actionsStackView.addArrangedSubview(self.waveButton)
+        
+        self.styleCapsuleButton(self.autoplayButton, title: "Авто", icon: "infinity")
+        self.autoplayButton.addTarget(self, action: #selector(self.autoplayPressed), for: .touchUpInside)
+        self.actionsStackView.addArrangedSubview(self.autoplayButton)
+        
+        self.styleCapsuleButton(self.queueToggleButton, title: "Очередь", icon: "list.bullet")
+        self.queueToggleButton.addTarget(self, action: #selector(self.queueSegmentPressed), for: .touchUpInside)
+        self.actionsStackView.addArrangedSubview(self.queueToggleButton)
+        
+        self.nowPlayingContainerView.addSubview(self.actionsStackView)
     }
     
-    // MARK: - UI Helpers & Apple Music Animations
+    private func setupQueuePane() {
+        // Queue Header
+        self.queueTitleLabel.text = "Далее в очереди"
+        self.queueTitleLabel.textColor = .white
+        self.queueTitleLabel.font = UIFont.systemFont(ofSize: 20, weight: .bold)
+        self.queueHeaderView.addSubview(self.queueTitleLabel)
+        
+        self.queueCountLabel.textColor = UIColor(white: 1.0, alpha: 0.6)
+        self.queueCountLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+        self.queueHeaderView.addSubview(self.queueCountLabel)
+        
+        self.queueShuffleButton.setTitle("Перемешать", for: .normal)
+        self.queueShuffleButton.setTitleColor(.white, for: .normal)
+        self.queueShuffleButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.queueShuffleButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.queueShuffleButton.layer.cornerRadius = 14
+        self.queueShuffleButton.clipsToBounds = true
+        self.queueShuffleButton.addTarget(self, action: #selector(self.queueShufflePressed), for: .touchUpInside)
+        self.queueHeaderView.addSubview(self.queueShuffleButton)
+        
+        self.queueClearButton.setTitle("Очистить", for: .normal)
+        self.queueClearButton.setTitleColor(UIColor(red: 1.0, green: 0.35, blue: 0.40, alpha: 1.0), for: .normal)
+        self.queueClearButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.queueClearButton.backgroundColor = UIColor(red: 1.0, green: 0.35, blue: 0.40, alpha: 0.12)
+        self.queueClearButton.layer.cornerRadius = 14
+        self.queueClearButton.clipsToBounds = true
+        self.queueClearButton.addTarget(self, action: #selector(self.queueClearPressed), for: .touchUpInside)
+        self.queueHeaderView.addSubview(self.queueClearButton)
+        
+        self.queueContainerView.addSubview(self.queueHeaderView)
+        
+        // Table View
+        self.queueTableView.backgroundColor = .clear
+        self.queueTableView.separatorStyle = .none
+        self.queueTableView.dataSource = self
+        self.queueTableView.delegate = self
+        self.queueTableView.register(SGDoxPlayerQueueCell.self, forCellReuseIdentifier: "SGDoxPlayerQueueCell")
+        self.queueContainerView.addSubview(self.queueTableView)
+        
+        // Mini Bar at bottom of Queue
+        self.queueMiniBar.backgroundColor = UIColor(white: 0.12, alpha: 0.75)
+        self.queueMiniBar.layer.cornerRadius = 24
+        self.queueMiniBar.layer.borderWidth = 0.5
+        self.queueMiniBar.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
+        self.queueMiniBar.clipsToBounds = true
+        
+        self.queueMiniArtwork.contentMode = .scaleAspectFill
+        self.queueMiniArtwork.clipsToBounds = true
+        self.queueMiniArtwork.layer.cornerRadius = 8
+        self.queueMiniBar.addSubview(self.queueMiniArtwork)
+        
+        self.queueMiniTitle.textColor = .white
+        self.queueMiniTitle.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.queueMiniTitle.lineBreakMode = .byTruncatingTail
+        self.queueMiniBar.addSubview(self.queueMiniTitle)
+        
+        self.queueMiniArtist.textColor = UIColor(white: 1.0, alpha: 0.65)
+        self.queueMiniArtist.font = UIFont.systemFont(ofSize: 11, weight: .regular)
+        self.queueMiniArtist.lineBreakMode = .byTruncatingTail
+        self.queueMiniBar.addSubview(self.queueMiniArtist)
+        
+        let miniPlayCfg = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        self.queueMiniPlayPause.setImage(UIImage(systemName: "play.fill", withConfiguration: miniPlayCfg), for: .normal)
+        self.queueMiniPlayPause.tintColor = .white
+        self.queueMiniPlayPause.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
+        self.queueMiniBar.addSubview(self.queueMiniPlayPause)
+        
+        let miniNextCfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        self.queueMiniNext.setImage(UIImage(systemName: "forward.fill", withConfiguration: miniNextCfg), for: .normal)
+        self.queueMiniNext.tintColor = UIColor.white.withAlphaComponent(0.8)
+        self.queueMiniNext.addTarget(self, action: #selector(self.nextPressed), for: .touchUpInside)
+        self.queueMiniBar.addSubview(self.queueMiniNext)
+        
+        let miniTap = UITapGestureRecognizer(target: self, action: #selector(self.nowPlayingSegmentPressed))
+        self.queueMiniBar.addGestureRecognizer(miniTap)
+        
+        self.queueContainerView.addSubview(self.queueMiniBar)
+    }
     
-    private func createTrackImage(color: UIColor, height: CGFloat = 3.5) -> UIImage {
-        let size = CGSize(width: height * 2, height: height)
+    private func styleCapsuleButton(_ button: UIButton, title: String, icon: String) {
+        let config = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        button.setImage(UIImage(systemName: icon, withConfiguration: config), for: .normal)
+        button.setTitle("  \(title)", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        button.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        button.tintColor = .white
+        button.layer.cornerRadius = 18
+        button.layer.borderWidth = 0.5
+        button.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
+    }
+    
+    private func generateSliderThumb() -> UIImage {
+        let size = CGSize(width: 14, height: 14)
         UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
-        defer { UIGraphicsEndImageContext() }
-        color.setFill()
-        let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: height / 2.0)
-        path.fill()
-        return (UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()).resizableImage(withCapInsets: UIEdgeInsets(top: height/2, left: height/2, bottom: height/2, right: height/2))
+        let context = UIGraphicsGetCurrentContext()
+        context?.setFillColor(UIColor.white.cgColor)
+        context?.fillEllipse(in: CGRect(origin: .zero, size: size))
+        let image = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+        UIGraphicsEndImageContext()
+        return image
     }
     
-    private func createThumbImage(size: CGFloat = 11.0) -> UIImage {
-        let canvas = CGSize(width: size + 8, height: size + 8)
-        UIGraphicsBeginImageContextWithOptions(canvas, false, 0.0)
-        defer { UIGraphicsEndImageContext() }
-        guard let ctx = UIGraphicsGetCurrentContext() else { return UIImage() }
-        ctx.setShadow(offset: CGSize(width: 0, height: 1.5), blur: 3.5, color: UIColor.black.withAlphaComponent(0.35).cgColor)
-        UIColor.white.setFill()
-        let path = UIBezierPath(ovalIn: CGRect(x: 4, y: 4, width: size, height: size))
-        path.fill()
-        return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
-    }
-    
-    private func updateAmbientColors(from image: UIImage?) {
-        guard let image = image, let cgImage = image.cgImage else {
-            let defaultColors = [
-                UIColor(red: 0.12, green: 0.14, blue: 0.22, alpha: 0.9).cgColor,
-                UIColor(red: 0.05, green: 0.06, blue: 0.10, alpha: 0.95).cgColor
-            ]
-            self.ambientGradientLayer.colors = defaultColors
-            return
-        }
-        
-        // Sample artwork colors
-        let width = 8
-        let height = 8
-        var rawData = [UInt8](repeating: 0, count: width * height * 4)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let context = CGContext(
-            data: &rawData,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: width * 4,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
-        )
-        context?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        
-        var totalR: CGFloat = 0, totalG: CGFloat = 0, totalB: CGFloat = 0
-        var maxSat: CGFloat = -1
-        var accentR: CGFloat = 0.3, accentG: CGFloat = 0.2, accentB: CGFloat = 0.45
-        let count = CGFloat(width * height)
-        
-        for i in 0..<(width * height) {
-            let r = CGFloat(rawData[i * 4]) / 255.0
-            let g = CGFloat(rawData[i * 4 + 1]) / 255.0
-            let b = CGFloat(rawData[i * 4 + 2]) / 255.0
-            totalR += r
-            totalG += g
-            totalB += b
-            
-            let maxC = max(r, max(g, b))
-            let minC = min(r, min(g, b))
-            let sat = maxC > 0 ? (maxC - minC) / maxC : 0
-            if sat > maxSat && maxC > 0.2 {
-                maxSat = sat
-                accentR = r
-                accentG = g
-                accentB = b
-            }
-        }
-        
-        let avgColor = UIColor(red: (totalR / count) * 0.75, green: (totalG / count) * 0.75, blue: (totalB / count) * 0.75, alpha: 0.95)
-        let vibrantColor = UIColor(red: min(1.0, accentR * 1.15), green: min(1.0, accentG * 1.15), blue: min(1.0, accentB * 1.15), alpha: 0.95)
-        let deepColor = UIColor(red: accentR * 0.18, green: accentG * 0.18, blue: accentB * 0.22, alpha: 0.98)
-        
-        let newColors = [vibrantColor.cgColor, avgColor.cgColor, deepColor.cgColor]
-        
-        let animation = CABasicAnimation(keyPath: "colors")
-        animation.fromValue = self.ambientGradientLayer.colors
-        animation.toValue = newColors
-        animation.duration = 0.8
-        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        self.ambientGradientLayer.add(animation, forKey: "colorsChange")
-        self.ambientGradientLayer.colors = newColors
-        
-        self.artworkContainerView.layer.shadowColor = vibrantColor.cgColor
-    }
-    
-    private func updateArtworkScale(isPlaying: Bool, animated: Bool) {
-        let block = {
-            if isPlaying {
-                self.artworkContainerView.transform = .identity
-                self.artworkContainerView.layer.shadowOpacity = 0.60
-                self.artworkContainerView.layer.shadowRadius = 28
-            } else {
-                self.artworkContainerView.transform = CGAffineTransform(scaleX: 0.86, y: 0.86)
-                self.artworkContainerView.layer.shadowOpacity = 0.22
-                self.artworkContainerView.layer.shadowRadius = 14
-            }
-        }
-        
-        if animated {
-            UIView.animate(
-                withDuration: 0.55,
-                delay: 0,
-                usingSpringWithDamping: 0.72,
-                initialSpringVelocity: 0.4,
-                options: [.allowUserInteraction, .beginFromCurrentState],
-                animations: block
-            )
-        } else {
-            block()
-        }
-    }
+    // MARK: - Layout
     
     public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
@@ -430,122 +483,263 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.backgroundImageView.frame = bounds
         self.ambientGradientLayer.frame = bounds
         self.backgroundBlurView.frame = bounds
+        self.darkDimOverlay.frame = bounds
         
-        self.grabberView.frame = CGRect(x: (bounds.width - 38) * 0.5, y: safeArea.top + 8, width: 38, height: 5)
+        let topY = max(safeArea.top, 14.0)
+        self.grabberView.frame = CGRect(x: (bounds.width - 38) * 0.5, y: topY + 6, width: 38, height: 5)
         
-        let headerY = safeArea.top + 16
-        self.dismissButton.frame = CGRect(x: 16, y: headerY, width: 44, height: 44)
-        self.sourceLabel.frame = CGRect(x: 60, y: headerY + 12, width: bounds.width - 120, height: 20)
+        let headerY = topY + 20
+        self.dismissButton.frame = CGRect(x: 18, y: headerY, width: 36, height: 36)
         
-        let artworkSide = min(bounds.width - 64, bounds.height * 0.38)
-        let artworkY = headerY + 50
-        self.artworkContainerView.frame = CGRect(x: (bounds.width - artworkSide) * 0.5, y: artworkY, width: artworkSide, height: artworkSide)
-        self.artworkImageView.frame = CGRect(x: 0, y: 0, width: artworkSide, height: artworkSide)
+        // Mode Switcher (Centered)
+        let segW: CGFloat = 190.0
+        let segH: CGFloat = 34.0
+        self.segmentContainerView.frame = CGRect(x: (bounds.width - segW) * 0.5, y: headerY + 1, width: segW, height: segH)
+        let itemW = segW * 0.5
+        self.nowPlayingSegmentButton.frame = CGRect(x: 0, y: 0, width: itemW, height: segH)
+        self.queueSegmentButton.frame = CGRect(x: itemW, y: 0, width: itemW, height: segH)
         
-        let titleY = artworkY + artworkSide + 28
-        let favoriteSize: CGFloat = 40
-        self.favoriteButton.frame = CGRect(x: bounds.width - 32 - favoriteSize, y: titleY + 4, width: favoriteSize, height: favoriteSize)
+        let indicatorX = self.isQueueMode ? itemW + 2 : 2
+        self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2, width: itemW - 4, height: segH - 4)
         
-        let titleWidth = bounds.width - 64 - favoriteSize - 8
-        self.titleLabel.frame = CGRect(x: 32, y: titleY, width: titleWidth, height: 28)
-        self.artistLabel.frame = CGRect(x: 32, y: titleY + 30, width: titleWidth, height: 22)
+        // Source Badge (Right)
+        let sourceW: CGFloat = 86.0
+        let sourceH: CGFloat = 28.0
+        self.sourceBadgeContainer.frame = CGRect(x: bounds.width - sourceW - 16, y: headerY + 4, width: sourceW, height: sourceH)
+        self.sourceIconView.frame = CGRect(x: 8, y: 7, width: 14, height: 14)
+        self.sourceLabel.frame = CGRect(x: 26, y: 4, width: sourceW - 32, height: 20)
         
-        let sliderY = titleY + 66
-        self.progressSlider.frame = CGRect(x: 32, y: sliderY, width: bounds.width - 64, height: 24)
+        let contentY = headerY + 46.0
+        let contentH = bounds.height - contentY - max(safeArea.bottom, 16.0)
+        let contentFrame = CGRect(x: 0, y: contentY, width: bounds.width, height: contentH)
+        
+        self.nowPlayingContainerView.frame = contentFrame
+        self.queueContainerView.frame = contentFrame
+        
+        self.layoutNowPlayingPane(contentH: contentH)
+        self.layoutQueuePane(contentH: contentH)
+    }
+    
+    private func layoutNowPlayingPane(contentH: CGFloat) {
+        let bounds = self.nowPlayingContainerView.bounds
+        
+        // Artwork: large square with dynamic height
+        let maxArtSide = min(bounds.width - 64, bounds.height * 0.42)
+        let artSide = max(200, maxArtSide)
+        let artY: CGFloat = 14.0
+        self.artworkContainerView.frame = CGRect(x: (bounds.width - artSide) * 0.5, y: artY, width: artSide, height: artSide)
+        self.artworkImageView.frame = CGRect(x: 0, y: 0, width: artSide, height: artSide)
+        
+        // Info: Title & Artist
+        let infoY = artY + artSide + 24.0
+        let heartSize: CGFloat = 36.0
+        self.infoContainerView.frame = CGRect(x: 32, y: infoY, width: bounds.width - 64, height: 50)
+        let titleW = bounds.width - 64 - heartSize - 12
+        self.titleLabel.frame = CGRect(x: 0, y: 0, width: titleW, height: 28)
+        self.artistLabel.frame = CGRect(x: 0, y: 28, width: titleW, height: 20)
+        self.favoriteButton.frame = CGRect(x: bounds.width - 64 - heartSize, y: 7, width: heartSize, height: heartSize)
+        
+        // Progress Slider
+        let sliderY = infoY + 58.0
+        self.progressSlider.frame = CGRect(x: 32, y: sliderY, width: bounds.width - 64, height: 26)
         self.currentTimeLabel.frame = CGRect(x: 32, y: sliderY + 22, width: 60, height: 16)
         self.remainingTimeLabel.frame = CGRect(x: bounds.width - 92, y: sliderY + 22, width: 60, height: 16)
         
-        let controlsY = sliderY + 56
-        let controlSpacing = (bounds.width - 64 - 70 - 176) / 4.0
+        // Controls Row
+        let controlsY = sliderY + 46.0
+        self.controlsStackView.frame = CGRect(x: 32, y: controlsY, width: bounds.width - 64, height: 68)
+        self.playPauseContainer.frame = CGRect(x: 0, y: 0, width: 68, height: 68)
+        self.playPauseButton.frame = self.playPauseContainer.bounds
         
-        self.shuffleButton.frame = CGRect(x: 32, y: controlsY + 13, width: 44, height: 44)
-        self.previousButton.frame = CGRect(x: 32 + 44 + controlSpacing, y: controlsY + 13, width: 44, height: 44)
-        self.playPauseButton.frame = CGRect(x: (bounds.width - 70) * 0.5, y: controlsY, width: 70, height: 70)
-        self.nextButton.frame = CGRect(x: bounds.width - 32 - 44 - controlSpacing - 44, y: controlsY + 13, width: 44, height: 44)
-        self.repeatButton.frame = CGRect(x: bounds.width - 32 - 44, y: controlsY + 13, width: 44, height: 44)
-        
-        let actionsY = controlsY + 86
-        let sideBtnSize: CGFloat = 40
-        let totalSpacing: CGFloat = 10 * 3
-        let mainActionWidth = max(70, (bounds.width - 64 - (sideBtnSize * 2) - totalSpacing) * 0.5)
-        
-        self.autoplayButton.frame = CGRect(x: 32, y: actionsY + 2, width: sideBtnSize, height: sideBtnSize)
-        self.waveButton.frame = CGRect(x: 32 + sideBtnSize + 10, y: actionsY, width: mainActionWidth, height: 44)
-        self.pinToProfileButton.frame = CGRect(x: 32 + sideBtnSize + 10 + mainActionWidth + 10, y: actionsY, width: mainActionWidth, height: 44)
-        self.queueButton.frame = CGRect(x: bounds.width - 32 - sideBtnSize, y: actionsY + 2, width: sideBtnSize, height: sideBtnSize)
+        // Bottom Action Buttons
+        let actionsY = controlsY + 76.0
+        self.actionsStackView.frame = CGRect(x: 20, y: actionsY, width: bounds.width - 40, height: 38)
     }
+    
+    private func layoutQueuePane(contentH: CGFloat) {
+        let bounds = self.queueContainerView.bounds
+        
+        // Header
+        self.queueHeaderView.frame = CGRect(x: 20, y: 8, width: bounds.width - 40, height: 48)
+        self.queueTitleLabel.frame = CGRect(x: 0, y: 2, width: 170, height: 24)
+        self.queueCountLabel.frame = CGRect(x: 0, y: 26, width: 170, height: 18)
+        
+        let clearW: CGFloat = 80.0
+        let shuffleW: CGFloat = 104.0
+        let btnH: CGFloat = 28.0
+        self.queueClearButton.frame = CGRect(x: bounds.width - 40 - clearW, y: 10, width: clearW, height: btnH)
+        self.queueShuffleButton.frame = CGRect(x: bounds.width - 40 - clearW - 8 - shuffleW, y: 10, width: shuffleW, height: btnH)
+        
+        // Mini Bar at bottom
+        let miniH: CGFloat = 50.0
+        let miniY = bounds.height - miniH - 10.0
+        self.queueMiniBar.frame = CGRect(x: 16, y: miniY, width: bounds.width - 32, height: miniH)
+        
+        self.queueMiniArtwork.frame = CGRect(x: 6, y: 6, width: 38, height: 38)
+        let miniControlsW: CGFloat = 72.0
+        let miniPlayX = self.queueMiniBar.bounds.width - miniControlsW
+        self.queueMiniPlayPause.frame = CGRect(x: miniPlayX, y: 8, width: 34, height: 34)
+        self.queueMiniNext.frame = CGRect(x: miniPlayX + 36, y: 8, width: 32, height: 34)
+        
+        let miniTextX = self.queueMiniArtwork.frame.maxX + 10
+        let miniTextW = max(0, miniPlayX - miniTextX - 6)
+        self.queueMiniTitle.frame = CGRect(x: miniTextX, y: 8, width: miniTextW, height: 18)
+        self.queueMiniArtist.frame = CGRect(x: miniTextX, y: 26, width: miniTextW, height: 16)
+        
+        // Table View
+        let tableY: CGFloat = 62.0
+        self.queueTableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: miniY - tableY - 6)
+        self.queueTableView.contentInset = UIEdgeInsets(top: 4, left: 0, bottom: 8, right: 0)
+    }
+    
+    // MARK: - Content Updates
     
     private func updateContent() {
         let manager = SGDoxMusicManager.shared
-        guard let track = manager.currentTrack else {
-            self.titleLabel.text = "Ничего не играет"
-            self.artistLabel.text = "Выберите трек"
-            self.sourceLabel.text = "DoxMusic"
-            self.displayedTrackId = nil
-            self.updateArtworkScale(isPlaying: false, animated: false)
-            return
-        }
+        guard let track = manager.currentTrack else { return }
         
-        let trackChanged = self.displayedTrackId != track.id
-        if trackChanged {
+        if self.displayedTrackId != track.id {
             self.displayedTrackId = track.id
             self.titleLabel.text = track.title
             self.artistLabel.text = track.artist
-            self.sourceLabel.text = "Играет из \(track.source.rawValue)"
             
+            self.queueMiniTitle.text = track.title
+            self.queueMiniArtist.text = track.artist
+            
+            // Artwork
             self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
+            self.queueMiniArtwork.image = SGDoxImageLoader.shared.placeholderArtwork()
+            
             SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 400, height: 400)) { [weak self] image in
-                if self?.displayedTrackId == track.id {
-                    let finalImg = image ?? SGDoxImageLoader.shared.placeholderArtwork()
-                    self?.artworkImageView.image = finalImg
-                    self?.backgroundImageView.image = image
-                    self?.updateAmbientColors(from: image)
-                }
+                guard let self = self, self.displayedTrackId == track.id, let img = image else { return }
+                self.artworkImageView.image = img
+                self.queueMiniArtwork.image = img
+                self.backgroundImageView.image = img
+                self.updateAmbientColor(from: img)
             }
         }
         
-        // Favorite state
+        // Source
+        self.sourceLabel.text = track.source.rawValue
+        self.sourceIconView.image = UIImage(systemName: track.source.iconName)
+        
+        // Play / Pause Icon
+        let playIconName = manager.isPlaying ? "pause.fill" : "play.fill"
+        let playCfg = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
+        self.playPauseButton.setImage(UIImage(systemName: playIconName, withConfiguration: playCfg), for: .normal)
+        
+        let miniCfg = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        self.queueMiniPlayPause.setImage(UIImage(systemName: playIconName, withConfiguration: miniCfg), for: .normal)
+        
+        // Favorite
         let isFav = manager.isFavorite(track: track)
-        let heartIcon = isFav ? "suit.heart.fill" : "suit.heart"
-        let heartConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: .medium)
-        self.favoriteButton.setImage(UIImage(systemName: heartIcon, withConfiguration: heartConfig), for: .normal)
-        self.favoriteButton.tintColor = isFav ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : .white
+        let heartIcon = isFav ? "heart.fill" : "heart"
+        let heartCfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
+        self.favoriteButton.setImage(UIImage(systemName: heartIcon, withConfiguration: heartCfg), for: .normal)
+        self.favoriteButton.tintColor = isFav ? UIColor(red: 1.0, green: 0.22, blue: 0.38, alpha: 1.0) : UIColor.white.withAlphaComponent(0.8)
         
-        // Play/Pause icon & Apple Music artwork spring animation
-        let playConfig = UIImage.SymbolConfiguration(pointSize: 34, weight: .bold)
-        let iconName = manager.isPlaying ? "pause.fill" : "play.fill"
-        self.playPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: playConfig), for: .normal)
-        self.updateArtworkScale(isPlaying: manager.isPlaying, animated: true)
-        
-        // Shuffle state
+        // Shuffle
         self.shuffleButton.tintColor = manager.isShuffleEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : UIColor.white.withAlphaComponent(0.6)
         
-        // Repeat state
-        let repeatConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+        // Repeat
+        let repCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
         switch manager.repeatMode {
         case .off:
-            self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: repeatConfig), for: .normal)
+            self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: repCfg), for: .normal)
             self.repeatButton.tintColor = UIColor.white.withAlphaComponent(0.6)
         case .all:
-            self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: repeatConfig), for: .normal)
+            self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: repCfg), for: .normal)
             self.repeatButton.tintColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
         case .one:
-            self.repeatButton.setImage(UIImage(systemName: "repeat.1", withConfiguration: repeatConfig), for: .normal)
+            self.repeatButton.setImage(UIImage(systemName: "repeat.1", withConfiguration: repCfg), for: .normal)
             self.repeatButton.tintColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
         }
         
-        // Wave state
-        if manager.isWaveEnabled {
-            self.waveButton.backgroundColor = UIColor(red: 0.95, green: 0.25, blue: 0.5, alpha: 0.85)
+        // Action states
+        self.waveButton.backgroundColor = manager.isWaveEnabled ? UIColor(red: 0.95, green: 0.25, blue: 0.50, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
+        self.autoplayButton.backgroundColor = manager.isAutoplayEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
+        
+        self.updateArtworkScale(isPlaying: manager.isPlaying, animated: true)
+    }
+    
+    private func reloadQueueData() {
+        self.cachedQueue = SGDoxMusicManager.shared.effectiveQueue()
+        let count = self.cachedQueue.count
+        self.queueCountLabel.text = count == 0 ? "Очередь завершена" : "\(count) трек\(self.pluralEnding(count))"
+        self.queueClearButton.isHidden = count == 0
+        self.queueTableView.reloadData()
+    }
+    
+    private func pluralEnding(_ count: Int) -> String {
+        let mod10 = count % 10
+        let mod100 = count % 100
+        if mod100 >= 11 && mod100 <= 19 { return "ов" }
+        if mod10 == 1 { return "" }
+        if mod10 >= 2 && mod10 <= 4 { return "а" }
+        return "ов"
+    }
+    
+    private func updateArtworkScale(isPlaying: Bool, animated: Bool) {
+        let block = {
+            if isPlaying {
+                self.artworkContainerView.transform = .identity
+                self.artworkContainerView.layer.shadowOpacity = 0.55
+                self.artworkContainerView.layer.shadowRadius = 26
+            } else {
+                self.artworkContainerView.transform = CGAffineTransform(scaleX: 0.90, y: 0.90)
+                self.artworkContainerView.layer.shadowOpacity = 0.25
+                self.artworkContainerView.layer.shadowRadius = 14
+            }
+        }
+        if animated {
+            UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.76, initialSpringVelocity: 0.3, options: [.allowUserInteraction, .beginFromCurrentState], animations: block)
         } else {
-            self.waveButton.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+            block()
+        }
+    }
+    
+    private func updateAmbientColor(from image: UIImage) {
+        guard let cgImage = image.cgImage else { return }
+        let width = 20
+        let height = 20
+        var rawData = [UInt8](repeating: 0, count: width * height * 4)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let ctx = CGContext(data: &rawData, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
+        ctx?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        var totalR: CGFloat = 0, totalG: CGFloat = 0, totalB: CGFloat = 0
+        var maxSat: CGFloat = -1
+        var accentR: CGFloat = 0.3, accentG: CGFloat = 0.25, accentB: CGFloat = 0.5
+        let count = CGFloat(width * height)
+        
+        for i in 0..<(width * height) {
+            let r = CGFloat(rawData[i * 4]) / 255.0
+            let g = CGFloat(rawData[i * 4 + 1]) / 255.0
+            let b = CGFloat(rawData[i * 4 + 2]) / 255.0
+            totalR += r; totalG += g; totalB += b
+            let maxC = max(r, max(g, b))
+            let minC = min(r, min(g, b))
+            let sat = maxC > 0 ? (maxC - minC) / maxC : 0
+            if sat > maxSat && maxC > 0.25 {
+                maxSat = sat
+                accentR = r; accentG = g; accentB = b
+            }
         }
         
-        // Autoplay state
-        self.autoplayButton.backgroundColor = manager.isAutoplayEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.15)
+        let avgColor = UIColor(red: (totalR / count) * 0.7, green: (totalG / count) * 0.7, blue: (totalB / count) * 0.7, alpha: 0.95)
+        let vibrantColor = UIColor(red: min(1.0, accentR * 1.2), green: min(1.0, accentG * 1.2), blue: min(1.0, accentB * 1.2), alpha: 0.95)
+        let deepColor = UIColor(red: accentR * 0.15, green: accentG * 0.15, blue: accentB * 0.20, alpha: 0.98)
         
-        // Queue state
-        self.queueButton.backgroundColor = !manager.queue.isEmpty ? UIColor(white: 1.0, alpha: 0.3) : UIColor(white: 1.0, alpha: 0.15)
+        let newColors = [vibrantColor.cgColor, avgColor.cgColor, deepColor.cgColor]
+        
+        let animation = CABasicAnimation(keyPath: "colors")
+        animation.fromValue = self.ambientGradientLayer.colors
+        animation.toValue = newColors
+        animation.duration = 0.7
+        self.ambientGradientLayer.add(animation, forKey: "colorsChange")
+        self.ambientGradientLayer.colors = newColors
+        
+        self.artworkContainerView.layer.shadowColor = vibrantColor.cgColor
     }
     
     private func formatTime(_ seconds: Double) -> String {
@@ -553,6 +747,63 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let mins = s / 60
         let secs = s % 60
         return String(format: "%d:%02d", mins, secs)
+    }
+    
+    // MARK: - Segment Switching (Now Playing vs Queue)
+    
+    @objc private func nowPlayingSegmentPressed() {
+        guard self.isQueueMode else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        self.isQueueMode = false
+        self.transitionPanes()
+    }
+    
+    @objc private func queueSegmentPressed() {
+        guard !self.isQueueMode else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        self.isQueueMode = true
+        self.reloadQueueData()
+        self.transitionPanes()
+    }
+    
+    private func transitionPanes() {
+        let segW = self.segmentContainerView.bounds.width
+        let itemW = segW * 0.5
+        let indicatorX = self.isQueueMode ? itemW + 2 : 2
+        
+        if self.isQueueMode {
+            self.queueContainerView.isHidden = false
+            self.queueContainerView.alpha = 0.0
+            self.queueContainerView.transform = CGAffineTransform(translationX: 30, y: 0)
+        } else {
+            self.nowPlayingContainerView.isHidden = false
+            self.nowPlayingContainerView.alpha = 0.0
+            self.nowPlayingContainerView.transform = CGAffineTransform(translationX: -30, y: 0)
+        }
+        
+        UIView.animate(withDuration: 0.32, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+            self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2, width: itemW - 4, height: self.segmentContainerView.bounds.height - 4)
+            
+            if self.isQueueMode {
+                self.nowPlayingContainerView.alpha = 0.0
+                self.nowPlayingContainerView.transform = CGAffineTransform(translationX: -30, y: 0)
+                
+                self.queueContainerView.alpha = 1.0
+                self.queueContainerView.transform = .identity
+            } else {
+                self.queueContainerView.alpha = 0.0
+                self.queueContainerView.transform = CGAffineTransform(translationX: 30, y: 0)
+                
+                self.nowPlayingContainerView.alpha = 1.0
+                self.nowPlayingContainerView.transform = .identity
+            }
+        }) { _ in
+            if self.isQueueMode {
+                self.nowPlayingContainerView.isHidden = true
+            } else {
+                self.queueContainerView.isHidden = true
+            }
+        }
     }
     
     // MARK: - Actions
@@ -564,10 +815,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     @objc private func favoritePressed() {
         guard let track = SGDoxMusicManager.shared.currentTrack else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        UIView.animate(withDuration: 0.15, animations: {
+        UIView.animate(withDuration: 0.14, animations: {
             self.favoriteButton.transform = CGAffineTransform(scaleX: 1.35, y: 1.35)
         }) { _ in
-            UIView.animate(withDuration: 0.15) {
+            UIView.animate(withDuration: 0.14) {
                 self.favoriteButton.transform = .identity
             }
         }
@@ -579,6 +830,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         SGDoxMusicManager.shared.toggleShuffle()
         self.updateContent()
+        self.reloadQueueData()
     }
     
     @objc private func repeatPressed() {
@@ -591,22 +843,16 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         SGDoxMusicManager.shared.toggleAutoplay()
         self.updateContent()
-    }
-    
-    @objc private func queuePressed() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        let queueController = SGDoxMusicQueueController(context: self.context)
-        queueController.navigationPresentation = .modal
-        self.present(queueController, in: .window(.root))
+        self.reloadQueueData()
     }
     
     @objc private func playPausePressed() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         UIView.animate(withDuration: 0.1, animations: {
-            self.playPauseButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+            self.playPauseContainer.transform = CGAffineTransform(scaleX: 0.90, y: 0.90)
         }) { _ in
-            UIView.animate(withDuration: 0.15) {
-                self.playPauseButton.transform = .identity
+            UIView.animate(withDuration: 0.14) {
+                self.playPauseContainer.transform = .identity
             }
         }
         SGDoxMusicManager.shared.togglePlay()
@@ -617,7 +863,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         UIView.animate(withDuration: 0.1, animations: {
             self.nextButton.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
         }) { _ in
-            UIView.animate(withDuration: 0.15) {
+            UIView.animate(withDuration: 0.14) {
                 self.nextButton.transform = .identity
             }
         }
@@ -629,7 +875,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         UIView.animate(withDuration: 0.1, animations: {
             self.previousButton.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
         }) { _ in
-            UIView.animate(withDuration: 0.15) {
+            UIView.animate(withDuration: 0.14) {
                 self.previousButton.transform = .identity
             }
         }
@@ -657,15 +903,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             manager.startWave()
         }
         self.updateContent()
+        self.reloadQueueData()
     }
     
     @objc private func pinToProfilePressed() {
         guard let track = SGDoxMusicManager.shared.currentTrack else { return }
-        
         SGDoxMusicManager.shared.pinCurrentTrackToProfile(context: self.context) { [weak self] success, errorText in
             guard let self = self else { return }
-            let text = success ? "Музыка «\(track.title)» добавлена в профиль" : (errorText ?? "Не удалось установить трек в профиль")
-            
+            let text = success ? "Музыка «\(track.title)» закреплена в профиле" : (errorText ?? "Не удалось установить трек в профиль")
             let undoController = UndoOverlayController(
                 presentationData: self.presentationData,
                 content: .universalImage(
@@ -681,5 +926,128 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             )
             self.present(undoController, in: .current)
         }
+    }
+    
+    @objc private func queueShufflePressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        SGDoxMusicManager.shared.toggleShuffle()
+        self.reloadQueueData()
+    }
+    
+    @objc private func queueClearPressed() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if let current = SGDoxMusicManager.shared.currentTrack {
+            SGDoxMusicManager.shared.play(track: current, queue: [])
+        }
+        self.reloadQueueData()
+    }
+    
+    // MARK: - Table View (Queue)
+    
+    public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return self.cachedQueue.count
+    }
+    
+    public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 60.0
+    }
+    
+    public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "SGDoxPlayerQueueCell", for: indexPath) as! SGDoxPlayerQueueCell
+        let track = self.cachedQueue[indexPath.row]
+        cell.configure(track: track)
+        return cell
+    }
+    
+    public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        guard indexPath.row < self.cachedQueue.count else { return }
+        let selectedTrack = self.cachedQueue[indexPath.row]
+        let remaining = Array(self.cachedQueue.suffix(from: indexPath.row + 1))
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        SGDoxMusicManager.shared.play(track: selectedTrack, queue: remaining)
+        self.reloadQueueData()
+    }
+}
+
+// MARK: - In-Player Queue Cell
+
+private final class SGDoxPlayerQueueCell: UITableViewCell {
+    private let artworkImageView = UIImageView()
+    private let titleLabel = UILabel()
+    private let artistLabel = UILabel()
+    private let durationLabel = UILabel()
+    private let sourceIconView = UIImageView()
+    private var currentTrackId: String?
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+        
+        self.artworkImageView.contentMode = .scaleAspectFill
+        self.artworkImageView.clipsToBounds = true
+        self.artworkImageView.layer.cornerRadius = 10
+        self.artworkImageView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
+        self.contentView.addSubview(self.artworkImageView)
+        
+        self.titleLabel.textColor = .white
+        self.titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        self.titleLabel.lineBreakMode = .byTruncatingTail
+        self.contentView.addSubview(self.titleLabel)
+        
+        self.artistLabel.textColor = UIColor(white: 1.0, alpha: 0.65)
+        self.artistLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+        self.artistLabel.lineBreakMode = .byTruncatingTail
+        self.contentView.addSubview(self.artistLabel)
+        
+        self.durationLabel.textColor = UIColor(white: 1.0, alpha: 0.45)
+        self.durationLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)
+        self.durationLabel.textAlignment = .right
+        self.contentView.addSubview(self.durationLabel)
+        
+        self.sourceIconView.contentMode = .scaleAspectFit
+        self.sourceIconView.tintColor = UIColor(white: 1.0, alpha: 0.45)
+        self.contentView.addSubview(self.sourceIconView)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    func configure(track: SGDoxMusicTrack) {
+        self.currentTrackId = track.id
+        self.titleLabel.text = track.title
+        self.artistLabel.text = track.artist
+        
+        let d = Int(track.duration)
+        self.durationLabel.text = d > 0 ? String(format: "%d:%02d", d / 60, d % 60) : ""
+        self.sourceIconView.image = UIImage(systemName: track.source.iconName)
+        
+        self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
+        SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 88, height: 88)) { [weak self] image in
+            if self?.currentTrackId == track.id, let img = image {
+                self?.artworkImageView.image = img
+            }
+        }
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let b = self.contentView.bounds
+        let artSide: CGFloat = 44.0
+        self.artworkImageView.frame = CGRect(x: 18, y: (b.height - artSide) * 0.5, width: artSide, height: artSide)
+        
+        let rightMargin: CGFloat = 18.0
+        let durW: CGFloat = 46.0
+        self.durationLabel.frame = CGRect(x: b.width - rightMargin - durW, y: (b.height - 18) * 0.5, width: durW, height: 18)
+        
+        let iconSize: CGFloat = 14.0
+        self.sourceIconView.frame = CGRect(x: self.durationLabel.frame.minX - iconSize - 6, y: (b.height - iconSize) * 0.5, width: iconSize, height: iconSize)
+        
+        let textX = self.artworkImageView.frame.maxX + 12.0
+        let textW = max(0, self.sourceIconView.frame.minX - textX - 8.0)
+        self.titleLabel.frame = CGRect(x: textX, y: 11, width: textW, height: 20)
+        self.artistLabel.frame = CGRect(x: textX, y: 31, width: textW, height: 18)
     }
 }
