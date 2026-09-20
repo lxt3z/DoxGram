@@ -183,24 +183,33 @@ public final class AppleMusicService: @unchecked Sendable {
         self.performITunesSearch(term: encoded, country: primaryCountry) { [weak self] primaryResults, error in
             guard let self = self else { return }
             if !primaryResults.isEmpty {
-                completion(primaryResults, nil)
+                completion(AppleMusicService.deduplicateTracks(primaryResults), nil)
                 return
             }
             
-            // If primary RU search yielded no results, fallback to device locale
-            let deviceCountry: String
-            if #available(iOS 16, *) {
-                deviceCountry = Locale.current.region?.identifier ?? "US"
-            } else {
-                deviceCountry = Locale.current.regionCode ?? "US"
-            }
-            
-            if deviceCountry != primaryCountry {
-                self.performITunesSearch(term: encoded, country: deviceCountry) { fallbackResults, fallbackError in
-                    completion(fallbackResults, fallbackError ?? error)
+            // If primary RU search yielded no results, fallback to KZ (complete CIS catalog for Russian artists like PHARAOH)
+            self.performITunesSearch(term: encoded, country: "KZ") { [weak self] kzResults, _ in
+                guard let self = self else { return }
+                if !kzResults.isEmpty {
+                    completion(AppleMusicService.deduplicateTracks(kzResults), nil)
+                    return
                 }
-            } else {
-                completion([], error)
+                
+                // Fallback to device locale / US
+                let deviceCountry: String
+                if #available(iOS 16, *) {
+                    deviceCountry = Locale.current.region?.identifier ?? "US"
+                } else {
+                    deviceCountry = Locale.current.regionCode ?? "US"
+                }
+                
+                if deviceCountry != primaryCountry && deviceCountry != "KZ" {
+                    self.performITunesSearch(term: encoded, country: deviceCountry) { fallbackResults, fallbackError in
+                        completion(AppleMusicService.deduplicateTracks(fallbackResults), fallbackError ?? error)
+                    }
+                } else {
+                    completion([], error)
+                }
             }
         }
     }
@@ -305,14 +314,14 @@ public final class AppleMusicService: @unchecked Sendable {
                             }
                             
                             DispatchQueue.main.async {
-                                completion(finalTracks.isEmpty ? merged : finalTracks, nil)
+                                completion(AppleMusicService.deduplicateTracks(finalTracks.isEmpty ? merged : finalTracks), nil)
                             }
                         }.resume()
                         return
                     }
                     
                     DispatchQueue.main.async {
-                        completion(merged, nil)
+                        completion(AppleMusicService.deduplicateTracks(merged), nil)
                     }
                 }.resume()
             }
@@ -536,6 +545,34 @@ public final class AppleMusicService: @unchecked Sendable {
         }
     }
     
+    public static func deduplicateTracks(_ tracks: [SGDoxMusicTrack]) -> [SGDoxMusicTrack] {
+        var seenIds = Set<String>()
+        var seenKeys = Set<String>()
+        var result: [SGDoxMusicTrack] = []
+        
+        for t in tracks {
+            if seenIds.contains(t.id) { continue }
+            
+            let normTitle = t.title.lowercased()
+                .replacingOccurrences(of: "\\(feat.*\\)", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\[feat.*\\]", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\(bonus.*\\)", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\[bonus.*\\]", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\(remaster.*\\)", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\(deluxe.*\\)", with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let normArtist = t.artist.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = "\(normArtist) - \(normTitle)"
+            
+            if seenKeys.contains(key) { continue }
+            
+            seenIds.insert(t.id)
+            seenKeys.insert(key)
+            result.append(t)
+        }
+        return result
+    }
+    
     // MARK: - Playback (Full Songs via MPMusicPlayerController or Preview)
     
     public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
@@ -546,22 +583,46 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
-        // 2. If it's a local track by persistent ID
-        if let appleMusicId = track.appleMusicId, appleMusicId.hasPrefix("local_") {
-            let pidStr = appleMusicId.replacingOccurrences(of: "local_", with: "")
-            if let pid = UInt64(pidStr) {
-                let query = MPMediaQuery.songs()
-                query.addFilterPredicate(MPMediaPropertyPredicate(value: NSNumber(value: pid), forProperty: MPMediaItemPropertyPersistentID))
-                if let item = query.items?.first, let assetUrl = item.value(forProperty: MPMediaItemPropertyAssetURL) as? URL {
-                    self.isUsingSystemPlayer = false
-                    self.playPreview(url: assetUrl, completion: completion)
-                    return
+        // 2. If it's a local track by persistent ID (local_ or am_local_)
+        let rawPidStr = (track.appleMusicId ?? track.id).replacingOccurrences(of: "am_local_", with: "").replacingOccurrences(of: "local_", with: "")
+        if let pid = UInt64(rawPidStr), (track.appleMusicId?.hasPrefix("local_") == true || track.appleMusicId?.hasPrefix("am_local_") == true || track.id.hasPrefix("am_local_")) {
+            let query = MPMediaQuery.songs()
+            query.addFilterPredicate(MPMediaPropertyPredicate(value: NSNumber(value: pid), forProperty: MPMediaItemPropertyPersistentID))
+            
+            // Check direct asset url
+            if let item = query.items?.first, let assetUrl = item.value(forProperty: MPMediaItemPropertyAssetURL) as? URL {
+                self.isUsingSystemPlayer = false
+                self.playPreview(url: assetUrl, completion: completion)
+                return
+            }
+            
+            // Play through media player query
+            DispatchQueue.main.async { [weak self] in
+                self?.avPlayer?.pause()
+                self?.avPlayer = nil
+            }
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self = self else { return }
+                let player = self.player
+                player.setQueue(with: query)
+                player.prepareToPlay { [weak self] error in
+                    DispatchQueue.main.async {
+                        if error == nil {
+                            player.currentPlaybackTime = 0.0
+                            player.play()
+                            self?.isUsingSystemPlayer = true
+                            completion(true)
+                        } else {
+                            self?.fallbackPlayPreviewOrSearch(track: track, completion: completion)
+                        }
+                    }
                 }
             }
+            return
         }
         
         // 3. Attempt system player if valid store ID
-        if let appleMusicId = track.appleMusicId, !appleMusicId.isEmpty && !appleMusicId.hasPrefix("local_") {
+        if let appleMusicId = track.appleMusicId, !appleMusicId.isEmpty && !appleMusicId.hasPrefix("local_") && !appleMusicId.hasPrefix("am_local_") {
             DispatchQueue.main.async { [weak self] in
                 self?.avPlayer?.pause()
                 self?.avPlayer = nil
@@ -575,6 +636,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 player.prepareToPlay { [weak self] error in
                     DispatchQueue.main.async {
                         if error == nil {
+                            player.currentPlaybackTime = 0.0
                             player.play()
                             self?.isUsingSystemPlayer = true
                             completion(true)
@@ -599,26 +661,38 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
-        // Search iTunes public API by track title & artist
-        let query = "\(track.artist) \(track.title)"
+        let cleanTitle = track.title
+            .replacingOccurrences(of: "\\(feat.*\\)", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\[feat.*\\]", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = "\(track.artist) \(cleanTitle)"
         self.searchITunesPublic(query: query) { [weak self] results, _ in
-            guard let self = self, let first = results.first(where: { $0.previewUrl != nil }) ?? results.first, let preview = first.previewUrl, let url = URL(string: preview) else {
+            guard let self = self else {
                 DispatchQueue.main.async { completion(false) }
                 return
             }
-            
-            if let art = first.artworkUrl, !art.isEmpty {
-                if let currentArt = track.artworkUrl, currentArt.hasPrefix("am_local_") {
+            if let first = results.first(where: { $0.previewUrl != nil }) ?? results.first, let preview = first.previewUrl, let url = URL(string: preview) {
+                if let art = first.artworkUrl, !art.isEmpty {
                     SGDoxImageLoader.shared.loadImage(urlString: art) { img in
                         if let img = img {
-                            SGDoxImageLoader.shared.storeImage(img, for: currentArt)
+                            SGDoxImageLoader.shared.storeImage(img, for: track.id)
+                            if let old = track.artworkUrl { SGDoxImageLoader.shared.storeImage(img, for: old) }
                         }
                     }
                 }
+                self.isUsingSystemPlayer = false
+                self.playPreview(url: url, completion: completion)
+            } else {
+                // Secondary fallback: search just the title
+                self.searchITunesPublic(query: cleanTitle) { [weak self] tResults, _ in
+                    guard let self = self, let first = tResults.first(where: { $0.previewUrl != nil }) ?? tResults.first, let preview = first.previewUrl, let url = URL(string: preview) else {
+                        DispatchQueue.main.async { completion(false) }
+                        return
+                    }
+                    self.isUsingSystemPlayer = false
+                    self.playPreview(url: url, completion: completion)
+                }
             }
-            
-            self.isUsingSystemPlayer = false
-            self.playPreview(url: url, completion: completion)
         }
     }
     
@@ -629,6 +703,7 @@ public final class AppleMusicService: @unchecked Sendable {
         let playerItem = AVPlayerItem(url: url)
         let player = AVPlayer(playerItem: playerItem)
         self.avPlayer = player
+        player.seek(to: .zero)
         player.play()
         DispatchQueue.main.async {
             completion(true)

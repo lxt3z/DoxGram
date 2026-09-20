@@ -11,7 +11,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let context: AccountContext
     private var presentationData: PresentationData
     
-    private let backgroundBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+    private let grabberView = UIView()
+    private let backgroundBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let backgroundImageView = UIImageView()
     private let ambientGradientLayer = CAGradientLayer()
     private let dismissButton = UIButton(type: .system)
@@ -51,6 +52,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.ready.set(.single(true))
     }
     
+    public override func loadDisplayNode() {
+        super.loadDisplayNode()
+        self.displayNode.backgroundColor = UIColor(red: 0.06, green: 0.06, blue: 0.09, alpha: 1.0)
+    }
+    
     public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
         self.view.setNeedsLayout()
@@ -62,7 +68,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = .black
+        self.view.backgroundColor = UIColor(red: 0.06, green: 0.06, blue: 0.09, alpha: 1.0)
         
         self.setupViews()
         self.updateContent()
@@ -121,19 +127,26 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.backgroundImageView.frame = self.view.bounds
         self.backgroundImageView.contentMode = .scaleAspectFill
         self.backgroundImageView.clipsToBounds = true
+        self.backgroundImageView.alpha = 0.35
         self.view.addSubview(self.backgroundImageView)
         
         self.ambientGradientLayer.frame = self.view.bounds
-        self.ambientGradientLayer.startPoint = CGPoint(x: 0.2, y: 0.0)
-        self.ambientGradientLayer.endPoint = CGPoint(x: 0.8, y: 1.0)
+        self.ambientGradientLayer.startPoint = CGPoint(x: 0.15, y: 0.0)
+        self.ambientGradientLayer.endPoint = CGPoint(x: 0.85, y: 1.0)
         self.ambientGradientLayer.colors = [
-            UIColor(red: 0.12, green: 0.14, blue: 0.22, alpha: 0.9).cgColor,
-            UIColor(red: 0.05, green: 0.06, blue: 0.10, alpha: 0.95).cgColor
+            UIColor(red: 0.22, green: 0.12, blue: 0.38, alpha: 0.95).cgColor,
+            UIColor(red: 0.08, green: 0.09, blue: 0.16, alpha: 0.98).cgColor
         ]
         self.view.layer.addSublayer(self.ambientGradientLayer)
         
         self.backgroundBlurView.frame = self.view.bounds
+        self.backgroundBlurView.alpha = 0.65
         self.view.addSubview(self.backgroundBlurView)
+        
+        // Grabber
+        self.grabberView.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
+        self.grabberView.layer.cornerRadius = 2.5
+        self.view.addSubview(self.grabberView)
         
         // Header
         let chevronDownImage = UIImage(systemName: "chevron.down") ?? UIImage()
@@ -148,15 +161,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.view.addSubview(self.sourceLabel)
         
         // Artwork
-        self.artworkContainerView.layer.shadowColor = UIColor.black.cgColor
-        self.artworkContainerView.layer.shadowOpacity = 0.55
-        self.artworkContainerView.layer.shadowRadius = 26
-        self.artworkContainerView.layer.shadowOffset = CGSize(width: 0, height: 12)
+        self.artworkContainerView.layer.shadowColor = UIColor(red: 0.22, green: 0.12, blue: 0.38, alpha: 1.0).cgColor
+        self.artworkContainerView.layer.shadowOpacity = 0.60
+        self.artworkContainerView.layer.shadowRadius = 28
+        self.artworkContainerView.layer.shadowOffset = CGSize(width: 0, height: 14)
         self.view.addSubview(self.artworkContainerView)
         
         self.artworkImageView.contentMode = .scaleAspectFill
         self.artworkImageView.clipsToBounds = true
-        self.artworkImageView.layer.cornerRadius = 22
+        self.artworkImageView.layer.cornerRadius = 24
         self.artworkImageView.backgroundColor = UIColor(white: 0.2, alpha: 1.0)
         self.artworkContainerView.addSubview(self.artworkImageView)
         
@@ -241,11 +254,16 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func setupActionButtons() {
+        let glassBorderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
+        let glassBgColor = UIColor(white: 1.0, alpha: 0.12)
+        
         // Autoplay button (Apple Music infinity button)
         let infinityConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
         self.autoplayButton.setImage(UIImage(systemName: "infinity", withConfiguration: infinityConfig), for: .normal)
         self.autoplayButton.tintColor = .white
-        self.autoplayButton.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+        self.autoplayButton.backgroundColor = glassBgColor
+        self.autoplayButton.layer.borderWidth = 0.5
+        self.autoplayButton.layer.borderColor = glassBorderColor
         self.autoplayButton.layer.cornerRadius = 20
         self.autoplayButton.addTarget(self, action: #selector(self.autoplayPressed), for: .touchUpInside)
         self.view.addSubview(self.autoplayButton)
@@ -255,7 +273,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.waveButton.setImage(UIImage(systemName: "dot.radiowaves.left.and.right"), for: .normal)
         self.waveButton.tintColor = .white
         self.waveButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        self.waveButton.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+        self.waveButton.backgroundColor = glassBgColor
+        self.waveButton.layer.borderWidth = 0.5
+        self.waveButton.layer.borderColor = glassBorderColor
         self.waveButton.layer.cornerRadius = 20
         self.waveButton.addTarget(self, action: #selector(self.wavePressed), for: .touchUpInside)
         self.view.addSubview(self.waveButton)
@@ -265,7 +285,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.pinToProfileButton.setImage(UIImage(systemName: "pin.fill"), for: .normal)
         self.pinToProfileButton.tintColor = .white
         self.pinToProfileButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        self.pinToProfileButton.backgroundColor = UIColor(red: 0.0, green: 0.55, blue: 1.0, alpha: 0.8)
+        self.pinToProfileButton.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.pinToProfileButton.layer.borderWidth = 0.5
+        self.pinToProfileButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
         self.pinToProfileButton.layer.cornerRadius = 20
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
         self.view.addSubview(self.pinToProfileButton)
@@ -274,7 +296,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let queueConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
         self.queueButton.setImage(UIImage(systemName: "list.bullet", withConfiguration: queueConfig), for: .normal)
         self.queueButton.tintColor = .white
-        self.queueButton.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+        self.queueButton.backgroundColor = glassBgColor
+        self.queueButton.layer.borderWidth = 0.5
+        self.queueButton.layer.borderColor = glassBorderColor
         self.queueButton.layer.cornerRadius = 20
         self.queueButton.addTarget(self, action: #selector(self.queuePressed), for: .touchUpInside)
         self.view.addSubview(self.queueButton)
@@ -355,8 +379,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         let avgColor = UIColor(red: (totalR / count) * 0.75, green: (totalG / count) * 0.75, blue: (totalB / count) * 0.75, alpha: 0.95)
-        let vibrantColor = UIColor(red: accentR * 0.85, green: accentG * 0.85, blue: accentB * 0.85, alpha: 0.9)
-        let deepColor = UIColor(red: accentR * 0.25, green: accentG * 0.25, blue: accentB * 0.3, alpha: 0.98)
+        let vibrantColor = UIColor(red: min(1.0, accentR * 1.15), green: min(1.0, accentG * 1.15), blue: min(1.0, accentB * 1.15), alpha: 0.95)
+        let deepColor = UIColor(red: accentR * 0.18, green: accentG * 0.18, blue: accentB * 0.22, alpha: 0.98)
         
         let newColors = [vibrantColor.cgColor, avgColor.cgColor, deepColor.cgColor]
         
@@ -367,14 +391,16 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         self.ambientGradientLayer.add(animation, forKey: "colorsChange")
         self.ambientGradientLayer.colors = newColors
+        
+        self.artworkContainerView.layer.shadowColor = vibrantColor.cgColor
     }
     
     private func updateArtworkScale(isPlaying: Bool, animated: Bool) {
         let block = {
             if isPlaying {
                 self.artworkContainerView.transform = .identity
-                self.artworkContainerView.layer.shadowOpacity = 0.55
-                self.artworkContainerView.layer.shadowRadius = 26
+                self.artworkContainerView.layer.shadowOpacity = 0.60
+                self.artworkContainerView.layer.shadowRadius = 28
             } else {
                 self.artworkContainerView.transform = CGAffineTransform(scaleX: 0.86, y: 0.86)
                 self.artworkContainerView.layer.shadowOpacity = 0.22
@@ -405,12 +431,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.ambientGradientLayer.frame = bounds
         self.backgroundBlurView.frame = bounds
         
-        let headerY = safeArea.top + 8
+        self.grabberView.frame = CGRect(x: (bounds.width - 38) * 0.5, y: safeArea.top + 8, width: 38, height: 5)
+        
+        let headerY = safeArea.top + 16
         self.dismissButton.frame = CGRect(x: 16, y: headerY, width: 44, height: 44)
         self.sourceLabel.frame = CGRect(x: 60, y: headerY + 12, width: bounds.width - 120, height: 20)
         
         let artworkSide = min(bounds.width - 64, bounds.height * 0.38)
-        let artworkY = headerY + 54
+        let artworkY = headerY + 50
         self.artworkContainerView.frame = CGRect(x: (bounds.width - artworkSide) * 0.5, y: artworkY, width: artworkSide, height: artworkSide)
         self.artworkImageView.frame = CGRect(x: 0, y: 0, width: artworkSide, height: artworkSide)
         
@@ -465,25 +493,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.artistLabel.text = track.artist
             self.sourceLabel.text = "Играет из \(track.source.rawValue)"
             
-            if let artworkUrl = track.artworkUrl {
-                if let cached = SGDoxImageLoader.shared.cachedImage(for: artworkUrl) {
-                    self.artworkImageView.image = cached
-                    self.backgroundImageView.image = cached
-                    self.updateAmbientColors(from: cached)
-                } else {
-                    self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
-                    SGDoxImageLoader.shared.loadImage(urlString: artworkUrl, targetSize: CGSize(width: 320, height: 320)) { [weak self] image in
-                        if self?.displayedTrackId == track.id, let image = image {
-                            self?.artworkImageView.image = image
-                            self?.backgroundImageView.image = image
-                            self?.updateAmbientColors(from: image)
-                        }
-                    }
+            self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
+            SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 400, height: 400)) { [weak self] image in
+                if self?.displayedTrackId == track.id {
+                    let finalImg = image ?? SGDoxImageLoader.shared.placeholderArtwork()
+                    self?.artworkImageView.image = finalImg
+                    self?.backgroundImageView.image = image
+                    self?.updateAmbientColors(from: image)
                 }
-            } else {
-                self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
-                self.backgroundImageView.image = nil
-                self.updateAmbientColors(from: nil)
             }
         }
         
@@ -580,7 +597,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let queueController = SGDoxMusicQueueController(context: self.context)
         queueController.navigationPresentation = .modal
-        self.push(queueController)
+        self.present(queueController, in: .window(.root))
     }
     
     @objc private func playPausePressed() {

@@ -31,16 +31,22 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
         fatalError("init(coder:) has not been implemented")
     }
     
+    public override func loadDisplayNode() {
+        super.loadDisplayNode()
+        self.displayNode.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
+    }
+    
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = UIColor(red: 0.09, green: 0.09, blue: 0.12, alpha: 1.0)
+        self.view.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
         
         self.blurView.frame = self.view.bounds
         self.blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        self.blurView.effect = UIBlurEffect(style: .systemMaterialDark)
         self.view.addSubview(self.blurView)
         
         // Grabber
-        let grabber = UIView(frame: CGRect(x: (self.view.bounds.width - 36) * 0.5, y: 10, width: 36, height: 5))
+        let grabber = UIView(frame: CGRect(x: (self.view.bounds.width - 38) * 0.5, y: 10, width: 38, height: 5))
         grabber.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
         grabber.layer.cornerRadius = 2.5
         grabber.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin]
@@ -145,19 +151,11 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
         cell.artistLabel.text = track.artist
         cell.indexLabel.text = "\(indexPath.row + 1)"
         
-        if let artwork = track.artworkUrl {
-            if let cached = SGDoxImageLoader.shared.cachedImage(for: artwork) {
-                cell.artworkView.image = cached
-            } else {
-                cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
-                SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak cell] img in
-                    if let img = img {
-                        cell?.artworkView.image = img
-                    }
-                }
+        cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
+        SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 80, height: 80)) { [weak cell] img in
+            if let img = img {
+                cell?.artworkView.image = img
             }
-        } else {
-            cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
         }
         
         return cell

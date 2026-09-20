@@ -130,13 +130,62 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.notifyStateChanged()
     }
     
+    public func updateTrackArtwork(trackId: String, newArtworkUrl: String) {
+        DispatchQueue.main.async {
+            var changed = false
+            if let idx = self.favorites.firstIndex(where: { $0.id == trackId }) {
+                let old = self.favorites[idx]
+                let updated = SGDoxMusicTrack(
+                    id: old.id,
+                    title: old.title,
+                    artist: old.artist,
+                    album: old.album,
+                    artworkUrl: newArtworkUrl,
+                    duration: old.duration,
+                    previewUrl: old.previewUrl,
+                    source: old.source,
+                    appleMusicId: old.appleMusicId,
+                    spotifyUri: old.spotifyUri,
+                    telegramFile: old.telegramFile
+                )
+                self.favorites[idx] = updated
+                changed = true
+            }
+            if let curr = self.currentTrack, curr.id == trackId {
+                self.currentTrack = SGDoxMusicTrack(
+                    id: curr.id,
+                    title: curr.title,
+                    artist: curr.artist,
+                    album: curr.album,
+                    artworkUrl: newArtworkUrl,
+                    duration: curr.duration,
+                    previewUrl: curr.previewUrl,
+                    source: curr.source,
+                    appleMusicId: curr.appleMusicId,
+                    spotifyUri: curr.spotifyUri,
+                    telegramFile: curr.telegramFile
+                )
+                changed = true
+            }
+            if changed {
+                self.saveFavorites()
+                self.notifyStateChanged()
+            }
+        }
+    }
+    
     public func syncFavoritesWithServices() {
         if AppleMusicService.shared.isAuthorized {
             AppleMusicService.shared.fetchLibrarySongs { [weak self] amTracks in
                 guard let self = self, !amTracks.isEmpty else { return }
                 var updated = self.favorites
                 for t in amTracks {
-                    if !updated.contains(where: { $0.id == t.id || ($0.title == t.title && $0.artist == t.artist) }) {
+                    if let existingIdx = updated.firstIndex(where: { $0.id == t.id || ($0.title == t.title && $0.artist == t.artist) }) {
+                        let existing = updated[existingIdx]
+                        if (existing.previewUrl == nil || existing.previewUrl?.isEmpty == true) && t.previewUrl != nil {
+                            updated[existingIdx] = t
+                        }
+                    } else {
                         updated.append(t)
                     }
                 }
@@ -153,7 +202,12 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 guard let self = self, !spTracks.isEmpty else { return }
                 var updated = self.favorites
                 for t in spTracks {
-                    if !updated.contains(where: { $0.id == t.id || ($0.title == t.title && $0.artist == t.artist) }) {
+                    if let existingIdx = updated.firstIndex(where: { $0.id == t.id || ($0.title == t.title && $0.artist == t.artist) }) {
+                        let existing = updated[existingIdx]
+                        if (existing.previewUrl == nil || existing.previewUrl?.isEmpty == true) && t.previewUrl != nil {
+                            updated[existingIdx] = t
+                        }
+                    } else {
                         updated.append(t)
                     }
                 }
@@ -332,6 +386,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
         
+        player.seek(to: .zero)
         player.play()
         self.isPlaying = true
         self.startTimeTracking()
@@ -567,13 +622,19 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
         
         // 2. Scan user's Saved Messages (Избранное) locally
+        let cleanTitle = track.title
+            .replacingOccurrences(of: "\\(feat.*\\)", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\[feat.*\\]", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let cleanArtist = track.artist
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            
         let _ = (context.account.postbox.transaction { transaction -> (FileMediaReference?, FileMediaReference?) in
             var matchedRef: FileMediaReference?
             var latestAudioRef: FileMediaReference?
             var count = 0
-            
-            let trackTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let trackArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             
             transaction.withAllMessages(peerId: context.account.peerId, namespace: nil, reversed: true) { message in
                 count += 1
@@ -600,21 +661,21 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                             let candPerformer = (songPerformer ?? "").lowercased()
                             let msgText = message.text.lowercased()
                             
-                            let titleMatch = !trackTitle.isEmpty && (candTitle.contains(trackTitle) || trackTitle.contains(candTitle) || msgText.contains(trackTitle))
-                            let artistMatch = !trackArtist.isEmpty && (candPerformer.contains(trackArtist) || trackArtist.contains(candPerformer) || msgText.contains(trackArtist))
+                            let titleMatch = !cleanTitle.isEmpty && (candTitle.contains(cleanTitle) || cleanTitle.contains(candTitle) || msgText.contains(cleanTitle))
+                            let artistMatch = !cleanArtist.isEmpty && (candPerformer.contains(cleanArtist) || cleanArtist.contains(candPerformer) || msgText.contains(cleanArtist))
                             
-                            if titleMatch || (titleMatch && artistMatch) {
+                            if (titleMatch && artistMatch) || titleMatch {
                                 matchedRef = fileRef
                                 return false
                             }
                         }
                     }
                 }
-                return count < 150
+                return count < 300
             }
             return (matchedRef, latestAudioRef)
         } |> deliverOnMainQueue).start(next: { (matchedRef, latestAudioRef) in
-            if let targetRef = matchedRef ?? latestAudioRef {
+            if let targetRef = matchedRef {
                 let _ = (context.engine.peers.addSavedMusic(file: targetRef) |> deliverOnMainQueue).start(error: { _ in
                     completion(false, "Не удалось закрепить трек в профиле")
                 }, completed: {
@@ -624,7 +685,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             }
             
             // 3. If not found in Saved Messages, search Telegram global messages
-            let searchQuery = "\(track.artist) \(track.title)"
+            let searchQuery = "\(track.artist) \(cleanTitle)"
             let searchLocation = SearchMessagesLocation.general(
                 scope: .everywhere,
                 groupId: nil,
@@ -638,7 +699,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 location: searchLocation,
                 query: searchQuery,
                 state: nil,
-                limit: 15
+                limit: 25
             )
             
             let _ = (searchSignal |> deliverOnMainQueue).start(next: { (result: (SearchMessagesResult, SearchMessagesState)) in
@@ -656,7 +717,38 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     }
                 }
                 
-                completion(false, "Трек не найден в Telegram. Отправьте аудиозапись в «Избранное» для закрепления в профиле.")
+                // Fallback: search clean title only
+                let titleSignal = context.engine.messages.searchMessages(
+                    location: searchLocation,
+                    query: cleanTitle,
+                    state: nil,
+                    limit: 25
+                )
+                let _ = (titleSignal |> deliverOnMainQueue).start(next: { (tResult: (SearchMessagesResult, SearchMessagesState)) in
+                    for message in tResult.0.messages {
+                        for media in message.media {
+                            if let file = media as? TelegramMediaFile, file.isMusic {
+                                let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
+                                let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(error: { _ in
+                                    completion(false, "Не удалось закрепить трек в профиле")
+                                }, completed: {
+                                    completion(true, nil)
+                                })
+                                return
+                            }
+                        }
+                    }
+                    
+                    if let fallback = latestAudioRef {
+                        let _ = (context.engine.peers.addSavedMusic(file: fallback) |> deliverOnMainQueue).start(error: { _ in
+                            completion(false, "Не удалось закрепить трек в профиле")
+                        }, completed: {
+                            completion(true, nil)
+                        })
+                    } else {
+                        completion(false, "Трек не найден в Telegram. Отправьте аудиозапись в «Избранное» для закрепления в профиле.")
+                    }
+                })
             })
         })
     }

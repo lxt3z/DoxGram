@@ -509,33 +509,27 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         let iconName = manager.isPlaying ? "pause.fill" : "play.fill"
         self.miniPlayPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
         
-        if let artwork = track.artworkUrl {
-            if let cached = SGDoxImageLoader.shared.cachedImage(for: artwork) {
-                self.miniArtworkImageView.image = cached
-            } else {
-                self.miniArtworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
-                SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak self] image in
-                    if let image = image {
-                        self?.miniArtworkImageView.image = image
-                    }
-                }
+        self.miniArtworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
+        SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 80, height: 80)) { [weak self] image in
+            if let image = image {
+                self?.miniArtworkImageView.image = image
             }
-        } else {
-            self.miniArtworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
         }
     }
     
     private func loadDefaultRecommendations() {
         if !SGDoxMusicManager.shared.history.isEmpty {
-            self.searchResults = Array(SGDoxMusicManager.shared.history.suffix(20).reversed())
+            let historyDeduped = AppleMusicService.deduplicateTracks(Array(SGDoxMusicManager.shared.history.suffix(20).reversed()))
+            self.searchResults = historyDeduped
             self.tableView.reloadData()
             return
         }
         
         if AppleMusicService.shared.isAuthorized {
             AppleMusicService.shared.fetchUserPersonalMusic { [weak self] tracks in
+                let deduped = AppleMusicService.deduplicateTracks(tracks)
                 DispatchQueue.main.async {
-                    self?.searchResults = tracks
+                    self?.searchResults = deduped
                     self?.tableView.reloadData()
                 }
             }
@@ -566,21 +560,24 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     private func performSearch(query: String) {
         if SpotifyService.shared.isAuthorized && !AppleMusicService.shared.isAuthorized {
             SpotifyService.shared.search(query: query) { [weak self] tracks, _ in
+                let deduped = AppleMusicService.deduplicateTracks(tracks)
                 DispatchQueue.main.async {
-                    self?.searchResults = tracks
+                    self?.searchResults = deduped
                     self?.tableView.reloadData()
                 }
             }
         } else {
             AppleMusicService.shared.search(query: query) { [weak self] appleTracks, _ in
+                let appleDeduped = AppleMusicService.deduplicateTracks(appleTracks)
                 DispatchQueue.main.async {
-                    if !appleTracks.isEmpty {
-                        self?.searchResults = appleTracks
+                    if !appleDeduped.isEmpty {
+                        self?.searchResults = appleDeduped
                         self?.tableView.reloadData()
                     } else if SpotifyService.shared.isAuthorized {
                         SpotifyService.shared.search(query: query) { spotifyTracks, _ in
+                            let spotifyDeduped = AppleMusicService.deduplicateTracks(spotifyTracks)
                             DispatchQueue.main.async {
-                                self?.searchResults = spotifyTracks
+                                self?.searchResults = spotifyDeduped
                                 self?.tableView.reloadData()
                             }
                         }
@@ -835,16 +832,10 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         
         cell.currentTrackId = track.id
-        if let artwork = track.artworkUrl, let cached = SGDoxImageLoader.shared.cachedImage(for: artwork) {
-            cell.artworkView.image = cached
-        } else {
-            cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
-            if let artwork = track.artworkUrl {
-                SGDoxImageLoader.shared.loadImage(urlString: artwork) { [weak cell] image in
-                    if cell?.currentTrackId == track.id, let image = image {
-                        cell?.artworkView.image = image
-                    }
-                }
+        cell.artworkView.image = SGDoxImageLoader.shared.placeholderArtwork()
+        SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 88, height: 88)) { [weak cell] image in
+            if cell?.currentTrackId == track.id, let image = image {
+                cell?.artworkView.image = image
             }
         }
     }

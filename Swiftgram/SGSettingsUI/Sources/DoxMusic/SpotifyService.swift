@@ -427,6 +427,7 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
                 let playerItem = AVPlayerItem(url: url)
                 let player = AVPlayer(playerItem: playerItem)
                 self?.avPlayer = player
+                player.seek(to: .zero)
                 player.play()
                 completion(true)
             }

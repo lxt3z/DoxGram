@@ -209,19 +209,11 @@ public final class SGDoxFloatingPlayerWidget: UIView {
             self.titleLabel.text = track.title
             self.artistLabel.text = track.artist
             
-            if let artworkUrl = track.artworkUrl {
-                if let cached = SGDoxImageLoader.shared.cachedImage(for: artworkUrl) {
-                    self.artworkImageView.image = cached
-                } else {
-                    self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
-                    SGDoxImageLoader.shared.loadImage(urlString: artworkUrl, targetSize: CGSize(width: 80, height: 80)) { [weak self] image in
-                        if self?.currentTrackId == track.id, let image = image {
-                            self?.artworkImageView.image = image
-                        }
-                    }
+            self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
+            SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 80, height: 80)) { [weak self] image in
+                if self?.currentTrackId == track.id, let image = image {
+                    self?.artworkImageView.image = image
                 }
-            } else {
-                self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
             }
         }
         
