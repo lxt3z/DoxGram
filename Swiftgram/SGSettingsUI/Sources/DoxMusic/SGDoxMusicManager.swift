@@ -551,67 +551,98 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         // 1. If it's already a native Telegram Media file
         if let file = track.telegramFile {
-            let _ = context.engine.peers.addSavedMusic(file: file).start(completed: {
+            let _ = (context.engine.peers.addSavedMusic(file: file) |> deliverOnMainQueue).start(completed: {
                 completion(true, nil)
+            }, error: { _ in
+                completion(false, "Не удалось закрепить трек в профиле")
             })
             return
         }
         
-        // 2. Search Telegram audio library for matching track (Artist - Title)
-        let searchQuery = "\(track.artist) \(track.title)"
-        let searchLocation = SearchMessagesLocation.general(
-            scope: .everywhere,
-            groupId: nil,
-            tags: .music,
-            minDate: nil,
-            maxDate: nil,
-            folderId: nil,
-            communityId: nil
-        )
-        let searchSignal = context.engine.messages.searchMessages(
-            location: searchLocation,
-            query: searchQuery,
-            state: nil,
-            limit: 10
-        )
-        
-        let _ = (searchSignal |> deliverOnMainQueue).start(next: { (result: (SearchMessagesResult, SearchMessagesState)) in
-            for message in result.0.messages {
+        // 2. Scan user's Saved Messages (Избранное) locally
+        let _ = (context.account.postbox.transaction { transaction -> (FileMediaReference?, FileMediaReference?) in
+            var matchedRef: FileMediaReference?
+            var latestAudioRef: FileMediaReference?
+            var count = 0
+            
+            let trackTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let trackArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            
+            transaction.withAllMessages(peerId: context.account.peerId, namespace: nil, reversed: true) { message in
+                count += 1
                 for media in message.media {
-                    if let file = media as? TelegramMediaFile, file.isMusic {
-                        let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
-                        let _ = context.engine.peers.addSavedMusic(file: fileRef).start(completed: {
-                            completion(true, nil)
-                        })
-                        return
+                    if let file = media as? TelegramMediaFile {
+                        let isAudio = file.isMusic || file.mimeType.hasPrefix("audio/") || (file.fileName?.lowercased().hasSuffix(".mp3") == true) || (file.fileName?.lowercased().hasSuffix(".m4a") == true) || (file.fileName?.lowercased().hasSuffix(".flac") == true)
+                        if isAudio {
+                            let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
+                            if latestAudioRef == nil {
+                                latestAudioRef = fileRef
+                            }
+                            
+                            var songTitle: String?
+                            var songPerformer: String?
+                            for attr in file.attributes {
+                                if case let .Audio(_, _, title, performer, _) = attr {
+                                    songTitle = title
+                                    songPerformer = performer
+                                    break
+                                }
+                            }
+                            
+                            let candTitle = (songTitle ?? file.fileName ?? "").lowercased()
+                            let candPerformer = (songPerformer ?? "").lowercased()
+                            let msgText = message.text.lowercased()
+                            
+                            let titleMatch = !trackTitle.isEmpty && (candTitle.contains(trackTitle) || trackTitle.contains(candTitle) || msgText.contains(trackTitle))
+                            let artistMatch = !trackArtist.isEmpty && (candPerformer.contains(trackArtist) || trackArtist.contains(candPerformer) || msgText.contains(trackArtist))
+                            
+                            if titleMatch || (titleMatch && artistMatch) {
+                                matchedRef = fileRef
+                                return false
+                            }
+                        }
                     }
                 }
+                return count < 150
+            }
+            return (matchedRef, latestAudioRef)
+        } |> deliverOnMainQueue).start(next: { (matchedRef, latestAudioRef) in
+            if let targetRef = matchedRef ?? latestAudioRef {
+                let _ = (context.engine.peers.addSavedMusic(file: targetRef) |> deliverOnMainQueue).start(completed: {
+                    completion(true, nil)
+                }, error: { _ in
+                    completion(false, "Не удалось закрепить трек в профиле")
+                })
+                return
             }
             
-            // If not found in global search, search in user's Saved Messages
-            let savedSearchLocation = SearchMessagesLocation.peer(
-                peerId: context.account.peerId,
-                fromId: nil,
-                tags: .music,
-                reactions: nil,
-                threadId: nil,
+            // 3. If not found in Saved Messages, search Telegram global messages
+            let searchQuery = "\(track.artist) \(track.title)"
+            let searchLocation = SearchMessagesLocation.general(
+                scope: .everywhere,
+                groupId: nil,
+                tags: nil,
                 minDate: nil,
-                maxDate: nil
+                maxDate: nil,
+                folderId: nil,
+                communityId: nil
             )
-            let savedSearchSignal = context.engine.messages.searchMessages(
-                location: savedSearchLocation,
-                query: track.title,
+            let searchSignal = context.engine.messages.searchMessages(
+                location: searchLocation,
+                query: searchQuery,
                 state: nil,
-                limit: 10
+                limit: 15
             )
             
-            let _ = (savedSearchSignal |> deliverOnMainQueue).start(next: { (savedResult: (SearchMessagesResult, SearchMessagesState)) in
-                for message in savedResult.0.messages {
+            let _ = (searchSignal |> deliverOnMainQueue).start(next: { (result: (SearchMessagesResult, SearchMessagesState)) in
+                for message in result.0.messages {
                     for media in message.media {
                         if let file = media as? TelegramMediaFile, file.isMusic {
                             let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
-                            let _ = context.engine.peers.addSavedMusic(file: fileRef).start(completed: {
+                            let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(completed: {
                                 completion(true, nil)
+                            }, error: { _ in
+                                completion(false, "Не удалось закрепить трек в профиле")
                             })
                             return
                         }

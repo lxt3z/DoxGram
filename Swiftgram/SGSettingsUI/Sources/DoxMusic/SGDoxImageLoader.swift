@@ -38,6 +38,27 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         }
     }
     
+    private var diskCacheDirectory: URL? {
+        let urls = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
+        guard let base = urls.first else { return nil }
+        let dir = base.appendingPathComponent("DoxMusicArtwork", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        return dir
+    }
+    
+    public func saveImageToDisk(_ image: UIImage, name: String) -> URL? {
+        guard let dir = self.diskCacheDirectory, let data = image.jpegData(compressionQuality: 0.85) else { return nil }
+        let fileUrl = dir.appendingPathComponent(name)
+        do {
+            try data.write(to: fileUrl, options: .atomic)
+            return fileUrl
+        } catch {
+            return nil
+        }
+    }
+    
     public func storeImage(_ image: UIImage, for key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -63,17 +84,45 @@ public final class SGDoxImageLoader: @unchecked Sendable {
             return
         }
         
+        // Handle local file URLs
+        if trimmed.hasPrefix("file://") {
+            if let url = URL(string: trimmed) {
+                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                    guard let self = self else { return }
+                    if let img = UIImage(contentsOfFile: url.path) {
+                        self.memoryCache.setObject(img, forKey: cacheKey)
+                        self.dispatchMain(image: img, completion: completion)
+                    } else {
+                        self.dispatchMain(image: nil, completion: completion)
+                    }
+                }
+                return
+            }
+        }
+        
         // Handle local Apple Music library persistent IDs
         if trimmed.hasPrefix("am_local_") {
             let pidStr = trimmed.replacingOccurrences(of: "am_local_", with: "")
             if let pid = UInt64(pidStr) {
                 DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                     guard let self = self else { return }
+                    
+                    // Check disk cache first
+                    if let dir = self.diskCacheDirectory {
+                        let diskPath = dir.appendingPathComponent("am_art_\(pid).jpg").path
+                        if let img = UIImage(contentsOfFile: diskPath) {
+                            self.memoryCache.setObject(img, forKey: cacheKey)
+                            self.dispatchMain(image: img, completion: completion)
+                            return
+                        }
+                    }
+                    
                     let query = MPMediaQuery.songs()
-                    query.addFilterPredicate(MPMediaPropertyPredicate(value: pid, forProperty: MPMediaItemPropertyPersistentID))
+                    query.addFilterPredicate(MPMediaPropertyPredicate(value: NSNumber(value: pid), forProperty: MPMediaItemPropertyPersistentID))
                     var loadedImg: UIImage?
                     if let item = query.items?.first, let art = item.artwork?.image(at: targetSize ?? CGSize(width: 300, height: 300)) {
                         self.memoryCache.setObject(art, forKey: cacheKey)
+                        let _ = self.saveImageToDisk(art, name: "am_art_\(pid).jpg")
                         loadedImg = art
                     }
                     self.dispatchMain(image: loadedImg, completion: completion)

@@ -474,21 +474,27 @@ public final class AppleMusicService: @unchecked Sendable {
                 let id = "\(item.persistentID)"
                 let localKey = "am_local_\(id)"
                 
+                var artUrlString = localKey
                 if let art = item.artwork?.image(at: CGSize(width: 300, height: 300)) {
-                    SGDoxImageLoader.shared.storeImage(art, for: localKey)
+                    if let diskUrl = SGDoxImageLoader.shared.saveImageToDisk(art, name: "am_art_\(id).jpg") {
+                        artUrlString = diskUrl.absoluteString
+                    } else {
+                        SGDoxImageLoader.shared.storeImage(art, for: localKey)
+                    }
                 }
                 
                 let storeId = item.playbackStoreID
                 let effectiveId = (!storeId.isEmpty && storeId != "0") ? storeId : "local_\(id)"
+                let assetUrl = item.value(forProperty: MPMediaItemPropertyAssetURL) as? URL
                 
                 return SGDoxMusicTrack(
                     id: localKey,
                     title: title,
                     artist: artist,
                     album: album,
-                    artworkUrl: localKey,
+                    artworkUrl: artUrlString,
                     duration: duration,
-                    previewUrl: nil,
+                    previewUrl: assetUrl?.absoluteString,
                     source: .appleMusic,
                     appleMusicId: effectiveId
                 )
@@ -518,12 +524,7 @@ public final class AppleMusicService: @unchecked Sendable {
                     }
                 } catch {
                 }
-                
-                MPMediaLibrary.default().addItem(withProductID: appleId) { _, error in
-                    DispatchQueue.main.async { completion(error == nil) }
-                }
             }
-            return
         }
         #endif
         
@@ -535,8 +536,29 @@ public final class AppleMusicService: @unchecked Sendable {
     // MARK: - Playback (Full Songs via MPMusicPlayerController or Preview)
     
     public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
-        // Attempt full playback via official Apple Music player first
-        if let appleMusicId = track.appleMusicId, !appleMusicId.isEmpty {
+        // 1. If it has a local asset URL (ipod-library://)
+        if let preview = track.previewUrl, let url = URL(string: preview), url.scheme == "ipod-library" {
+            self.isUsingSystemPlayer = false
+            self.playPreview(url: url, completion: completion)
+            return
+        }
+        
+        // 2. If it's a local track by persistent ID
+        if let appleMusicId = track.appleMusicId, appleMusicId.hasPrefix("local_") {
+            let pidStr = appleMusicId.replacingOccurrences(of: "local_", with: "")
+            if let pid = UInt64(pidStr) {
+                let query = MPMediaQuery.songs()
+                query.addFilterPredicate(MPMediaPropertyPredicate(value: NSNumber(value: pid), forProperty: MPMediaItemPropertyPersistentID))
+                if let item = query.items?.first, let assetUrl = item.value(forProperty: MPMediaItemPropertyAssetURL) as? URL {
+                    self.isUsingSystemPlayer = false
+                    self.playPreview(url: assetUrl, completion: completion)
+                    return
+                }
+            }
+        }
+        
+        // 3. Attempt system player if valid store ID
+        if let appleMusicId = track.appleMusicId, !appleMusicId.isEmpty && !appleMusicId.hasPrefix("local_") {
             DispatchQueue.main.async { [weak self] in
                 self?.avPlayer?.pause()
                 self?.avPlayer = nil
@@ -546,14 +568,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 guard let self = self else { return }
                 
                 let player = self.player
-                if appleMusicId.hasPrefix("local_"), let pid = UInt64(appleMusicId.replacingOccurrences(of: "local_", with: "")) {
-                    let query = MPMediaQuery.songs()
-                    query.addFilterPredicate(MPMediaPropertyPredicate(value: pid, forProperty: MPMediaItemPropertyPersistentID))
-                    player.setQueue(with: query)
-                } else {
-                    player.setQueue(with: [appleMusicId])
-                }
-                
+                player.setQueue(with: [appleMusicId])
                 player.prepareToPlay { [weak self] error in
                     DispatchQueue.main.async {
                         if error == nil {
@@ -561,13 +576,8 @@ public final class AppleMusicService: @unchecked Sendable {
                             self?.isUsingSystemPlayer = true
                             completion(true)
                         } else {
-                            // Fallback to preview stream
-                            self?.isUsingSystemPlayer = false
-                            if let preview = track.previewUrl, let url = URL(string: preview) {
-                                self?.playPreview(url: url, completion: completion)
-                            } else {
-                                completion(false)
-                            }
+                            // Fallback to preview stream or search
+                            self?.fallbackPlayPreviewOrSearch(track: track, completion: completion)
                         }
                     }
                 }
@@ -575,11 +585,37 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
+        // 4. Fallback to preview or online search
+        self.fallbackPlayPreviewOrSearch(track: track, completion: completion)
+    }
+    
+    private func fallbackPlayPreviewOrSearch(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
         if let preview = track.previewUrl, let url = URL(string: preview) {
             self.isUsingSystemPlayer = false
             self.playPreview(url: url, completion: completion)
-        } else {
-            completion(false)
+            return
+        }
+        
+        // Search iTunes public API by track title & artist
+        let query = "\(track.artist) \(track.title)"
+        self.searchITunesPublic(query: query) { [weak self] results, _ in
+            guard let self = self, let first = results.first(where: { $0.previewUrl != nil }) ?? results.first, let preview = first.previewUrl, let url = URL(string: preview) else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            
+            if let art = first.artworkUrl, !art.isEmpty {
+                if let currentArt = track.artworkUrl, currentArt.hasPrefix("am_local_") {
+                    SGDoxImageLoader.shared.loadImage(urlString: art) { img in
+                        if let img = img {
+                            SGDoxImageLoader.shared.storeImage(img, for: currentArt)
+                        }
+                    }
+                }
+            }
+            
+            self.isUsingSystemPlayer = false
+            self.playPreview(url: url, completion: completion)
         }
     }
     

@@ -33,15 +33,15 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
     
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = .clear
+        self.view.backgroundColor = UIColor(red: 0.09, green: 0.09, blue: 0.12, alpha: 1.0)
         
         self.blurView.frame = self.view.bounds
         self.blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         self.view.addSubview(self.blurView)
         
         // Grabber
-        let grabber = UIView(frame: CGRect(x: (self.view.bounds.width - 36) * 0.5, y: 8, width: 36, height: 5))
-        grabber.backgroundColor = UIColor(white: 1.0, alpha: 0.3)
+        let grabber = UIView(frame: CGRect(x: (self.view.bounds.width - 36) * 0.5, y: 10, width: 36, height: 5))
+        grabber.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
         grabber.layer.cornerRadius = 2.5
         grabber.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin]
         self.view.addSubview(grabber)
@@ -100,14 +100,17 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
     public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         let bounds = self.view.bounds
+        let topInset = max(self.view.safeAreaInsets.top, 16.0)
         
-        self.headerLabel.frame = CGRect(x: 20, y: 24, width: bounds.width - 120, height: 26)
-        self.subtitleLabel.frame = CGRect(x: 20, y: 50, width: bounds.width - 120, height: 18)
+        self.headerLabel.frame = CGRect(x: 20, y: topInset + 14, width: bounds.width - 130, height: 26)
+        self.subtitleLabel.frame = CGRect(x: 20, y: topInset + 40, width: bounds.width - 130, height: 18)
         
-        self.clearButton.frame = CGRect(x: bounds.width - 130, y: 24, width: 70, height: 30)
-        self.closeButton.frame = CGRect(x: bounds.width - 50, y: 22, width: 34, height: 34)
+        self.clearButton.frame = CGRect(x: bounds.width - 125, y: topInset + 14, width: 70, height: 30)
+        self.closeButton.frame = CGRect(x: bounds.width - 48, y: topInset + 12, width: 34, height: 34)
         
-        self.tableView.frame = CGRect(x: 0, y: 76, width: bounds.width, height: bounds.height - 76)
+        let tableTop = topInset + 68
+        self.tableView.frame = CGRect(x: 0, y: tableTop, width: bounds.width, height: bounds.height - tableTop)
+        self.tableView.contentInset = UIEdgeInsets(top: 4, left: 0, bottom: max(self.view.safeAreaInsets.bottom, 20.0), right: 0)
     }
     
     @objc private func closePressed() {
