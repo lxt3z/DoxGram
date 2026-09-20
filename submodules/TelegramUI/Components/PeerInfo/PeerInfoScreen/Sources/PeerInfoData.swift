@@ -933,7 +933,10 @@ func peerInfoScreenSettingsData(context: AccountContext, peerId: EnginePeer.Id, 
             for bot in bots {
                 if let maybePeer = peersMap[bot.peerId], let peer = maybePeer {
                     let resultBot = AttachMenuBot(peer: peer, shortName: bot.name, icons: bot.icons, peerTypes: bot.peerTypes, flags: bot.flags)
-                    if bot.flags.contains(.showInSettings) {
+                    let lowerName = bot.name.lowercased()
+                    let lowerUsername = (peer.addressName ?? "").lowercased()
+                    let isWallet = lowerUsername == "wallet" || lowerName == "wallet" || lowerName.contains("wallet") || lowerName.contains("кошелек") || lowerName.contains("кошелёк")
+                    if bot.flags.contains(.showInSettings) && !isWallet {
                         result.append(.single(resultBot))
                     }
                 }

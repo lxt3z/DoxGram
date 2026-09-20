@@ -630,12 +630,9 @@ final class AuthorizedApplicationContext {
                 }
                 
                 let config = splitTest.configuration
-                var order = config.order
+                var order = config.order.filter { $0 != .siri }
                 if !order.contains(.cellularData) {
                     order.append(.cellularData)
-                }
-                if !order.contains(.siri) {
-                    order.append(.siri)
                 }
                 var requestedPermissions: [(PermissionState, Bool)] = []
                 var i: Int = 0

@@ -633,9 +633,6 @@ private func dataAndStorageControllerEntries(context: AccountContext, state: Dat
     entries.append(.useLessVoiceDataInfo(presentationData.theme, presentationData.strings.CallSettings_UseLessDataLongDescription))
     
     entries.append(.otherHeader(presentationData.theme, presentationData.strings.ChatSettings_Other))
-    if #available(iOSApplicationExtension 13.2, iOS 13.2, *) {
-        entries.append(.shareSheet(presentationData.theme, presentationData.strings.ChatSettings_IntentsSettings))
-    }
     entries.append(.saveEditedPhotos(presentationData.theme, presentationData.strings.Settings_SaveEditedPhotos, data.generatedMediaStoreSettings.storeEditedPhotos))
     entries.append(.pauseMusicOnRecording(presentationData.theme, presentationData.strings.Settings_PauseMusicOnRecording, data.mediaInputSettings.pauseMusicOnRecording))
     entries.append(.raiseToListen(presentationData.theme, presentationData.strings.Settings_RaiseToListen, data.mediaInputSettings.enableRaiseToSpeak))

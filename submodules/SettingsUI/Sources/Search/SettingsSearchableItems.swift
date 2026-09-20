@@ -908,23 +908,7 @@ private func premiumSearchableItems(context: AccountContext) -> [SettingsSearcha
         )
     }
     
-    items.append(
-        SettingsSearchableItem(
-            id: "ton",
-            title: strings.Settings_MyTon,
-            alternate: [],
-            icon: .ton,
-            breadcrumbs: [],
-            present: { context, _, present in
-                guard let tonContext = context.tonContext else {
-                    return
-                }
-                let controller = context.sharedContext.makeStarsTransactionsScreen(context: context, starsContext: tonContext)
-                present(.push, controller)
-            }
-        )
-    )
-    
+
     items.append(
         SettingsSearchableItem(
             id: "send-gift",
@@ -3680,43 +3664,6 @@ private func dataSearchableItems(context: AccountContext) -> [SettingsSearchable
             isVisible: false,
             present: { context, _, present in
                 presentDataSettings(context, present, .sensitiveContent)
-            }
-        ),
-        SettingsSearchableItem(
-            id: "data/share-sheet",
-            title: strings.ChatSettings_IntentsSettings,
-            alternate: synonyms(strings.SettingsSearch_Synonyms_ChatSettings_IntentsSettings),
-            icon: icon,
-            breadcrumbs: [strings.Settings_ChatSettings],
-            present: { context, _, present in
-                present(.push, intentsSettingsController(context: context))
-            }
-        ),
-        SettingsSearchableItem(
-            id: "data/share-sheet/suggested-chats",
-            icon: icon,
-            breadcrumbs: [strings.Settings_ChatSettings, strings.ChatSettings_IntentsSettings],
-            isVisible: false,
-            present: { context, _, present in
-                present(.push, intentsSettingsController(context: context, focusOnItemTag: .suggested))
-            }
-        ),
-        SettingsSearchableItem(
-            id: "data/share-sheet/suggest-by",
-            icon: icon,
-            breadcrumbs: [strings.Settings_ChatSettings, strings.ChatSettings_IntentsSettings],
-            isVisible: false,
-            present: { context, _, present in
-                present(.push, intentsSettingsController(context: context, focusOnItemTag: .suggestBy))
-            }
-        ),
-        SettingsSearchableItem(
-            id: "data/share-sheet/reset",
-            icon: icon,
-            breadcrumbs: [strings.Settings_ChatSettings, strings.ChatSettings_IntentsSettings],
-            isVisible: false,
-            present: { context, _, present in
-                present(.push, intentsSettingsController(context: context, focusOnItemTag: .reset))
             }
         )
     ]

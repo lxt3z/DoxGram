@@ -301,6 +301,11 @@ extension ChatControllerImpl {
                     }
                     
                     for bot in attachMenuBots.reversed() {
+                        let lowerName = bot.shortName.lowercased()
+                        let lowerUsername = (bot.peer.addressName ?? "").lowercased()
+                        if lowerUsername == "wallet" || lowerName == "wallet" || lowerName.contains("wallet") || lowerName.contains("кошелек") || lowerName.contains("кошелёк") {
+                            continue
+                        }
                         var peerType = peerType
                         if bot.peer.id == peer.id {
                             peerType.insert(.sameBot)
