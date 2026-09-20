@@ -82,6 +82,8 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     public var chatListController: ChatListController?
     public var accountSettingsController: PeerInfoScreen?
     private var floatingMusicWidget: SGDoxFloatingPlayerWidget?
+    private var validLayout: ContainerViewLayout?
+    private var viewControllersDisposable: Disposable?
     
     private var permissionsDisposable: Disposable?
     private var presentationDataDisposable: Disposable?
@@ -107,6 +109,21 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         
         super.init(mode: .automaticMasterDetail, theme: NavigationControllerTheme(presentationTheme: self.presentationData.theme))
+        
+        self.viewControllersDisposable = (self.viewControllersSignal
+        |> deliverOnMainQueue).startStrict(next: { [weak self] vcs in
+            guard let self = self else { return }
+            let isSubscreen = vcs.count > 1
+            if let floatingWidget = self.floatingMusicWidget {
+                if let layout = self.validLayout {
+                    floatingWidget.updateLayout(size: layout.size, insets: layout.intrinsicInsets, transition: .immediate)
+                }
+                floatingWidget.setHiddenForSubscreens(isSubscreen)
+                if !isSubscreen {
+                    floatingWidget.superview?.bringSubviewToFront(floatingWidget)
+                }
+            }
+        })
         
         self.presentationDataDisposable = (context.sharedContext.presentationData
         |> deliverOnMainQueue).startStrict(next: { [weak self] presentationData in
@@ -150,6 +167,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.presentationDataDisposable?.dispose()
         self.applicationInFocusDisposable?.dispose()
         self.storyUploadEventsDisposable?.dispose()
+        self.viewControllersDisposable?.dispose()
     }
     
     public func getContactsController() -> ViewController? {
@@ -177,6 +195,8 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     }
     
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        self.validLayout = layout
+        
         let needsRootWallpaperBackgroundNode: Bool
         if case .regular = layout.metrics.widthClass {
             needsRootWallpaperBackgroundNode = true
@@ -273,6 +293,10 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         }
         self.floatingMusicWidget = floatingWidget
         tabBarController.view.addSubview(floatingWidget)
+        if let layout = self.validLayout {
+            floatingWidget.updateLayout(size: layout.size, insets: layout.intrinsicInsets, transition: .immediate)
+        }
+        floatingWidget.setHiddenForSubscreens(self.viewControllers.count > 1)
         
         self.pushViewController(tabBarController, animated: false)
     }

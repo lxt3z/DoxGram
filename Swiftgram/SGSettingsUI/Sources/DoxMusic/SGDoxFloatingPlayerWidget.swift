@@ -62,7 +62,8 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.layer.zPosition = 1000.0
         
         self.containerView.clipsToBounds = true
-        self.containerView.layer.cornerRadius = 26
+        self.containerView.layer.cornerRadius = 18
+        self.containerView.layer.cornerCurve = .continuous
         self.containerView.layer.borderWidth = 0.5
         self.addSubview(self.containerView)
         
@@ -93,6 +94,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.artworkImageView.contentMode = .scaleAspectFill
         self.artworkImageView.clipsToBounds = true
         self.artworkImageView.layer.cornerRadius = 10
+        self.artworkImageView.layer.cornerCurve = .continuous
         self.artworkImageView.layer.borderWidth = 0.5
         self.containerView.addSubview(self.artworkImageView)
         
@@ -109,7 +111,8 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.containerView.addSubview(self.textContainerView)
         
         // Play / Pause Button with circular background
-        self.playPauseContainer.layer.cornerRadius = 17
+        self.playPauseContainer.layer.cornerRadius = 18
+        self.playPauseContainer.layer.cornerCurve = .continuous
         self.playPauseContainer.clipsToBounds = true
         self.containerView.addSubview(self.playPauseContainer)
         
@@ -125,6 +128,8 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.containerView.addSubview(self.nextButton)
         
         // Progress View
+        self.progressView.layer.cornerRadius = 1.25
+        self.progressView.clipsToBounds = true
         self.containerView.addSubview(self.progressView)
     }
     
@@ -205,14 +210,16 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     }
     
     public func updateLayout(size: CGSize, insets: UIEdgeInsets, transition: ContainedViewLayoutTransition) {
-        let widgetHeight: CGFloat = 52.0
+        let widgetHeight: CGFloat = 54.0
         let horizontalMargin: CGFloat = 16.0
         let widgetWidth = min(size.width - horizontalMargin * 2.0, 420.0)
         let x = floor((size.width - widgetWidth) * 0.5)
         
         // Floating tab bar clearance:
-        // Tab bar height (~56pt) + bottom inset + 12pt gap
-        let bottomOffset = max(insets.bottom, 16.0) + 72.0 + 12.0
+        // Tab bar height is ~56pt, bottom safe area inset is max(insets.bottom, 8.0).
+        // The tab bar top is at size.height - (56.0 + max(insets.bottom, 8.0)).
+        // We float with an elegant 8pt gap above the tab bar.
+        let bottomOffset = max(insets.bottom, 8.0) + 56.0 + 8.0
         let y = size.height - bottomOffset - widgetHeight
         
         let targetFrame = CGRect(x: x, y: y, width: widgetWidth, height: widgetHeight)
@@ -228,13 +235,13 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.tintOverlayView.frame = self.bounds
         self.glossLayer.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: 24)
         
-        let artSide: CGFloat = 38.0
-        self.artworkImageView.frame = CGRect(x: 7, y: (widgetHeight - artSide) * 0.5, width: artSide, height: artSide)
+        let artSide: CGFloat = 40.0
+        self.artworkImageView.frame = CGRect(x: 8, y: (widgetHeight - artSide) * 0.5, width: artSide, height: artSide)
         
         let nextWidth: CGFloat = 34.0
-        let playWidth: CGFloat = 34.0
-        let nextX = widgetWidth - nextWidth - 8.0
-        let playX = nextX - playWidth - 6.0
+        let playWidth: CGFloat = 36.0
+        let nextX = widgetWidth - nextWidth - 10.0
+        let playX = nextX - playWidth - 8.0
         
         self.nextButton.frame = CGRect(x: nextX, y: (widgetHeight - nextWidth) * 0.5, width: nextWidth, height: nextWidth)
         self.playPauseContainer.frame = CGRect(x: playX, y: (widgetHeight - playWidth) * 0.5, width: playWidth, height: playWidth)
@@ -247,7 +254,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.titleLabel.frame = CGRect(x: 0, y: 0, width: textWidth, height: 18)
         self.artistLabel.frame = CGRect(x: 0, y: 17, width: textWidth, height: 16)
         
-        self.progressView.frame = CGRect(x: 18.0, y: widgetHeight - 2.0, width: widgetWidth - 36.0, height: 2.0)
+        self.progressView.frame = CGRect(x: 16.0, y: widgetHeight - 2.5, width: widgetWidth - 32.0, height: 2.5)
     }
     
     private func updateContent(animated: Bool) {

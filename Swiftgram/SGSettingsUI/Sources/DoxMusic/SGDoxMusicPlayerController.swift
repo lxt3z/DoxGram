@@ -46,7 +46,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let currentTimeLabel = UILabel()
     private let remainingTimeLabel = UILabel()
     
-    private let controlsStackView = UIStackView()
+    private let controlsContainerView = UIView()
     private let shuffleButton = UIButton(type: .system)
     private let previousButton = UIButton(type: .system)
     private let playPauseContainer = UIView()
@@ -69,6 +69,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let queueTableView = UITableView(frame: .zero, style: .plain)
     
     private let queueMiniBar = UIView()
+    private let queueMiniBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let queueMiniArtwork = UIImageView()
     private let queueMiniTitle = UILabel()
     private let queueMiniArtist = UILabel()
@@ -313,24 +314,21 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.nowPlayingContainerView.addSubview(self.remainingTimeLabel)
         
         // Controls Row: Shuffle | Prev | Play/Pause | Next | Repeat
-        self.controlsStackView.axis = .horizontal
-        self.controlsStackView.distribution = .equalSpacing
-        self.controlsStackView.alignment = .center
-        
         let subConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
         self.shuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: subConfig), for: .normal)
         self.shuffleButton.tintColor = UIColor.white.withAlphaComponent(0.6)
         self.shuffleButton.addTarget(self, action: #selector(self.shufflePressed), for: .touchUpInside)
-        self.controlsStackView.addArrangedSubview(self.shuffleButton)
+        self.controlsContainerView.addSubview(self.shuffleButton)
         
         let skipConfig = UIImage.SymbolConfiguration(pointSize: 26, weight: .bold)
         self.previousButton.setImage(UIImage(systemName: "backward.fill", withConfiguration: skipConfig), for: .normal)
         self.previousButton.tintColor = .white
         self.previousButton.addTarget(self, action: #selector(self.previousPressed), for: .touchUpInside)
-        self.controlsStackView.addArrangedSubview(self.previousButton)
+        self.controlsContainerView.addSubview(self.previousButton)
         
         // Play/Pause Big Glass Circle
         self.playPauseContainer.layer.cornerRadius = 34
+        self.playPauseContainer.layer.cornerCurve = .continuous
         self.playPauseContainer.clipsToBounds = true
         self.playPauseContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.22)
         self.playPauseContainer.layer.borderWidth = 0.5
@@ -341,31 +339,31 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.playPauseButton.tintColor = .white
         self.playPauseButton.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
         self.playPauseContainer.addSubview(self.playPauseButton)
-        self.controlsStackView.addArrangedSubview(self.playPauseContainer)
+        self.controlsContainerView.addSubview(self.playPauseContainer)
         
         self.nextButton.setImage(UIImage(systemName: "forward.fill", withConfiguration: skipConfig), for: .normal)
         self.nextButton.tintColor = .white
         self.nextButton.addTarget(self, action: #selector(self.nextPressed), for: .touchUpInside)
-        self.controlsStackView.addArrangedSubview(self.nextButton)
+        self.controlsContainerView.addSubview(self.nextButton)
         
         self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: subConfig), for: .normal)
         self.repeatButton.tintColor = UIColor.white.withAlphaComponent(0.6)
         self.repeatButton.addTarget(self, action: #selector(self.repeatPressed), for: .touchUpInside)
-        self.controlsStackView.addArrangedSubview(self.repeatButton)
+        self.controlsContainerView.addSubview(self.repeatButton)
         
-        self.nowPlayingContainerView.addSubview(self.controlsStackView)
+        self.nowPlayingContainerView.addSubview(self.controlsContainerView)
         
-        // Bottom Action Buttons: Pin to Profile | Wave | Autoplay | Queue Toggle
+        // Bottom Action Buttons: Profile | Wave | Autoplay | Queue Toggle
         self.actionsStackView.axis = .horizontal
-        self.actionsStackView.distribution = .equalSpacing
-        self.actionsStackView.alignment = .center
+        self.actionsStackView.distribution = .fillEqually
+        self.actionsStackView.alignment = .fill
         self.actionsStackView.spacing = 8
         
-        self.styleCapsuleButton(self.pinToProfileButton, title: "В профиль", icon: "person.crop.circle.badge.plus")
+        self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.crop.circle.badge.plus")
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
         self.actionsStackView.addArrangedSubview(self.pinToProfileButton)
         
-        self.styleCapsuleButton(self.waveButton, title: "Моя волна", icon: "waveform")
+        self.styleCapsuleButton(self.waveButton, title: "Волна", icon: "waveform")
         self.waveButton.addTarget(self, action: #selector(self.wavePressed), for: .touchUpInside)
         self.actionsStackView.addArrangedSubview(self.waveButton)
         
@@ -387,24 +385,41 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.queueTitleLabel.font = UIFont.systemFont(ofSize: 20, weight: .bold)
         self.queueHeaderView.addSubview(self.queueTitleLabel)
         
-        self.queueCountLabel.textColor = UIColor(white: 1.0, alpha: 0.6)
-        self.queueCountLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+        self.queueCountLabel.textColor = UIColor.white.withAlphaComponent(0.85)
+        self.queueCountLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .semibold)
+        self.queueCountLabel.textAlignment = .center
+        self.queueCountLabel.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.queueCountLabel.layer.cornerRadius = 11
+        self.queueCountLabel.layer.cornerCurve = .continuous
+        self.queueCountLabel.clipsToBounds = true
         self.queueHeaderView.addSubview(self.queueCountLabel)
         
-        self.queueShuffleButton.setTitle("Перемешать", for: .normal)
+        let shuffleConfig = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        self.queueShuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: shuffleConfig), for: .normal)
+        self.queueShuffleButton.setTitle(" Перемешать", for: .normal)
         self.queueShuffleButton.setTitleColor(.white, for: .normal)
-        self.queueShuffleButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-        self.queueShuffleButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
-        self.queueShuffleButton.layer.cornerRadius = 14
+        self.queueShuffleButton.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        self.queueShuffleButton.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.queueShuffleButton.layer.cornerRadius = 15
+        self.queueShuffleButton.layer.cornerCurve = .continuous
+        self.queueShuffleButton.layer.borderWidth = 0.5
+        self.queueShuffleButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
+        self.queueShuffleButton.tintColor = .white
         self.queueShuffleButton.clipsToBounds = true
         self.queueShuffleButton.addTarget(self, action: #selector(self.queueShufflePressed), for: .touchUpInside)
         self.queueHeaderView.addSubview(self.queueShuffleButton)
         
-        self.queueClearButton.setTitle("Очистить", for: .normal)
+        let clearConfig = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        self.queueClearButton.setImage(UIImage(systemName: "trash", withConfiguration: clearConfig), for: .normal)
+        self.queueClearButton.setTitle(" Очистить", for: .normal)
         self.queueClearButton.setTitleColor(UIColor(red: 1.0, green: 0.35, blue: 0.40, alpha: 1.0), for: .normal)
-        self.queueClearButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.queueClearButton.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
         self.queueClearButton.backgroundColor = UIColor(red: 1.0, green: 0.35, blue: 0.40, alpha: 0.12)
-        self.queueClearButton.layer.cornerRadius = 14
+        self.queueClearButton.layer.cornerRadius = 15
+        self.queueClearButton.layer.cornerCurve = .continuous
+        self.queueClearButton.layer.borderWidth = 0.5
+        self.queueClearButton.layer.borderColor = UIColor(red: 1.0, green: 0.35, blue: 0.40, alpha: 0.25).cgColor
+        self.queueClearButton.tintColor = UIColor(red: 1.0, green: 0.35, blue: 0.40, alpha: 1.0)
         self.queueClearButton.clipsToBounds = true
         self.queueClearButton.addTarget(self, action: #selector(self.queueClearPressed), for: .touchUpInside)
         self.queueHeaderView.addSubview(self.queueClearButton)
@@ -420,24 +435,34 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.queueContainerView.addSubview(self.queueTableView)
         
         // Mini Bar at bottom of Queue
-        self.queueMiniBar.backgroundColor = UIColor(white: 0.12, alpha: 0.75)
-        self.queueMiniBar.layer.cornerRadius = 24
+        self.queueMiniBar.layer.cornerRadius = 18
+        self.queueMiniBar.layer.cornerCurve = .continuous
         self.queueMiniBar.layer.borderWidth = 0.5
         self.queueMiniBar.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
         self.queueMiniBar.clipsToBounds = true
         
+        self.queueMiniBlurView.effect = UIBlurEffect(style: .dark)
+        self.queueMiniBlurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        self.queueMiniBar.addSubview(self.queueMiniBlurView)
+        
+        let darkOverlay = UIView()
+        darkOverlay.backgroundColor = UIColor(white: 0.10, alpha: 0.65)
+        darkOverlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        self.queueMiniBar.addSubview(darkOverlay)
+        
         self.queueMiniArtwork.contentMode = .scaleAspectFill
         self.queueMiniArtwork.clipsToBounds = true
-        self.queueMiniArtwork.layer.cornerRadius = 8
+        self.queueMiniArtwork.layer.cornerRadius = 10
+        self.queueMiniArtwork.layer.cornerCurve = .continuous
         self.queueMiniBar.addSubview(self.queueMiniArtwork)
         
         self.queueMiniTitle.textColor = .white
-        self.queueMiniTitle.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.queueMiniTitle.font = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
         self.queueMiniTitle.lineBreakMode = .byTruncatingTail
         self.queueMiniBar.addSubview(self.queueMiniTitle)
         
         self.queueMiniArtist.textColor = UIColor(white: 1.0, alpha: 0.65)
-        self.queueMiniArtist.font = UIFont.systemFont(ofSize: 11, weight: .regular)
+        self.queueMiniArtist.font = UIFont.systemFont(ofSize: 11.5, weight: .regular)
         self.queueMiniArtist.lineBreakMode = .byTruncatingTail
         self.queueMiniBar.addSubview(self.queueMiniArtist)
         
@@ -449,7 +474,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         let miniNextCfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
         self.queueMiniNext.setImage(UIImage(systemName: "forward.fill", withConfiguration: miniNextCfg), for: .normal)
-        self.queueMiniNext.tintColor = UIColor.white.withAlphaComponent(0.8)
+        self.queueMiniNext.tintColor = UIColor.white.withAlphaComponent(0.85)
         self.queueMiniNext.addTarget(self, action: #selector(self.nextPressed), for: .touchUpInside)
         self.queueMiniBar.addSubview(self.queueMiniNext)
         
@@ -460,17 +485,20 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func styleCapsuleButton(_ button: UIButton, title: String, icon: String) {
-        let config = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        let config = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         button.setImage(UIImage(systemName: icon, withConfiguration: config), for: .normal)
-        button.setTitle("  \(title)", for: .normal)
+        button.setTitle(" \(title)", for: .normal)
         button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 11.5, weight: .semibold)
+        button.titleLabel?.adjustsFontSizeToFitWidth = true
+        button.titleLabel?.minimumScaleFactor = 0.8
         button.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
         button.tintColor = .white
-        button.layer.cornerRadius = 18
+        button.layer.cornerRadius = 16
+        button.layer.cornerCurve = .continuous
         button.layer.borderWidth = 0.5
         button.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
-        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
     }
     
     private func generateSliderThumb() -> UIImage {
@@ -503,9 +531,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.dismissButton.frame = CGRect(x: 18, y: headerY, width: 36, height: 36)
         
         // Mode Switcher (Centered)
-        let segW: CGFloat = 190.0
-        let segH: CGFloat = 34.0
-        self.segmentContainerView.frame = CGRect(x: (bounds.width - segW) * 0.5, y: headerY + 1, width: segW, height: segH)
+        let segW: CGFloat = 164.0
+        let segH: CGFloat = 32.0
+        self.segmentContainerView.frame = CGRect(x: (bounds.width - segW) * 0.5, y: headerY + 2, width: segW, height: segH)
         let itemW = segW * 0.5
         self.nowPlayingSegmentButton.frame = CGRect(x: 0, y: 0, width: itemW, height: segH)
         self.queueSegmentButton.frame = CGRect(x: itemW, y: 0, width: itemW, height: segH)
@@ -514,7 +542,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2, width: itemW - 4, height: segH - 4)
         
         // Source Badge (Right)
-        let sourceW: CGFloat = 86.0
+        let sourceW: CGFloat = 78.0
         let sourceH: CGFloat = 28.0
         self.sourceBadgeContainer.frame = CGRect(x: bounds.width - sourceW - 16, y: headerY + 4, width: sourceW, height: sourceH)
         self.sourceIconView.frame = CGRect(x: 8, y: 7, width: 14, height: 14)
@@ -556,49 +584,70 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.currentTimeLabel.frame = CGRect(x: 32, y: sliderY + 22, width: 60, height: 16)
         self.remainingTimeLabel.frame = CGRect(x: bounds.width - 92, y: sliderY + 22, width: 60, height: 16)
         
-        // Controls Row
+        // Controls Row: deterministic frame positioning (never collapses)
         let controlsY = sliderY + 46.0
-        self.controlsStackView.frame = CGRect(x: 32, y: controlsY, width: bounds.width - 64, height: 68)
-        self.playPauseContainer.frame = CGRect(x: 0, y: 0, width: 68, height: 68)
+        let controlsW = bounds.width - 48.0
+        self.controlsContainerView.frame = CGRect(x: 24, y: controlsY, width: controlsW, height: 68)
+        
+        let centerX = controlsW * 0.5
+        self.playPauseContainer.frame = CGRect(x: centerX - 34.0, y: 0, width: 68.0, height: 68.0)
         self.playPauseButton.frame = self.playPauseContainer.bounds
         
+        let skipSize: CGFloat = 44.0
+        self.previousButton.frame = CGRect(x: centerX - 34.0 - 24.0 - skipSize, y: (68.0 - skipSize) * 0.5, width: skipSize, height: skipSize)
+        self.nextButton.frame = CGRect(x: centerX + 34.0 + 24.0, y: (68.0 - skipSize) * 0.5, width: skipSize, height: skipSize)
+        
+        let subSize: CGFloat = 40.0
+        self.shuffleButton.frame = CGRect(x: 8.0, y: (68.0 - subSize) * 0.5, width: subSize, height: subSize)
+        self.repeatButton.frame = CGRect(x: controlsW - 8.0 - subSize, y: (68.0 - subSize) * 0.5, width: subSize, height: subSize)
+        
         // Bottom Action Buttons
-        let actionsY = controlsY + 76.0
-        self.actionsStackView.frame = CGRect(x: 20, y: actionsY, width: bounds.width - 40, height: 38)
+        let actionsY = controlsY + 78.0
+        self.actionsStackView.frame = CGRect(x: 20, y: actionsY, width: bounds.width - 40, height: 36)
     }
     
     private func layoutQueuePane(contentH: CGFloat) {
         let bounds = self.queueContainerView.bounds
         
         // Header
-        self.queueHeaderView.frame = CGRect(x: 20, y: 8, width: bounds.width - 40, height: 48)
-        self.queueTitleLabel.frame = CGRect(x: 0, y: 2, width: 170, height: 24)
-        self.queueCountLabel.frame = CGRect(x: 0, y: 26, width: 170, height: 18)
+        let headerH: CGFloat = 72.0
+        self.queueHeaderView.frame = CGRect(x: 20, y: 4, width: bounds.width - 40, height: headerH)
         
-        let clearW: CGFloat = 80.0
-        let shuffleW: CGFloat = 104.0
-        let btnH: CGFloat = 28.0
-        self.queueClearButton.frame = CGRect(x: bounds.width - 40 - clearW, y: 10, width: clearW, height: btnH)
-        self.queueShuffleButton.frame = CGRect(x: bounds.width - 40 - clearW - 8 - shuffleW, y: 10, width: shuffleW, height: btnH)
+        let countText = self.queueCountLabel.text ?? ""
+        let countFont = UIFont.systemFont(ofSize: 11.5, weight: .semibold)
+        let countSize = (countText as NSString).size(withAttributes: [.font: countFont])
+        let badgeW = max(56.0, countSize.width + 16.0)
+        let badgeH: CGFloat = 22.0
+        
+        self.queueCountLabel.frame = CGRect(x: (bounds.width - 40) - badgeW, y: 4, width: badgeW, height: badgeH)
+        self.queueTitleLabel.frame = CGRect(x: 0, y: 2, width: (bounds.width - 40) - badgeW - 8, height: 26)
+        
+        let row2Y: CGFloat = 36.0
+        let btnH: CGFloat = 30.0
+        let shuffleW: CGFloat = 118.0
+        let clearW: CGFloat = 92.0
+        self.queueShuffleButton.frame = CGRect(x: 0, y: row2Y, width: shuffleW, height: btnH)
+        self.queueClearButton.frame = CGRect(x: shuffleW + 8.0, y: row2Y, width: clearW, height: btnH)
         
         // Mini Bar at bottom
-        let miniH: CGFloat = 50.0
+        let miniH: CGFloat = 54.0
         let miniY = bounds.height - miniH - 10.0
         self.queueMiniBar.frame = CGRect(x: 16, y: miniY, width: bounds.width - 32, height: miniH)
+        self.queueMiniBlurView.frame = self.queueMiniBar.bounds
         
-        self.queueMiniArtwork.frame = CGRect(x: 6, y: 6, width: 38, height: 38)
-        let miniControlsW: CGFloat = 72.0
+        self.queueMiniArtwork.frame = CGRect(x: 7, y: 7, width: 40, height: 40)
+        let miniControlsW: CGFloat = 76.0
         let miniPlayX = self.queueMiniBar.bounds.width - miniControlsW
-        self.queueMiniPlayPause.frame = CGRect(x: miniPlayX, y: 8, width: 34, height: 34)
-        self.queueMiniNext.frame = CGRect(x: miniPlayX + 36, y: 8, width: 32, height: 34)
+        self.queueMiniPlayPause.frame = CGRect(x: miniPlayX, y: 9, width: 36, height: 36)
+        self.queueMiniNext.frame = CGRect(x: miniPlayX + 38, y: 9, width: 34, height: 36)
         
         let miniTextX = self.queueMiniArtwork.frame.maxX + 10
         let miniTextW = max(0, miniPlayX - miniTextX - 6)
-        self.queueMiniTitle.frame = CGRect(x: miniTextX, y: 8, width: miniTextW, height: 18)
-        self.queueMiniArtist.frame = CGRect(x: miniTextX, y: 26, width: miniTextW, height: 16)
+        self.queueMiniTitle.frame = CGRect(x: miniTextX, y: 9, width: miniTextW, height: 18)
+        self.queueMiniArtist.frame = CGRect(x: miniTextX, y: 28, width: miniTextW, height: 16)
         
         // Table View
-        let tableY: CGFloat = 62.0
+        let tableY: CGFloat = 82.0
         self.queueTableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: miniY - tableY - 6)
         self.queueTableView.contentInset = UIEdgeInsets(top: 4, left: 0, bottom: 8, right: 0)
     }
@@ -631,7 +680,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         // Source
-        self.sourceLabel.text = track.source.rawValue
+        switch track.source {
+        case .appleMusic:
+            self.sourceLabel.text = "Apple"
+        case .spotify:
+            self.sourceLabel.text = "Spotify"
+        case .telegram:
+            self.sourceLabel.text = "Telegram"
+        }
         self.sourceIconView.image = UIImage(systemName: track.source.iconName)
         
         // Play / Pause Icon
@@ -676,9 +732,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func reloadQueueData() {
         self.cachedQueue = SGDoxMusicManager.shared.effectiveQueue()
         let count = self.cachedQueue.count
-        self.queueCountLabel.text = count == 0 ? "Очередь завершена" : "\(count) трек\(self.pluralEnding(count))"
+        self.queueCountLabel.text = count == 0 ? "Пусто" : "\(count) трек\(self.pluralEnding(count))"
         self.queueClearButton.isHidden = count == 0
         self.queueTableView.reloadData()
+        self.view.setNeedsLayout()
     }
     
     private func pluralEnding(_ count: Int) -> String {
