@@ -360,6 +360,13 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.notifyStateChanged()
     }
     
+    public func stop() {
+        self.pause()
+        self.stopCurrentAudio()
+        self.currentTrack = nil
+        self.notifyStateChanged()
+    }
+    
     public func resume() {
         if let track = self.currentTrack {
             self.isPlaying = true
@@ -551,10 +558,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         // 1. If it's already a native Telegram Media file
         if let file = track.telegramFile {
-            let _ = (context.engine.peers.addSavedMusic(file: file) |> deliverOnMainQueue).start(completed: {
-                completion(true, nil)
-            }, error: { _ in
+            let _ = (context.engine.peers.addSavedMusic(file: file) |> deliverOnMainQueue).start(error: { _ in
                 completion(false, "Не удалось закрепить трек в профиле")
+            }, completed: {
+                completion(true, nil)
             })
             return
         }
@@ -608,10 +615,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             return (matchedRef, latestAudioRef)
         } |> deliverOnMainQueue).start(next: { (matchedRef, latestAudioRef) in
             if let targetRef = matchedRef ?? latestAudioRef {
-                let _ = (context.engine.peers.addSavedMusic(file: targetRef) |> deliverOnMainQueue).start(completed: {
-                    completion(true, nil)
-                }, error: { _ in
+                let _ = (context.engine.peers.addSavedMusic(file: targetRef) |> deliverOnMainQueue).start(error: { _ in
                     completion(false, "Не удалось закрепить трек в профиле")
+                }, completed: {
+                    completion(true, nil)
                 })
                 return
             }
@@ -639,10 +646,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     for media in message.media {
                         if let file = media as? TelegramMediaFile, file.isMusic {
                             let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
-                            let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(completed: {
-                                completion(true, nil)
-                            }, error: { _ in
+                            let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(error: { _ in
                                 completion(false, "Не удалось закрепить трек в профиле")
+                            }, completed: {
+                                completion(true, nil)
                             })
                             return
                         }

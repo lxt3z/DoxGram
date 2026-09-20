@@ -220,12 +220,15 @@ public final class AppleMusicService: @unchecked Sendable {
         
         URLSession.shared.dataTask(with: songRequest) { [weak self] data, _, error in
             guard let self = self else { return }
-            var songTracks: [SGDoxMusicTrack] = []
+            let initialSongTracks: [SGDoxMusicTrack]
             if let data = data,
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let results = json["results"] as? [[String: Any]] {
-                songTracks = self.parseITunesResults(results)
+                initialSongTracks = self.parseITunesResults(results)
+            } else {
+                initialSongTracks = []
             }
+            let songTracks = initialSongTracks
             
             // Check album lookup if song results are sparse or album query was matched
             let checkAlbum: (@escaping @Sendable ([SGDoxMusicTrack]) -> Void) -> Void = { next in
