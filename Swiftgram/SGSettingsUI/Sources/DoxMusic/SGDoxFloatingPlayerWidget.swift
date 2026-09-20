@@ -30,6 +30,8 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     
     private var isHiddenForSubscreens = false
     private var currentTrackId: String?
+    private var stateToken: UUID?
+    private var timeToken: UUID?
     
     public init(context: AccountContext) {
         self.context = context
@@ -46,8 +48,18 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         fatalError("init(coder:) has not been implemented")
     }
     
+    deinit {
+        if let token = self.stateToken {
+            SGDoxMusicManager.shared.removeStateListener(token)
+        }
+        if let token = self.timeToken {
+            SGDoxMusicManager.shared.removeTimeListener(token)
+        }
+    }
+    
     private func setupViews() {
         self.backgroundColor = .clear
+        self.layer.zPosition = 1000.0
         
         self.containerView.clipsToBounds = true
         self.containerView.layer.cornerRadius = 26
@@ -166,17 +178,17 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     }
     
     private func setupListeners() {
-        SGDoxMusicManager.shared.addStateListener { [weak self] in
+        self.stateToken = SGDoxMusicManager.shared.addStateListener { [weak self] in
             DispatchQueue.main.async {
                 self?.updateContent(animated: true)
             }
         }
         
-        SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
+        self.timeToken = SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 let d = duration > 0 ? duration : 30.0
-                self.progressView.setProgress(Float(current / d), animated: true)
+                self.progressView.setProgress(Float(current / d), animated: false)
             }
         }
     }
@@ -236,9 +248,6 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.artistLabel.frame = CGRect(x: 0, y: 17, width: textWidth, height: 16)
         
         self.progressView.frame = CGRect(x: 18.0, y: widgetHeight - 2.0, width: widgetWidth - 36.0, height: 2.0)
-        
-        // Ensure kept in front of tab bar controllers
-        self.superview?.bringSubviewToFront(self)
     }
     
     private func updateContent(animated: Bool) {
@@ -271,8 +280,6 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     
     private func updateVisibility(animated: Bool) {
         let shouldShow = SGDoxMusicManager.shared.currentTrack != nil && !self.isHiddenForSubscreens
-        
-        self.superview?.bringSubviewToFront(self)
         
         if !shouldShow {
             if animated && !self.isHidden {

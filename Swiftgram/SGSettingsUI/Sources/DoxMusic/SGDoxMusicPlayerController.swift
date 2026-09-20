@@ -78,6 +78,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var cachedQueue: [SGDoxMusicTrack] = []
     private var isDraggingSlider = false
     private var displayedTrackId: String?
+    private var stateToken: UUID?
+    private var timeToken: UUID?
     
     public init(context: AccountContext) {
         self.context = context
@@ -90,6 +92,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     required init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        if let token = self.stateToken {
+            SGDoxMusicManager.shared.removeStateListener(token)
+        }
+        if let token = self.timeToken {
+            SGDoxMusicManager.shared.removeTimeListener(token)
+        }
     }
     
     public override func loadDisplayNode() {
@@ -110,14 +121,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.updateContent()
         self.reloadQueueData()
         
-        SGDoxMusicManager.shared.addStateListener { [weak self] in
+        self.stateToken = SGDoxMusicManager.shared.addStateListener { [weak self] in
             DispatchQueue.main.async {
                 self?.updateContent()
                 self?.reloadQueueData()
             }
         }
         
-        SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
+        self.timeToken = SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
             DispatchQueue.main.async {
                 guard let self = self, !self.isDraggingSlider else { return }
                 let d = duration > 0 ? duration : 30.0
@@ -699,47 +710,52 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func updateAmbientColor(from image: UIImage) {
-        guard let cgImage = image.cgImage else { return }
-        let width = 20
-        let height = 20
-        var rawData = [UInt8](repeating: 0, count: width * height * 4)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let ctx = CGContext(data: &rawData, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
-        ctx?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        
-        var totalR: CGFloat = 0, totalG: CGFloat = 0, totalB: CGFloat = 0
-        var maxSat: CGFloat = -1
-        var accentR: CGFloat = 0.3, accentG: CGFloat = 0.25, accentB: CGFloat = 0.5
-        let count = CGFloat(width * height)
-        
-        for i in 0..<(width * height) {
-            let r = CGFloat(rawData[i * 4]) / 255.0
-            let g = CGFloat(rawData[i * 4 + 1]) / 255.0
-            let b = CGFloat(rawData[i * 4 + 2]) / 255.0
-            totalR += r; totalG += g; totalB += b
-            let maxC = max(r, max(g, b))
-            let minC = min(r, min(g, b))
-            let sat = maxC > 0 ? (maxC - minC) / maxC : 0
-            if sat > maxSat && maxC > 0.25 {
-                maxSat = sat
-                accentR = r; accentG = g; accentB = b
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let cgImage = image.cgImage else { return }
+            let width = 20
+            let height = 20
+            var rawData = [UInt8](repeating: 0, count: width * height * 4)
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            let ctx = CGContext(data: &rawData, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
+            ctx?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            
+            var totalR: CGFloat = 0, totalG: CGFloat = 0, totalB: CGFloat = 0
+            var maxSat: CGFloat = -1
+            var accentR: CGFloat = 0.3, accentG: CGFloat = 0.25, accentB: CGFloat = 0.5
+            let count = CGFloat(width * height)
+            
+            for i in 0..<(width * height) {
+                let r = CGFloat(rawData[i * 4]) / 255.0
+                let g = CGFloat(rawData[i * 4 + 1]) / 255.0
+                let b = CGFloat(rawData[i * 4 + 2]) / 255.0
+                totalR += r; totalG += g; totalB += b
+                let maxC = max(r, max(g, b))
+                let minC = min(r, min(g, b))
+                let sat = maxC > 0 ? (maxC - minC) / maxC : 0
+                if sat > maxSat && maxC > 0.25 {
+                    maxSat = sat
+                    accentR = r; accentG = g; accentB = b
+                }
+            }
+            
+            let avgColor = UIColor(red: (totalR / count) * 0.7, green: (totalG / count) * 0.7, blue: (totalB / count) * 0.7, alpha: 0.95)
+            let vibrantColor = UIColor(red: min(1.0, accentR * 1.2), green: min(1.0, accentG * 1.2), blue: min(1.0, accentB * 1.2), alpha: 0.95)
+            let deepColor = UIColor(red: accentR * 0.15, green: accentG * 0.15, blue: accentB * 0.20, alpha: 0.98)
+            
+            let newColors = [vibrantColor.cgColor, avgColor.cgColor, deepColor.cgColor]
+            
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                let animation = CABasicAnimation(keyPath: "colors")
+                animation.fromValue = self.ambientGradientLayer.colors
+                animation.toValue = newColors
+                animation.duration = 0.7
+                self.ambientGradientLayer.add(animation, forKey: "colorsChange")
+                self.ambientGradientLayer.colors = newColors
+                
+                self.artworkContainerView.layer.shadowColor = vibrantColor.cgColor
             }
         }
-        
-        let avgColor = UIColor(red: (totalR / count) * 0.7, green: (totalG / count) * 0.7, blue: (totalB / count) * 0.7, alpha: 0.95)
-        let vibrantColor = UIColor(red: min(1.0, accentR * 1.2), green: min(1.0, accentG * 1.2), blue: min(1.0, accentB * 1.2), alpha: 0.95)
-        let deepColor = UIColor(red: accentR * 0.15, green: accentG * 0.15, blue: accentB * 0.20, alpha: 0.98)
-        
-        let newColors = [vibrantColor.cgColor, avgColor.cgColor, deepColor.cgColor]
-        
-        let animation = CABasicAnimation(keyPath: "colors")
-        animation.fromValue = self.ambientGradientLayer.colors
-        animation.toValue = newColors
-        animation.duration = 0.7
-        self.ambientGradientLayer.add(animation, forKey: "colorsChange")
-        self.ambientGradientLayer.colors = newColors
-        
-        self.artworkContainerView.layer.shadowColor = vibrantColor.cgColor
     }
     
     private func formatTime(_ seconds: Double) -> String {

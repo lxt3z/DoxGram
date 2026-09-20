@@ -225,8 +225,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private var playbackTimer: Foundation.Timer?
     private var playbackStartTimestamp: Double = 0.0
     private var playbackStartOffset: Double = 0.0
-    private var stateListeners: [() -> Void] = []
-    private var timeListeners: [(Double, Double) -> Void] = []
+    private var stateListeners: [UUID: () -> Void] = [:]
+    private var timeListeners: [UUID: (Double, Double) -> Void] = [:]
     private var lastReportedTrackId: String?
     private var lastReportedIsPlaying: Bool?
     private var lastReportedDuration: Double = 0.0
@@ -249,12 +249,26 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
     }
     
-    public func addStateListener(_ listener: @escaping () -> Void) {
-        self.stateListeners.append(listener)
+    @discardableResult
+    public func addStateListener(_ listener: @escaping () -> Void) -> UUID {
+        let id = UUID()
+        self.stateListeners[id] = listener
+        return id
     }
     
-    public func addTimeListener(_ listener: @escaping (Double, Double) -> Void) {
-        self.timeListeners.append(listener)
+    public func removeStateListener(_ id: UUID) {
+        self.stateListeners.removeValue(forKey: id)
+    }
+    
+    @discardableResult
+    public func addTimeListener(_ listener: @escaping (Double, Double) -> Void) -> UUID {
+        let id = UUID()
+        self.timeListeners[id] = listener
+        return id
+    }
+    
+    public func removeTimeListener(_ id: UUID) {
+        self.timeListeners.removeValue(forKey: id)
     }
     
     private func notifyStateChanged() {
@@ -265,7 +279,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.lastReportedDuration = self.duration
                 DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
             }
-            for listener in self.stateListeners {
+            for listener in self.stateListeners.values {
                 listener()
             }
         }
@@ -305,7 +319,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.currentTime = current
             }
             
-            for listener in self.timeListeners {
+            for listener in self.timeListeners.values {
                 listener(self.currentTime, self.duration)
             }
             

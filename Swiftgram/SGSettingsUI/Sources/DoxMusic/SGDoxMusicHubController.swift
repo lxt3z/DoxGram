@@ -305,6 +305,8 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     private var isSearching = false
     private var searchTimer: Foundation.Timer?
     private var activeSearchTask: URLSessionDataTask?
+    private var stateToken: UUID?
+    private var timeToken: UUID?
     
     public init(context: AccountContext) {
         self.context = context
@@ -324,6 +326,12 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     deinit {
         self.searchTimer?.invalidate()
         self.activeSearchTask?.cancel()
+        if let token = self.stateToken {
+            SGDoxMusicManager.shared.removeStateListener(token)
+        }
+        if let token = self.timeToken {
+            SGDoxMusicManager.shared.removeTimeListener(token)
+        }
     }
     
     public override func viewWillAppear(_ animated: Bool) {
@@ -339,7 +347,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.setupTableView()
         self.setupMiniPlayer()
         
-        SGDoxMusicManager.shared.addStateListener { [weak self] in
+        self.stateToken = SGDoxMusicManager.shared.addStateListener { [weak self] in
             guard let self = self else { return }
             self.updateMiniPlayer()
             if let visible = self.tableView.indexPathsForVisibleRows {
@@ -349,10 +357,10 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             }
         }
         
-        SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
+        self.timeToken = SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
             guard let self = self, duration > 0 else { return }
             let progress = Float(current / duration)
-            self.miniProgressView.setProgress(progress, animated: true)
+            self.miniProgressView.setProgress(progress, animated: false)
         }
         
         DiscordRPCService.shared.onStatusChanged = { [weak self] _ in

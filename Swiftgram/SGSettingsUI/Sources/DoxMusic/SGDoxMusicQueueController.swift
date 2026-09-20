@@ -18,6 +18,7 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
     private let tableView = UITableView(frame: .zero, style: .plain)
     
     private var queue: [SGDoxMusicTrack] = []
+    private var stateToken: UUID?
     
     public init(context: AccountContext) {
         self.context = context
@@ -29,6 +30,12 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
     
     required init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        if let token = self.stateToken {
+            SGDoxMusicManager.shared.removeStateListener(token)
+        }
     }
     
     public override func loadDisplayNode() {
@@ -82,7 +89,7 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
         
         self.reloadQueue()
         
-        SGDoxMusicManager.shared.addStateListener { [weak self] in
+        self.stateToken = SGDoxMusicManager.shared.addStateListener { [weak self] in
             self?.reloadQueue()
         }
     }
