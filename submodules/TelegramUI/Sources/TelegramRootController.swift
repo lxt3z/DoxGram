@@ -269,7 +269,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             guard let self = self else { return }
             let playerController = SGDoxMusicPlayerController(context: self.context)
             playerController.navigationPresentation = .modal
-            self.push(playerController)
+            self.pushViewController(playerController)
         }
         self.floatingMusicWidget = floatingWidget
         tabBarController.view.addSubview(floatingWidget)
