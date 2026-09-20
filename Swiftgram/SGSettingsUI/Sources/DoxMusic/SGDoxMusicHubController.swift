@@ -293,10 +293,12 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     private let miniPlayerContainer = UIView()
     private let miniPlayerBlurView = UIVisualEffectView()
+    private let miniGlossLayer = CAGradientLayer()
     private let miniArtworkImageView = UIImageView()
     private let miniTitleLabel = UILabel()
     private let miniArtistLabel = UILabel()
     private let miniPlayPauseButton = UIButton(type: .system)
+    private let miniNextButton = UIButton(type: .system)
     private let miniProgressView = UIProgressView(progressViewStyle: .default)
     
     private var searchResults: [SGDoxMusicTrack] = []
@@ -399,32 +401,42 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     private func setupMiniPlayer() {
         self.miniPlayerContainer.backgroundColor = .clear
         self.miniPlayerContainer.layer.shadowColor = UIColor.black.cgColor
-        self.miniPlayerContainer.layer.shadowOpacity = 0.2
-        self.miniPlayerContainer.layer.shadowRadius = 12
-        self.miniPlayerContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
+        self.miniPlayerContainer.layer.shadowOpacity = 0.32
+        self.miniPlayerContainer.layer.shadowRadius = 14
+        self.miniPlayerContainer.layer.shadowOffset = CGSize(width: 0, height: 5)
         
         let blurEffect = UIBlurEffect(style: self.presentationData.theme.overallDarkAppearance ? .systemMaterialDark : .systemMaterialLight)
         self.miniPlayerBlurView.effect = blurEffect
         self.miniPlayerBlurView.layer.cornerRadius = 24
         self.miniPlayerBlurView.layer.borderWidth = 0.5
-        self.miniPlayerBlurView.layer.borderColor = self.presentationData.theme.list.itemBlocksSeparatorColor.cgColor
+        self.miniPlayerBlurView.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
         self.miniPlayerBlurView.clipsToBounds = true
         self.miniPlayerContainer.addSubview(self.miniPlayerBlurView)
+        
+        self.miniGlossLayer.colors = [
+            UIColor.white.withAlphaComponent(0.16).cgColor,
+            UIColor.white.withAlphaComponent(0.02).cgColor,
+            UIColor.clear.cgColor
+        ]
+        self.miniGlossLayer.locations = [0.0, 0.5, 1.0]
+        self.miniGlossLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+        self.miniGlossLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
+        self.miniPlayerBlurView.contentView.layer.addSublayer(self.miniGlossLayer)
         
         let tap = UITapGestureRecognizer(target: self, action: #selector(self.miniPlayerTapped))
         self.miniPlayerContainer.addGestureRecognizer(tap)
         
-        self.miniArtworkImageView.layer.cornerRadius = 8
+        self.miniArtworkImageView.layer.cornerRadius = 9
         self.miniArtworkImageView.clipsToBounds = true
         self.miniArtworkImageView.contentMode = .scaleAspectFill
         self.miniArtworkImageView.backgroundColor = UIColor(white: 0.2, alpha: 1.0)
         self.miniPlayerBlurView.contentView.addSubview(self.miniArtworkImageView)
         
-        self.miniTitleLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        self.miniTitleLabel.font = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
         self.miniTitleLabel.textColor = self.presentationData.theme.list.itemPrimaryTextColor
         self.miniPlayerBlurView.contentView.addSubview(self.miniTitleLabel)
         
-        self.miniArtistLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+        self.miniArtistLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .regular)
         self.miniArtistLabel.textColor = self.presentationData.theme.list.itemSecondaryTextColor
         self.miniPlayerBlurView.contentView.addSubview(self.miniArtistLabel)
         
@@ -432,8 +444,14 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.miniPlayPauseButton.addTarget(self, action: #selector(self.miniPlayPausePressed), for: .touchUpInside)
         self.miniPlayerBlurView.contentView.addSubview(self.miniPlayPauseButton)
         
+        let nextConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        self.miniNextButton.setImage(UIImage(systemName: "forward.fill", withConfiguration: nextConfig), for: .normal)
+        self.miniNextButton.tintColor = self.presentationData.theme.list.itemSecondaryTextColor
+        self.miniNextButton.addTarget(self, action: #selector(self.miniNextPressed), for: .touchUpInside)
+        self.miniPlayerBlurView.contentView.addSubview(self.miniNextButton)
+        
         self.miniProgressView.progressTintColor = self.presentationData.theme.list.itemAccentColor
-        self.miniProgressView.trackTintColor = self.presentationData.theme.list.itemBlocksSeparatorColor
+        self.miniProgressView.trackTintColor = UIColor.white.withAlphaComponent(0.12)
         self.miniPlayerBlurView.contentView.addSubview(self.miniProgressView)
         
         self.view.addSubview(self.miniPlayerContainer)
@@ -448,20 +466,24 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         
         self.searchBar.frame = CGRect(x: 8, y: navHeight + 4, width: bounds.width - 16, height: 44)
         
-        let miniPlayerHeight: CGFloat = SGDoxMusicManager.shared.currentTrack != nil ? 60.0 : 0.0
+        let miniPlayerHeight: CGFloat = SGDoxMusicManager.shared.currentTrack != nil ? 56.0 : 0.0
         let miniPlayerY = bounds.height - layout.intrinsicInsets.bottom - miniPlayerHeight - 8
         
         self.miniPlayerContainer.frame = CGRect(x: 16, y: miniPlayerY, width: bounds.width - 32, height: miniPlayerHeight)
         self.miniPlayerBlurView.frame = self.miniPlayerContainer.bounds
+        self.miniGlossLayer.frame = CGRect(x: 0, y: 0, width: self.miniPlayerBlurView.bounds.width, height: 26)
         self.miniPlayerContainer.isHidden = miniPlayerHeight == 0
         
-        self.miniArtworkImageView.frame = CGRect(x: 10, y: 10, width: 40, height: 40)
-        self.miniPlayPauseButton.frame = CGRect(x: self.miniPlayerBlurView.bounds.width - 48, y: 12, width: 36, height: 36)
+        let artSide: CGFloat = 40.0
+        self.miniArtworkImageView.frame = CGRect(x: 8, y: (miniPlayerHeight - artSide) * 0.5, width: artSide, height: artSide)
+        self.miniPlayPauseButton.frame = CGRect(x: self.miniPlayerBlurView.bounds.width - 76, y: (miniPlayerHeight - 36) * 0.5, width: 34, height: 36)
+        self.miniNextButton.frame = CGRect(x: self.miniPlayerBlurView.bounds.width - 38, y: (miniPlayerHeight - 36) * 0.5, width: 32, height: 36)
         
-        let labelWidth = self.miniPlayerBlurView.bounds.width - 110
-        self.miniTitleLabel.frame = CGRect(x: 60, y: 12, width: labelWidth, height: 18)
-        self.miniArtistLabel.frame = CGRect(x: 60, y: 30, width: labelWidth, height: 16)
-        self.miniProgressView.frame = CGRect(x: 0, y: self.miniPlayerBlurView.bounds.height - 2, width: self.miniPlayerBlurView.bounds.width, height: 2)
+        let textX = self.miniArtworkImageView.frame.maxX + 10
+        let textWidth = max(0, self.miniPlayPauseButton.frame.minX - textX - 8)
+        self.miniTitleLabel.frame = CGRect(x: textX, y: (miniPlayerHeight - 34) * 0.5, width: textWidth, height: 18)
+        self.miniArtistLabel.frame = CGRect(x: textX, y: (miniPlayerHeight - 34) * 0.5 + 18, width: textWidth, height: 15)
+        self.miniProgressView.frame = CGRect(x: 16, y: self.miniPlayerBlurView.bounds.height - 2, width: self.miniPlayerBlurView.bounds.width - 32, height: 2)
         
         let tableY = self.searchBar.frame.maxY + 4
         self.tableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: max(0, bounds.height - tableY))
@@ -483,8 +505,8 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.miniTitleLabel.text = track.title
         self.miniArtistLabel.text = track.artist
         
-        let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)
-        let iconName = manager.isPlaying ? "pause.circle.fill" : "play.circle.fill"
+        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+        let iconName = manager.isPlaying ? "pause.fill" : "play.fill"
         self.miniPlayPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
         
         if let artwork = track.artworkUrl {
@@ -1021,6 +1043,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     @objc private func miniPlayPausePressed() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         SGDoxMusicManager.shared.togglePlay()
+    }
+    
+    @objc private func miniNextPressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        SGDoxMusicManager.shared.next()
     }
     
     @objc private func miniPlayerTapped() {

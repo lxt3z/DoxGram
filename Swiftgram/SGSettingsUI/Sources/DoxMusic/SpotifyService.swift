@@ -256,13 +256,18 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
     // MARK: - Search & Wave Recommendations
     
     public func search(query: String, completion: @escaping @Sendable ([SGDoxMusicTrack], String?) -> Void) {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        let cleanQuery = query
+            .replacingOccurrences(of: " — ", with: " ")
+            .replacingOccurrences(of: " – ", with: " ")
+            .replacingOccurrences(of: " - ", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanQuery.isEmpty else {
             completion([], nil)
             return
         }
-        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed),
-              let url = URL(string: "https://api.spotify.com/v1/search?q=\(encoded)&type=track&limit=25") else {
+        guard let encoded = cleanQuery.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed),
+              let url = URL(string: "https://api.spotify.com/v1/search?q=\(encoded)&type=track&limit=30") else {
             completion([], "Invalid search query")
             return
         }

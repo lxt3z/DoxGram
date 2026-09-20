@@ -1,4 +1,5 @@
 import SGSimpleSettings
+import SGSettingsUI
 import Foundation
 import UIKit
 import Display
@@ -80,6 +81,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     public var callListController: CallListController?
     public var chatListController: ChatListController?
     public var accountSettingsController: PeerInfoScreen?
+    private var floatingMusicWidget: SGDoxFloatingPlayerWidget?
     
     private var permissionsDisposable: Disposable?
     private var presentationDataDisposable: Disposable?
@@ -116,6 +118,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
                 if previousTheme !== presentationData.theme {
                     (strongSelf.rootTabController as? TabBarControllerImpl)?.updateTheme(theme: presentationData.theme)
                     strongSelf.rootTabController?.statusBar.statusBarStyle = presentationData.theme.rootController.statusBarStyle.style
+                    strongSelf.floatingMusicWidget?.updateTheme(presentationData.theme)
                 }
             }
         })
@@ -197,6 +200,16 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         }
     
         super.containerLayoutUpdated(layout, transition: transition)
+        
+        if let floatingWidget = self.floatingMusicWidget {
+            floatingWidget.updateLayout(size: layout.size, insets: layout.intrinsicInsets, transition: transition)
+            floatingWidget.setHiddenForSubscreens(self.viewControllers.count > 1)
+        }
+    }
+    
+    override public func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        self.floatingMusicWidget?.setHiddenForSubscreens(self.viewControllers.count > 1)
     }
     
     public func addRootControllers(hidePhoneInSettings: Bool, showContactsTab: Bool, showCallsTab: Bool) {
@@ -250,6 +263,17 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.chatListController = chatListController
         self.accountSettingsController = accountSettingsController
         self.rootTabController = tabBarController
+        
+        let floatingWidget = SGDoxFloatingPlayerWidget(context: self.context)
+        floatingWidget.openPlayer = { [weak self] in
+            guard let self = self else { return }
+            let playerController = SGDoxMusicPlayerController(context: self.context)
+            playerController.navigationPresentation = .modal
+            self.push(playerController)
+        }
+        self.floatingMusicWidget = floatingWidget
+        tabBarController.view.addSubview(floatingWidget)
+        
         self.pushViewController(tabBarController, animated: false)
     }
         
