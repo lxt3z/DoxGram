@@ -144,8 +144,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     duration: old.duration,
                     previewUrl: old.previewUrl,
                     source: old.source,
-                    appleMusicId: old.appleMusicId,
                     spotifyUri: old.spotifyUri,
+                    appleMusicId: old.appleMusicId,
                     telegramFile: old.telegramFile
                 )
                 self.favorites[idx] = updated
@@ -161,8 +161,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     duration: curr.duration,
                     previewUrl: curr.previewUrl,
                     source: curr.source,
-                    appleMusicId: curr.appleMusicId,
                     spotifyUri: curr.spotifyUri,
+                    appleMusicId: curr.appleMusicId,
                     telegramFile: curr.telegramFile
                 )
                 changed = true
