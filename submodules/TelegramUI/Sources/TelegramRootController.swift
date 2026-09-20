@@ -82,7 +82,6 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     public var chatListController: ChatListController?
     public var accountSettingsController: PeerInfoScreen?
     private var floatingMusicWidget: SGDoxFloatingPlayerWidget?
-    private var validLayout: ContainerViewLayout?
     private var viewControllersDisposable: Disposable?
     
     private var permissionsDisposable: Disposable?
@@ -195,8 +194,6 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     }
     
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
-        self.validLayout = layout
-        
         let needsRootWallpaperBackgroundNode: Bool
         if case .regular = layout.metrics.widthClass {
             needsRootWallpaperBackgroundNode = true
