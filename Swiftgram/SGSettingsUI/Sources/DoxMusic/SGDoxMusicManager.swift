@@ -107,6 +107,49 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
     }
     
+    public func dismissPlayer() {
+        self.pause()
+        self.stopCurrentAudio()
+        UserDefaults.standard.set(true, forKey: "dox_music_is_dismissed")
+        self.currentTrack = nil
+        self.savePersistedState()
+        self.notifyStateChanged()
+    }
+    
+    private func loadPersistedState() {
+        let isDismissed = UserDefaults.standard.bool(forKey: "dox_music_is_dismissed")
+        guard !isDismissed else { return }
+        
+        if let trackData = UserDefaults.standard.data(forKey: "dox_music_current_track"),
+           let track = try? JSONDecoder().decode(SGDoxMusicTrack.self, from: trackData) {
+            self.currentTrack = track
+            self.duration = track.duration > 0 ? track.duration : 30.0
+            self.currentTime = UserDefaults.standard.double(forKey: "dox_music_current_time")
+            self.isPlaying = false
+            
+            if let queueData = UserDefaults.standard.data(forKey: "dox_music_queue"),
+               let q = try? JSONDecoder().decode([SGDoxMusicTrack].self, from: queueData) {
+                self.queue = q
+            }
+        }
+    }
+    
+    private func savePersistedState() {
+        guard let track = self.currentTrack else {
+            UserDefaults.standard.removeObject(forKey: "dox_music_current_track")
+            UserDefaults.standard.removeObject(forKey: "dox_music_queue")
+            UserDefaults.standard.removeObject(forKey: "dox_music_current_time")
+            return
+        }
+        if let trackData = try? JSONEncoder().encode(track) {
+            UserDefaults.standard.set(trackData, forKey: "dox_music_current_track")
+        }
+        if let queueData = try? JSONEncoder().encode(self.queue) {
+            UserDefaults.standard.set(queueData, forKey: "dox_music_queue")
+        }
+        UserDefaults.standard.set(self.currentTime, forKey: "dox_music_current_time")
+    }
+    
     public func isFavorite(track: SGDoxMusicTrack) -> Bool {
         return self.favorites.contains(where: { $0.id == track.id || ($0.title == track.title && $0.artist == track.artist) })
     }
@@ -235,6 +278,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         super.init()
         self.setupAudioSession()
         self.loadFavorites()
+        self.loadPersistedState()
         self.syncFavoritesWithServices()
     }
     
@@ -362,6 +406,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
         
         self.stopCurrentAudio()
+        UserDefaults.standard.set(false, forKey: "dox_music_is_dismissed")
+        self.savePersistedState()
         
         switch track.source {
         case .appleMusic:
@@ -432,6 +478,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.avPlayer?.pause()
         AppleMusicService.shared.pause()
         SpotifyService.shared.pause()
+        self.savePersistedState()
         self.notifyStateChanged()
     }
     
@@ -439,11 +486,26 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.pause()
         self.stopCurrentAudio()
         self.currentTrack = nil
+        self.savePersistedState()
         self.notifyStateChanged()
     }
     
     public func resume() {
         if let track = self.currentTrack {
+            UserDefaults.standard.set(false, forKey: "dox_music_is_dismissed")
+            if track.source == .telegram && self.avPlayer == nil {
+                self.playTelegramTrack(track: track)
+                if self.currentTime > 0 {
+                    self.seek(to: self.currentTime)
+                }
+                return
+            } else if track.source == .appleMusic && !AppleMusicService.shared.isAuthorized {
+                self.play(track: track, queue: self.queue)
+                return
+            } else if track.source == .spotify && !SpotifyService.shared.isAuthorized {
+                self.play(track: track, queue: self.queue)
+                return
+            }
             self.isPlaying = true
             self.playbackStartTimestamp = CACurrentMediaTime()
             self.playbackStartOffset = self.currentTime
@@ -456,6 +518,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.avPlayer?.play()
             }
             self.startTimeTracking()
+            self.savePersistedState()
             self.notifyStateChanged()
         }
     }
@@ -537,6 +600,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         if self.isPlaying {
             DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: seconds, duration: self.duration)
         }
+        self.savePersistedState()
         self.notifyStateChanged()
     }
     

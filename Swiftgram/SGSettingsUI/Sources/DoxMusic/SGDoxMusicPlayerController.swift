@@ -81,6 +81,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var displayedTrackId: String?
     private var stateToken: UUID?
     private var timeToken: UUID?
+    private var validLayout: ContainerViewLayout?
     
     public init(context: AccountContext) {
         self.context = context
@@ -111,7 +112,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
-        self.view.setNeedsLayout()
+        self.validLayout = layout
+        self.displayNode.frame = CGRect(origin: .zero, size: layout.size)
+        self.view.frame = CGRect(origin: .zero, size: layout.size)
+        let bounds = CGRect(origin: .zero, size: layout.size)
+        let safeArea = layout.safeInsets
+        self.applyLayout(bounds: bounds, safeArea: safeArea)
     }
     
     public override func viewDidLoad() {
@@ -121,6 +127,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.setupViews()
         self.updateContent()
         self.reloadQueueData()
+        
+        if let layout = self.validLayout {
+            self.applyLayout(bounds: CGRect(origin: .zero, size: layout.size), safeArea: layout.safeInsets)
+        } else if self.view.bounds.width > 0 && self.view.bounds.height > 0 {
+            self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
+        }
         
         self.stateToken = SGDoxMusicManager.shared.addStateListener { [weak self] in
             DispatchQueue.main.async {
@@ -516,8 +528,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let bounds = self.view.bounds
-        let safeArea = self.view.safeAreaInsets
+        if let layout = self.validLayout {
+            self.applyLayout(bounds: CGRect(origin: .zero, size: layout.size), safeArea: layout.safeInsets)
+        } else if self.view.bounds.width > 0 && self.view.bounds.height > 0 {
+            self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
+        }
+    }
+    
+    private func applyLayout(bounds: CGRect, safeArea: UIEdgeInsets) {
+        guard bounds.width > 0 && bounds.height > 0 else { return }
         
         self.backgroundImageView.frame = bounds
         self.ambientGradientLayer.frame = bounds
@@ -561,16 +580,17 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     private func layoutNowPlayingPane(contentH: CGFloat) {
         let bounds = self.nowPlayingContainerView.bounds
+        guard bounds.width > 0 && bounds.height > 0 else { return }
         
         // Artwork: large square with dynamic height
-        let maxArtSide = min(bounds.width - 64, bounds.height * 0.42)
-        let artSide = max(200, maxArtSide)
+        let maxArtSide = min(bounds.width - 64, bounds.height * 0.40)
+        let artSide = max(160, maxArtSide)
         let artY: CGFloat = 14.0
         self.artworkContainerView.frame = CGRect(x: (bounds.width - artSide) * 0.5, y: artY, width: artSide, height: artSide)
         self.artworkImageView.frame = CGRect(x: 0, y: 0, width: artSide, height: artSide)
         
         // Info: Title & Artist
-        let infoY = artY + artSide + 24.0
+        let infoY = artY + artSide + 20.0
         let heartSize: CGFloat = 36.0
         self.infoContainerView.frame = CGRect(x: 32, y: infoY, width: bounds.width - 64, height: 50)
         let titleW = bounds.width - 64 - heartSize - 12
@@ -579,13 +599,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.favoriteButton.frame = CGRect(x: bounds.width - 64 - heartSize, y: 7, width: heartSize, height: heartSize)
         
         // Progress Slider
-        let sliderY = infoY + 58.0
+        let sliderY = infoY + 56.0
         self.progressSlider.frame = CGRect(x: 32, y: sliderY, width: bounds.width - 64, height: 26)
         self.currentTimeLabel.frame = CGRect(x: 32, y: sliderY + 22, width: 60, height: 16)
         self.remainingTimeLabel.frame = CGRect(x: bounds.width - 92, y: sliderY + 22, width: 60, height: 16)
         
         // Controls Row: deterministic frame positioning (never collapses)
-        let controlsY = sliderY + 46.0
+        let controlsY = sliderY + 44.0
         let controlsW = bounds.width - 48.0
         self.controlsContainerView.frame = CGRect(x: 24, y: controlsY, width: controlsW, height: 68)
         
@@ -602,12 +622,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.repeatButton.frame = CGRect(x: controlsW - 8.0 - subSize, y: (68.0 - subSize) * 0.5, width: subSize, height: subSize)
         
         // Bottom Action Buttons
-        let actionsY = controlsY + 78.0
+        let actionsY = controlsY + 76.0
         self.actionsStackView.frame = CGRect(x: 20, y: actionsY, width: bounds.width - 40, height: 36)
     }
     
     private func layoutQueuePane(contentH: CGFloat) {
         let bounds = self.queueContainerView.bounds
+        guard bounds.width > 0 && bounds.height > 0 else { return }
         
         // Header
         let headerH: CGFloat = 72.0
@@ -648,7 +669,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Table View
         let tableY: CGFloat = 82.0
-        self.queueTableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: miniY - tableY - 6)
+        self.queueTableView.frame = CGRect(x: 0, y: tableY, width: bounds.width, height: max(60, miniY - tableY - 6))
         self.queueTableView.contentInset = UIEdgeInsets(top: 4, left: 0, bottom: 8, right: 0)
     }
     
@@ -657,6 +678,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func updateContent() {
         let manager = SGDoxMusicManager.shared
         guard let track = manager.currentTrack else { return }
+        
+        let d = manager.duration > 0 ? manager.duration : 30.0
+        if !self.isDraggingSlider {
+            self.progressSlider.value = Float(manager.currentTime / d)
+            self.currentTimeLabel.text = self.formatTime(manager.currentTime)
+            self.remainingTimeLabel.text = "-\(self.formatTime(max(0, d - manager.currentTime)))"
+        }
         
         if self.displayedTrackId != track.id {
             self.displayedTrackId = track.id

@@ -282,10 +282,11 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             guard let self = self else { return }
             let playerController = SGDoxMusicPlayerController(context: self.context)
             playerController.navigationPresentation = .modal
+            let presentationArguments = ViewControllerPresentationArguments(presentationAnimation: .modalSheet)
             if let topViewController = self.topViewController as? ViewController {
-                topViewController.present(playerController, in: .window(.root))
+                topViewController.present(playerController, in: .window(.root), with: presentationArguments)
             } else if let rootTabController = self.rootTabController {
-                rootTabController.present(playerController, in: .window(.root))
+                rootTabController.present(playerController, in: .window(.root), with: presentationArguments)
             }
         }
         self.floatingMusicWidget = floatingWidget
