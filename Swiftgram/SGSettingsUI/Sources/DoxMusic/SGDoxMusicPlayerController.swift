@@ -58,7 +58,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let pinToProfileButton = UIButton(type: .system)
     private let waveButton = UIButton(type: .system)
     private let autoplayButton = UIButton(type: .system)
-    private let queueToggleButton = UIButton(type: .system)
+    
+    public var onDismiss: (() -> Void)?
     
     // --- Queue Pane ---
     private let queueHeaderView = UIView()
@@ -365,13 +366,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         self.nowPlayingContainerView.addSubview(self.controlsContainerView)
         
-        // Bottom Action Buttons: Profile | Wave | Autoplay | Queue Toggle
+        // Bottom Action Buttons: Profile | Wave | Autoplay
         self.actionsStackView.axis = .horizontal
         self.actionsStackView.distribution = .fillEqually
         self.actionsStackView.alignment = .fill
-        self.actionsStackView.spacing = 8
+        self.actionsStackView.spacing = 10
         
-        self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.crop.circle.badge.plus")
+        self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.circle")
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
         self.actionsStackView.addArrangedSubview(self.pinToProfileButton)
         
@@ -382,10 +383,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.styleCapsuleButton(self.autoplayButton, title: "Авто", icon: "infinity")
         self.autoplayButton.addTarget(self, action: #selector(self.autoplayPressed), for: .touchUpInside)
         self.actionsStackView.addArrangedSubview(self.autoplayButton)
-        
-        self.styleCapsuleButton(self.queueToggleButton, title: "Очередь", icon: "list.bullet")
-        self.queueToggleButton.addTarget(self, action: #selector(self.queueSegmentPressed), for: .touchUpInside)
-        self.actionsStackView.addArrangedSubview(self.queueToggleButton)
         
         self.nowPlayingContainerView.addSubview(self.actionsStackView)
     }
@@ -497,20 +494,21 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func styleCapsuleButton(_ button: UIButton, title: String, icon: String) {
-        let config = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        let config = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
         button.setImage(UIImage(systemName: icon, withConfiguration: config), for: .normal)
         button.setTitle(" \(title)", for: .normal)
         button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 11.5, weight: .semibold)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
         button.titleLabel?.adjustsFontSizeToFitWidth = true
-        button.titleLabel?.minimumScaleFactor = 0.8
+        button.titleLabel?.minimumScaleFactor = 0.75
+        button.titleLabel?.lineBreakMode = .byClipping
         button.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
         button.tintColor = .white
         button.layer.cornerRadius = 16
         button.layer.cornerCurve = .continuous
         button.layer.borderWidth = 0.5
         button.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
-        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
     }
     
     private func generateSliderThumb() -> UIImage {
@@ -533,6 +531,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         } else if self.view.bounds.width > 0 && self.view.bounds.height > 0 {
             self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
         }
+    }
+    
+    public override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        self.onDismiss?()
     }
     
     private func applyLayout(bounds: CGRect, safeArea: UIEdgeInsets) {
@@ -586,7 +589,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let maxArtSide = min(bounds.width - 64, bounds.height * 0.40)
         let artSide = max(160, maxArtSide)
         let artY: CGFloat = 14.0
-        self.artworkContainerView.frame = CGRect(x: (bounds.width - artSide) * 0.5, y: artY, width: artSide, height: artSide)
+        self.artworkContainerView.bounds = CGRect(x: 0, y: 0, width: artSide, height: artSide)
+        self.artworkContainerView.center = CGPoint(x: bounds.width * 0.5, y: artY + artSide * 0.5)
         self.artworkImageView.frame = CGRect(x: 0, y: 0, width: artSide, height: artSide)
         
         // Info: Title & Artist
@@ -777,18 +781,17 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     private func updateArtworkScale(isPlaying: Bool, animated: Bool) {
         let block = {
+            self.artworkContainerView.transform = .identity
             if isPlaying {
-                self.artworkContainerView.transform = .identity
                 self.artworkContainerView.layer.shadowOpacity = 0.55
                 self.artworkContainerView.layer.shadowRadius = 26
             } else {
-                self.artworkContainerView.transform = CGAffineTransform(scaleX: 0.90, y: 0.90)
-                self.artworkContainerView.layer.shadowOpacity = 0.25
-                self.artworkContainerView.layer.shadowRadius = 14
+                self.artworkContainerView.layer.shadowOpacity = 0.30
+                self.artworkContainerView.layer.shadowRadius = 16
             }
         }
         if animated {
-            UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.76, initialSpringVelocity: 0.3, options: [.allowUserInteraction, .beginFromCurrentState], animations: block)
+            UIView.animate(withDuration: 0.35, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState], animations: block)
         } else {
             block()
         }

@@ -115,7 +115,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             let isSubscreen = vcs.count > 1
             if let floatingWidget = self.floatingMusicWidget {
                 if let layout = self.validLayout {
-                    floatingWidget.updateLayout(size: layout.size, insets: layout.intrinsicInsets, transition: .immediate)
+                    floatingWidget.updateLayout(size: layout.size, insets: layout.safeInsets, transition: .immediate)
                 }
                 floatingWidget.setHiddenForSubscreens(isSubscreen)
                 if !isSubscreen {
@@ -219,7 +219,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         super.containerLayoutUpdated(layout, transition: transition)
         
         if let floatingWidget = self.floatingMusicWidget {
-            floatingWidget.updateLayout(size: layout.size, insets: layout.intrinsicInsets, transition: transition)
+            floatingWidget.updateLayout(size: layout.size, insets: layout.safeInsets, transition: transition)
             floatingWidget.setHiddenForSubscreens(self.viewControllers.count > 1)
         }
     }
@@ -278,10 +278,18 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         
         let floatingWidget = SGDoxFloatingPlayerWidget(context: self.context)
         floatingWidget.layer.zPosition = 1000.0
-        floatingWidget.openPlayer = { [weak self] in
+        floatingWidget.openPlayer = { [weak self, weak floatingWidget] in
             guard let self = self else { return }
+            floatingWidget?.setHiddenForSubscreens(true)
             let playerController = SGDoxMusicPlayerController(context: self.context)
             playerController.navigationPresentation = .modal
+            playerController.onDismiss = { [weak self, weak floatingWidget] in
+                guard let self = self else { return }
+                floatingWidget?.setHiddenForSubscreens(self.viewControllers.count > 1)
+                if let layout = self.validLayout {
+                    floatingWidget?.updateLayout(size: layout.size, insets: layout.safeInsets, transition: .animated(duration: 0.25, curve: .easeInOut))
+                }
+            }
             let presentationArguments = ViewControllerPresentationArguments(presentationAnimation: .modalSheet)
             if let topViewController = self.topViewController as? ViewController {
                 topViewController.present(playerController, in: .window(.root), with: presentationArguments)
@@ -292,7 +300,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.floatingMusicWidget = floatingWidget
         tabBarController.view.addSubview(floatingWidget)
         if let layout = self.validLayout {
-            floatingWidget.updateLayout(size: layout.size, insets: layout.intrinsicInsets, transition: .immediate)
+            floatingWidget.updateLayout(size: layout.size, insets: layout.safeInsets, transition: .immediate)
         }
         floatingWidget.setHiddenForSubscreens(self.viewControllers.count > 1)
         

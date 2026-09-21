@@ -325,7 +325,13 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.lastReportedIsPlaying = self.isPlaying
                 self.lastReportedDuration = self.duration
                 self.lastReportedArtworkUrl = artworkUrl
-                DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
+                
+                // If starting a new track, wait for actual audio hardware start (>= 0.2s) in startTimeTracking
+                // to avoid Discord timer starting 2 seconds before sound reaches headphones.
+                // If paused, stopped, or already playing with valid audio time, update Discord immediately.
+                if !self.isPlaying || self.currentTime > 0.1 || self.hasSyncedAudioStart {
+                    DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
+                }
             }
             for listener in self.stateListeners.values {
                 listener()
@@ -385,9 +391,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.currentTime = current
             }
             
-            // When real audio starts producing sound (>= 0.4s) and we haven't synced audio start,
+            // When real audio starts producing sound (>= 0.2s) and we haven't synced audio start,
             // re-sync Discord RPC so its timeline starts synchronously with headphones/speakers
-            if current >= 0.4 && !self.hasSyncedAudioStart {
+            if current >= 0.2 && !self.hasSyncedAudioStart {
                 self.hasSyncedAudioStart = true
                 DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
             }

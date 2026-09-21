@@ -86,10 +86,20 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         let tap = UITapGestureRecognizer(target: self, action: #selector(self.widgetTapped))
         self.addGestureRecognizer(tap)
         
-        // Swipe down to stop
-        let swipe = UISwipeGestureRecognizer(target: self, action: #selector(self.handleSwipeDown))
-        swipe.direction = .down
-        self.addGestureRecognizer(swipe)
+        // Swipe down to dismiss
+        let swipeDown = UISwipeGestureRecognizer(target: self, action: #selector(self.handleSwipeDown))
+        swipeDown.direction = .down
+        self.addGestureRecognizer(swipeDown)
+        
+        // Swipe left for next track
+        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(self.handleSwipeLeft))
+        swipeLeft.direction = .left
+        self.addGestureRecognizer(swipeLeft)
+        
+        // Swipe right for previous track
+        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(self.handleSwipeRight))
+        swipeRight.direction = .right
+        self.addGestureRecognizer(swipeRight)
         
         // Artwork
         self.artworkImageView.contentMode = .scaleAspectFill
@@ -244,9 +254,10 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         let x = floor((size.width - widgetWidth) * 0.5)
         
         // Floating tab bar clearance:
-        // Tab bar height is 64pt (56 + 8), bottom safe area inset is max(insets.bottom, 8.0).
+        // Tab bar height is 64pt (56 + 8), bottom safe area inset is capped at 34.0 (hardware home indicator).
         // Adding 14pt extra gap above the tab bar so it floats cleanly without touching or overlapping navigation.
-        let bottomOffset = max(insets.bottom, 8.0) + 64.0 + 14.0
+        let safeBottom = min(max(insets.bottom, 8.0), 34.0)
+        let bottomOffset = safeBottom + 64.0 + 14.0
         let y = size.height - bottomOffset - widgetHeight
         
         let targetFrame = CGRect(x: x, y: y, width: widgetWidth, height: widgetHeight)
@@ -366,6 +377,39 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     @objc private func handleSwipeDown() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         SGDoxMusicManager.shared.stop()
+    }
+    
+    @objc private func handleSwipeLeft() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        self.animateTrackTransition(direction: -1) {
+            SGDoxMusicManager.shared.next()
+        }
+    }
+    
+    @objc private func handleSwipeRight() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        self.animateTrackTransition(direction: 1) {
+            SGDoxMusicManager.shared.previous()
+        }
+    }
+    
+    private func animateTrackTransition(direction: CGFloat, completion: @escaping () -> Void) {
+        UIView.animate(withDuration: 0.12, delay: 0, options: [.curveEaseOut], animations: {
+            self.artworkImageView.transform = CGAffineTransform(translationX: direction * -18, y: 0)
+            self.textContainerView.transform = CGAffineTransform(translationX: direction * -18, y: 0)
+            self.artworkImageView.alpha = 0.45
+            self.textContainerView.alpha = 0.45
+        }) { _ in
+            completion()
+            self.artworkImageView.transform = CGAffineTransform(translationX: direction * 18, y: 0)
+            self.textContainerView.transform = CGAffineTransform(translationX: direction * 18, y: 0)
+            UIView.animate(withDuration: 0.22, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.curveEaseOut], animations: {
+                self.artworkImageView.transform = .identity
+                self.textContainerView.transform = .identity
+                self.artworkImageView.alpha = 1.0
+                self.textContainerView.alpha = 1.0
+            })
+        }
     }
     
     @objc private func playPausePressed() {

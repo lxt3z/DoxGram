@@ -33,6 +33,8 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     private var currentIsPlaying: Bool = false
     private var currentPlaybackTime: Double = 0.0
     private var currentTrackDuration: Double = 0.0
+    private var activeTrackId: String?
+    private var activeStartTimestamp: Int64?
     private var externalAssetCache: [String: String] = [:]
     private var resolvingUrls: Set<String> = []
     
@@ -235,6 +237,10 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     
     public func updatePlayback(track: SGDoxMusicTrack?, isPlaying: Bool, currentTime: Double = 0.0, duration: Double = 0.0) {
         let dur = duration > 0 ? duration : (track?.duration ?? 0.0)
+        if !isPlaying || track?.id != self.activeTrackId {
+            self.activeTrackId = track?.id
+            self.activeStartTimestamp = nil
+        }
         self.currentPlayingTrack = track
         self.currentIsPlaying = isPlaying
         self.currentPlaybackTime = currentTime
@@ -301,12 +307,23 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         }
         
         let now = Date().timeIntervalSince1970
-        let startTimestamp = Int64(max(0.0, now - self.currentPlaybackTime) * 1000)
+        let startTimestamp: Int64
+        let expectedStart = now - self.currentPlaybackTime
+        if self.activeTrackId == track.id, let existingStart = self.activeStartTimestamp, abs(Double(existingStart) / 1000.0 - expectedStart) < 3.0 {
+            // Keep the exact same established startTimestamp for this track so Discord client timer stays rock-steady and does not drift
+            startTimestamp = existingStart
+        } else {
+            let computed = Int64(max(0.0, expectedStart) * 1000)
+            startTimestamp = computed
+            self.activeTrackId = track.id
+            self.activeStartTimestamp = computed
+        }
+        
         var timestamps: [String: Any] = [
             "start": startTimestamp
         ]
         if self.currentTrackDuration > 0 {
-            let endTimestamp = Int64((max(0.0, now - self.currentPlaybackTime) + self.currentTrackDuration) * 1000)
+            let endTimestamp = startTimestamp + Int64(self.currentTrackDuration * 1000)
             if endTimestamp > startTimestamp {
                 timestamps["end"] = endTimestamp
             }
