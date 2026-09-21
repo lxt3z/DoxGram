@@ -329,29 +329,24 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
                     assets["large_image"] = "spotify:\(id)"
                 }
                 self.resolveExternalAsset(imageUrl: artwork)
-            } else if track.source == .appleMusic {
-                // Use official appicon as placeholder so question mark icon is never displayed
-                assets["large_image"] = "appicon"
-                self.resolveExternalAsset(imageUrl: artwork)
+            } else if artwork.hasPrefix("mp:") {
+                assets["large_image"] = artwork
             } else {
                 self.resolveExternalAsset(imageUrl: artwork)
             }
-        } else if track.source == .appleMusic {
-            assets["large_image"] = "appicon"
         }
         
         let doxgramIconUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Telegram/Telegram-iOS/SGDefault.alticon/SGDefault%403x.png"
         if let cachedDox = self.externalAssetCache[doxgramIconUrl] {
             assets["small_image"] = cachedDox
+            assets["small_text"] = "DoxGram iOS"
         } else {
             self.resolveExternalAsset(imageUrl: doxgramIconUrl)
-            if track.source == .appleMusic {
-                assets["small_image"] = "appicon"
-            } else if track.source == .spotify {
+            if track.source == .spotify {
                 assets["small_image"] = "spotify"
+                assets["small_text"] = "DoxGram iOS"
             }
         }
-        assets["small_text"] = "DoxGram iOS"
         
         if !assets.isEmpty {
             activity["assets"] = assets

@@ -239,11 +239,12 @@ public final class SGDoxImageLoader: @unchecked Sendable {
     }
     
     private func searchArtworkOnline(for track: SGDoxMusicTrack, completion: @escaping @MainActor (UIImage?) -> Void) {
-        let cleanTitle = track.title
-            .replacingOccurrences(of: "\\(feat.*\\)", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "\\[feat.*\\]", with: "", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let query = "\(track.artist) \(cleanTitle)"
+        var cleanTitle = track.title
+        cleanTitle = cleanTitle.replacingOccurrences(of: "(?i)\\s*\\((?:feat|ft|with)\\..*?\\)", with: "", options: .regularExpression)
+        cleanTitle = cleanTitle.replacingOccurrences(of: "(?i)\\s*\\[(?:feat|ft|with)\\..*?\\]", with: "", options: .regularExpression)
+        cleanTitle = cleanTitle.replacingOccurrences(of: "(?i)\\s*-\\s*(?:Single|EP|Remix)", with: "", options: .regularExpression)
+        cleanTitle = cleanTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = "\(track.artist) \(cleanTitle)".trimmingCharacters(in: .whitespacesAndNewlines)
         
         AppleMusicService.shared.searchITunesPublic(query: query) { [weak self] results, _ in
             guard let self = self else {
@@ -265,9 +266,47 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                     completion(img)
                 }
             } else {
-                self.dispatchMain(image: nil, completion: completion)
+                self.searchDeezerArtwork(for: track, query: query, completion: completion)
             }
         }
+    }
+    
+    private func searchDeezerArtwork(for track: SGDoxMusicTrack, query: String, completion: @escaping @MainActor (UIImage?) -> Void) {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://api.deezer.com/search?q=\(encoded)&limit=5") else {
+            self.dispatchMain(image: nil, completion: completion)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8.0
+        
+        self.session.dataTask(with: request) { [weak self] data, _, error in
+            guard let self = self, let data = data, error == nil,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let items = json["data"] as? [[String: Any]],
+                  let first = items.first,
+                  let album = first["album"] as? [String: Any] else {
+                self?.dispatchMain(image: nil, completion: completion)
+                return
+            }
+            
+            let artUrl = (album["cover_xl"] as? String) ?? (album["cover_big"] as? String) ?? (album["cover_medium"] as? String) ?? (album["cover"] as? String)
+            guard let validArtUrl = artUrl, !validArtUrl.isEmpty else {
+                self.dispatchMain(image: nil, completion: completion)
+                return
+            }
+            
+            self.loadImage(urlString: validArtUrl) { img in
+                if let img = img {
+                    self.storeImage(img, for: track.id)
+                    if let old = track.artworkUrl { self.storeImage(img, for: old) }
+                    let _ = self.saveImageToDisk(img, name: "am_art_\(track.id).jpg")
+                    SGDoxMusicManager.shared.updateTrackArtwork(trackId: track.id, newArtworkUrl: validArtUrl)
+                }
+                completion(img)
+            }
+        }.resume()
     }
     
     public func placeholderArtwork() -> UIImage {

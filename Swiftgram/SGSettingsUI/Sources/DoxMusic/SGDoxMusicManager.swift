@@ -273,6 +273,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private var lastReportedTrackId: String?
     private var lastReportedIsPlaying: Bool?
     private var lastReportedDuration: Double = 0.0
+    private var lastReportedArtworkUrl: String?
+    private var hasSyncedAudioStart: Bool = false
     
     private override init() {
         super.init()
@@ -317,10 +319,12 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     private func notifyStateChanged() {
         DispatchQueue.main.async {
-            if self.lastReportedTrackId != self.currentTrack?.id || self.lastReportedIsPlaying != self.isPlaying {
+            let artworkUrl = self.currentTrack?.artworkUrl
+            if self.lastReportedTrackId != self.currentTrack?.id || self.lastReportedIsPlaying != self.isPlaying || self.lastReportedArtworkUrl != artworkUrl {
                 self.lastReportedTrackId = self.currentTrack?.id
                 self.lastReportedIsPlaying = self.isPlaying
                 self.lastReportedDuration = self.duration
+                self.lastReportedArtworkUrl = artworkUrl
                 DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
             }
             for listener in self.stateListeners.values {
@@ -333,34 +337,59 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.stopTimeTracking()
         self.playbackStartTimestamp = CACurrentMediaTime()
         self.playbackStartOffset = self.currentTime
+        self.hasSyncedAudioStart = false
         
         self.playbackTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self = self, self.isPlaying else { return }
             
-            let elapsed = CACurrentMediaTime() - self.playbackStartTimestamp
-            var current = self.playbackStartOffset + elapsed
-            let total = self.duration
-            
+            var currentRealTime: Double?
             if let track = self.currentTrack {
                 switch track.source {
                 case .appleMusic:
-                    // If playing 30s AVPlayer preview, AVPlayer has precise in-process seconds
-                    if !AppleMusicService.shared.isUsingSystemPlayer {
-                        let t = AppleMusicService.shared.currentPlaybackTime
-                        if t.isFinite && !t.isNaN && t > 0 { current = t }
+                    // Both system player and 30s AVPlayer preview are handled accurately
+                    let t = AppleMusicService.shared.currentPlaybackTime
+                    if t.isFinite && !t.isNaN && t >= 0 {
+                        currentRealTime = t
                     }
                 case .spotify:
                     break
                 case .telegram:
                     if let p = self.avPlayer {
                         let t = p.currentTime().seconds
-                        if t.isFinite && !t.isNaN && t >= 0 { current = t }
+                        if t.isFinite && !t.isNaN && t >= 0 {
+                            currentRealTime = t
+                        }
                     }
                 }
             }
             
+            var current: Double
+            if let real = currentRealTime, real > 0 {
+                current = real
+                self.playbackStartOffset = real
+                self.playbackStartTimestamp = CACurrentMediaTime()
+            } else {
+                // If real audio output has not started yet (still buffering/loading),
+                // do not accumulate elapsed time ahead of audio output!
+                if currentRealTime == 0.0 && self.currentTime == 0.0 {
+                    self.playbackStartTimestamp = CACurrentMediaTime()
+                    current = 0.0
+                } else {
+                    let elapsed = CACurrentMediaTime() - self.playbackStartTimestamp
+                    current = self.playbackStartOffset + elapsed
+                }
+            }
+            
+            let total = self.duration
             if current.isFinite && !current.isNaN {
                 self.currentTime = current
+            }
+            
+            // When real audio starts producing sound (>= 0.4s) and we haven't synced audio start,
+            // re-sync Discord RPC so its timeline starts synchronously with headphones/speakers
+            if current >= 0.4 && !self.hasSyncedAudioStart {
+                self.hasSyncedAudioStart = true
+                DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
             }
             
             for listener in self.timeListeners.values {
@@ -390,6 +419,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.currentTime = 0.0
         self.playbackStartTimestamp = CACurrentMediaTime()
         self.playbackStartOffset = 0.0
+        self.hasSyncedAudioStart = false
         
         if !queue.isEmpty {
             var q = queue.filter { $0.id != track.id }
@@ -509,6 +539,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             self.isPlaying = true
             self.playbackStartTimestamp = CACurrentMediaTime()
             self.playbackStartOffset = self.currentTime
+            self.hasSyncedAudioStart = false
             switch track.source {
             case .appleMusic:
                 AppleMusicService.shared.resume()
@@ -595,6 +626,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.currentTime = seconds
         self.playbackStartTimestamp = CACurrentMediaTime()
         self.playbackStartOffset = seconds
+        self.hasSyncedAudioStart = true
         self.avPlayer?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
         AppleMusicService.shared.seek(to: seconds)
         if self.isPlaying {
