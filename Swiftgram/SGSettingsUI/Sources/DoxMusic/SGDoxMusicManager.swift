@@ -282,6 +282,17 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.loadFavorites()
         self.loadPersistedState()
         self.syncFavoritesWithServices()
+        
+        AppleMusicService.shared.onTrackDidFinish = { [weak self] in
+            DispatchQueue.main.async {
+                self?.next()
+            }
+        }
+        AppleMusicService.shared.onPlaybackFailed = { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.next()
+            }
+        }
     }
     
     private func setupAudioSession() {
@@ -356,6 +367,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     let t = AppleMusicService.shared.currentPlaybackTime
                     if t.isFinite && !t.isNaN && t >= 0 {
                         currentRealTime = t
+                    }
+                    let dur = AppleMusicService.shared.playbackDuration
+                    if dur > 0 && abs(self.duration - dur) > 1.0 {
+                        self.duration = dur
                     }
                 case .spotify:
                     break

@@ -25,7 +25,7 @@ public final class SGTGWsProxy {
         return URLSession(configuration: config)
     }()
 
-    // Verified fallback domains from Flowseal tg-ws-proxy
+    // Verified fallback domains from Flowseal tg-ws-proxy + official Telegram Web endpoints
     public static let defaultDomains: [String] = [
         "pclead.co.uk",
         "offshor.co.uk",
@@ -46,8 +46,54 @@ public final class SGTGWsProxy {
         "sadnews.co.uk",
         "onedaychamp.co.uk",
         "stopblocking.co.uk",
-        "nothingthere.co.uk"
+        "nothingthere.co.uk",
+        "web.telegram.org"
     ]
+
+    public static var lastWorkingDomain: String?
+
+    public static func decodeCfDomain(_ s: String) -> String {
+        let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasSuffix(".com") else { return trimmed }
+        let p = String(trimmed.dropLast(4))
+        let n = p.unicodeScalars.filter { CharacterSet.letters.contains($0) }.count
+        var res = ""
+        for c in p {
+            if let ascii = c.asciiValue, (65...90).contains(ascii) || (97...122).contains(ascii) {
+                let base: UInt8 = ascii >= 97 ? 97 : 65
+                let shifted = (Int(ascii) - Int(base) - n) % 26
+                let normalized = shifted < 0 ? shifted + 26 : shifted
+                res.append(Character(UnicodeScalar(base + UInt8(normalized))))
+            } else {
+                res.append(c)
+            }
+        }
+        return res + ".co.uk"
+    }
+
+    public func fetchLatestDomains() {
+        guard let url = URL(string: "https://raw.githubusercontent.com/Flowseal/tg-ws-proxy/main/.github/cfproxy-domains.txt") else { return }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 8.0
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            guard let data = data, let text = String(data: data, encoding: .utf8) else { return }
+            let lines = text.components(separatedBy: .newlines)
+            var decoded: [String] = []
+            for line in lines {
+                let d = SGTGWsProxy.decodeCfDomain(line)
+                if !d.isEmpty && !decoded.contains(d) {
+                    decoded.append(d)
+                }
+            }
+            if !decoded.isEmpty {
+                if !decoded.contains("web.telegram.org") {
+                    decoded.append("web.telegram.org")
+                }
+                UserDefaults.standard.set(decoded, forKey: "dox_cached_cfproxy_domains")
+                SGLogger.shared.log("SGTGWsProxy", "Updated \(decoded.count) proxy domains from GitHub")
+            }
+        }.resume()
+    }
 
     private init() {
         NotificationCenter.default.addObserver(
@@ -100,6 +146,7 @@ public final class SGTGWsProxy {
     }
 
     private func startInternal() {
+        self.fetchLatestDomains()
         guard !self.isRunning else { return }
         let portValue = UInt16(SGSimpleSettings.shared.tgWsProxyPort > 0 ? SGSimpleSettings.shared.tgWsProxyPort : 10855)
         guard let port = NWEndpoint.Port(rawValue: portValue) else {
@@ -215,9 +262,18 @@ private final class SGTGWsSession {
         self.queue = queue
         self.onClose = onClose
 
-        let domains = SGTGWsProxy.defaultDomains
-        let startIndex = abs(id) % domains.count
-        self.candidateDomains = (startIndex..<domains.count).map { domains[$0] } + (0..<startIndex).map { domains[$0] }
+        var domains = UserDefaults.standard.stringArray(forKey: "dox_cached_cfproxy_domains") ?? SGTGWsProxy.defaultDomains
+        if domains.isEmpty {
+            domains = SGTGWsProxy.defaultDomains
+        }
+        if let lastWorking = SGTGWsProxy.lastWorkingDomain, let idx = domains.firstIndex(of: lastWorking) {
+            domains.remove(at: idx)
+            domains.insert(lastWorking, at: 0)
+            self.candidateDomains = domains
+        } else {
+            let startIndex = abs(id) % domains.count
+            self.candidateDomains = (startIndex..<domains.count).map { domains[$0] } + (0..<startIndex).map { domains[$0] }
+        }
     }
 
     func start() {
@@ -446,7 +502,7 @@ private final class SGTGWsSession {
         }
 
         var request = URLRequest(url: url)
-        request.timeoutInterval = 10.0
+        request.timeoutInterval = 6.0
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
 
         let isFakeTLS = SGSimpleSettings.shared.tgWsProxyFakeTLS
@@ -454,6 +510,7 @@ private final class SGTGWsSession {
             let hostDomain = url.host ?? "cloudflare.com"
             request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
             request.setValue("https://\(hostDomain)", forHTTPHeaderField: "Origin")
+            request.setValue("binary", forHTTPHeaderField: "Sec-WebSocket-Protocol")
             request.setValue("ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7", forHTTPHeaderField: "Accept-Language")
             request.setValue("permessage-deflate; client_max_window_bits", forHTTPHeaderField: "Sec-WebSocket-Extensions")
             request.setValue("websocket", forHTTPHeaderField: "Sec-Fetch-Dest")
@@ -583,7 +640,12 @@ private final class SGTGWsSession {
 
                 switch result {
                 case let .success(message):
-                    self.hasReceivedWsData = true
+                    if !self.hasReceivedWsData {
+                        self.hasReceivedWsData = true
+                        if self.currentDomainIndex < self.candidateDomains.count {
+                            SGTGWsProxy.lastWorkingDomain = self.candidateDomains[self.currentDomainIndex]
+                        }
+                    }
                     self.pendingClientData.removeAll(keepingCapacity: false)
 
                     let dataToSend: Data?
@@ -621,10 +683,11 @@ private final class SGTGWsSession {
 
                 case let .failure(error):
                     let isCustom = !SGSimpleSettings.shared.tgWsProxyCustomWorker.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    if !self.hasReceivedWsData && self.attemptCount < 3 && !isCustom {
+                    let maxAttempts = isCustom ? 1 : min(self.candidateDomains.count, 8)
+                    if !self.hasReceivedWsData && self.attemptCount < maxAttempts && !isCustom {
                         self.attemptCount += 1
                         self.currentDomainIndex += 1
-                        SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS connect failed (\(error)), failing over to next domain (\(self.attemptCount)/3)...")
+                        SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS connect failed (\(error)), failing over to next domain (\(self.attemptCount)/\(maxAttempts))...")
                         self.stopPingTimer()
                         self.webSocketTask?.cancel(with: .goingAway, reason: nil)
                         self.webSocketTask = nil
