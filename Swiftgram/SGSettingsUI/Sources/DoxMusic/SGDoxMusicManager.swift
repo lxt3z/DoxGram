@@ -286,12 +286,18 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         AppleMusicService.shared.onTrackDidFinish = { [weak self] in
             DispatchQueue.main.async {
-                self?.next()
+                guard let self = self, self.isPlaying else { return }
+                self.next()
             }
         }
         AppleMusicService.shared.onPlaybackFailed = { [weak self] _ in
             DispatchQueue.main.async {
-                self?.next()
+                guard let self = self, self.isPlaying else { return }
+                if self.isAutoplayEnabled || self.isWaveEnabled {
+                    self.next()
+                } else {
+                    self.pause()
+                }
             }
         }
     }
@@ -449,17 +455,19 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 q.shuffle()
             }
             self.queue = q
-        } else if self.queue.isEmpty {
-            var q = self.favorites.filter { $0.id != track.id }
-            if self.isShuffleEnabled {
-                q.shuffle()
-            }
-            self.queue = q
+        } else {
+            self.queue = []
         }
         
         self.stopCurrentAudio()
         UserDefaults.standard.set(false, forKey: "dox_music_is_dismissed")
         self.savePersistedState()
+        
+        // 1. Check if track is downloaded for offline playback
+        if let localUrl = SGDoxMusicOfflineManager.shared.localAudioUrl(for: track.id) {
+            self.playLocalAudioFile(url: localUrl, track: track)
+            return
+        }
         
         switch track.source {
         case .appleMusic:
@@ -491,6 +499,22 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
     }
     
+    private func playLocalAudioFile(url: URL, track: SGDoxMusicTrack) {
+        let playerItem = AVPlayerItem(url: url)
+        let player = AVPlayer(playerItem: playerItem)
+        self.avPlayer = player
+        
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
+        
+        player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.play()
+        self.isPlaying = true
+        self.startTimeTracking()
+        self.notifyStateChanged()
+        self.checkWaveReplenishmentIfNeeded()
+    }
+
     private func playTelegramTrack(track: SGDoxMusicTrack) {
         guard let preview = track.previewUrl, let url = URL(string: preview) else {
             self.isPlaying = false
@@ -513,6 +537,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     @objc private func playerDidFinishPlaying() {
+        guard self.isPlaying else { return }
         self.next()
     }
     
@@ -545,7 +570,24 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     public func resume() {
         if let track = self.currentTrack {
             UserDefaults.standard.set(false, forKey: "dox_music_is_dismissed")
-            if track.source == .telegram && self.avPlayer == nil {
+            if let localUrl = SGDoxMusicOfflineManager.shared.localAudioUrl(for: track.id) {
+                if self.avPlayer == nil {
+                    self.playLocalAudioFile(url: localUrl, track: track)
+                    if self.currentTime > 0 {
+                        self.seek(to: self.currentTime)
+                    }
+                    return
+                }
+                self.isPlaying = true
+                self.playbackStartTimestamp = CACurrentMediaTime()
+                self.playbackStartOffset = self.currentTime
+                self.hasSyncedAudioStart = false
+                self.avPlayer?.play()
+                self.startTimeTracking()
+                self.savePersistedState()
+                self.notifyStateChanged()
+                return
+            } else if track.source == .telegram && self.avPlayer == nil {
                 self.playTelegramTrack(track: track)
                 if self.currentTime > 0 {
                     self.seek(to: self.currentTime)
@@ -608,14 +650,6 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         if !self.queue.isEmpty {
             let nextTrack = self.queue.removeFirst()
             self.play(track: nextTrack, queue: self.queue)
-            return
-        }
-        
-        let eff = self.effectiveQueue()
-        if !eff.isEmpty {
-            var remaining = eff
-            let nextTrack = remaining.removeFirst()
-            self.play(track: nextTrack, queue: remaining)
             return
         }
         

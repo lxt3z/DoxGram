@@ -811,6 +811,10 @@ public final class AppleMusicService: @unchecked Sendable {
         NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidStall), name: .AVPlayerItemPlaybackStalled, object: playerItem)
         NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidFail), name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
         
+        guard SGDoxMusicManager.shared.isPlaying else {
+            completion(false)
+            return
+        }
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
         DispatchQueue.main.async {
@@ -820,22 +824,26 @@ public final class AppleMusicService: @unchecked Sendable {
 
     @objc private func avPlayerDidFinishPlaying() {
         DispatchQueue.main.async { [weak self] in
+            guard SGDoxMusicManager.shared.isPlaying else { return }
             self?.onTrackDidFinish?()
         }
     }
 
     @objc private func avPlayerDidStall() {
+        guard SGDoxMusicManager.shared.isPlaying else { return }
         guard let track = self.currentTrack, !self.isDeezerPreviewActive else { return }
         self.isDeezerPreviewActive = true
         self.fetchDeezerPreview(artist: track.artist, title: track.title) { [weak self] deezerUrl, _ in
             guard let self = self, let deezerUrl = deezerUrl else { return }
             DispatchQueue.main.async {
+                guard SGDoxMusicManager.shared.isPlaying else { return }
                 self.playPreview(url: deezerUrl) { _ in }
             }
         }
     }
 
     @objc private func avPlayerDidFail() {
+        guard SGDoxMusicManager.shared.isPlaying else { return }
         self.avPlayerDidStall()
     }
     

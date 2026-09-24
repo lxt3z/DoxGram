@@ -34,6 +34,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var isQueueMode = false
     
     // --- Now Playing Pane ---
+    private let artworkAmbientGlowView = UIView()
+    private let artworkGlowGradientLayer = CAGradientLayer()
     private let artworkContainerView = UIView()
     private let artworkImageView = UIImageView()
     
@@ -58,6 +60,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let pinToProfileButton = UIButton(type: .system)
     private let waveButton = UIButton(type: .system)
     private let autoplayButton = UIButton(type: .system)
+    private let downloadButton = UIButton(type: .system)
     
     public var onDismiss: (() -> Void)?
     
@@ -272,6 +275,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func setupNowPlayingPane() {
+        // Animated Ambient Glow behind Artwork
+        self.artworkAmbientGlowView.layer.cornerRadius = 44
+        self.artworkAmbientGlowView.clipsToBounds = false
+        self.artworkGlowGradientLayer.cornerRadius = 44
+        self.artworkGlowGradientLayer.startPoint = CGPoint(x: 0.1, y: 0.1)
+        self.artworkGlowGradientLayer.endPoint = CGPoint(x: 0.9, y: 0.9)
+        self.artworkAmbientGlowView.layer.addSublayer(self.artworkGlowGradientLayer)
+        self.nowPlayingContainerView.addSubview(self.artworkAmbientGlowView)
+
         // Artwork
         self.artworkContainerView.layer.cornerRadius = 24
         self.artworkContainerView.layer.shadowOffset = CGSize(width: 0, height: 16)
@@ -366,11 +378,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         self.nowPlayingContainerView.addSubview(self.controlsContainerView)
         
-        // Bottom Action Buttons: Profile | Wave | Autoplay
+        // Bottom Action Buttons: Profile | Wave | Autoplay | Download
         self.actionsStackView.axis = .horizontal
         self.actionsStackView.distribution = .fillEqually
         self.actionsStackView.alignment = .fill
-        self.actionsStackView.spacing = 10
+        self.actionsStackView.spacing = 8
         
         self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.circle")
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
@@ -383,6 +395,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.styleCapsuleButton(self.autoplayButton, title: "Авто", icon: "infinity")
         self.autoplayButton.addTarget(self, action: #selector(self.autoplayPressed), for: .touchUpInside)
         self.actionsStackView.addArrangedSubview(self.autoplayButton)
+
+        self.styleCapsuleButton(self.downloadButton, title: "Скачать", icon: "arrow.down.circle")
+        self.downloadButton.addTarget(self, action: #selector(self.downloadPressed), for: .touchUpInside)
+        self.actionsStackView.addArrangedSubview(self.downloadButton)
         
         self.nowPlayingContainerView.addSubview(self.actionsStackView)
     }
@@ -594,6 +610,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.artworkContainerView.frame = CGRect(x: artX, y: artY, width: artSide, height: artSide)
         self.artworkImageView.frame = self.artworkContainerView.bounds
         
+        let glowInset: CGFloat = -22.0
+        self.artworkAmbientGlowView.frame = self.artworkContainerView.frame.insetBy(dx: glowInset, dy: glowInset)
+        self.artworkGlowGradientLayer.frame = self.artworkAmbientGlowView.bounds
+        
         // Info: Title & Artist
         let infoY = artY + artSide + 20.0
         let heartSize: CGFloat = 36.0
@@ -759,6 +779,18 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.waveButton.backgroundColor = manager.isWaveEnabled ? UIColor(red: 0.95, green: 0.25, blue: 0.50, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
         self.autoplayButton.backgroundColor = manager.isAutoplayEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
         
+        let isDownloaded = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
+        let downConfig = UIImage.SymbolConfiguration(pointSize: 11.5, weight: .semibold)
+        if isDownloaded {
+            self.downloadButton.backgroundColor = UIColor(red: 0.18, green: 0.80, blue: 0.44, alpha: 0.85)
+            self.downloadButton.setTitle(" Скачано", for: .normal)
+            self.downloadButton.setImage(UIImage(systemName: "checkmark.circle.fill", withConfiguration: downConfig), for: .normal)
+        } else {
+            self.downloadButton.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+            self.downloadButton.setTitle(" Скачать", for: .normal)
+            self.downloadButton.setImage(UIImage(systemName: "arrow.down.circle", withConfiguration: downConfig), for: .normal)
+        }
+        
         self.updateArtworkScale(isPlaying: manager.isPlaying, animated: true)
     }
     
@@ -829,6 +861,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             
             let newColors = [vibrantColor.cgColor, avgColor.cgColor, deepColor.cgColor]
             
+            let glowColors = [
+                vibrantColor.withAlphaComponent(0.75).cgColor,
+                avgColor.withAlphaComponent(0.40).cgColor,
+                UIColor.clear.cgColor
+            ]
+            
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 let animation = CABasicAnimation(keyPath: "colors")
@@ -839,8 +877,48 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 self.ambientGradientLayer.colors = newColors
                 
                 self.artworkContainerView.layer.shadowColor = vibrantColor.cgColor
+                
+                self.artworkGlowGradientLayer.colors = glowColors
+                self.artworkAmbientGlowView.layer.shadowColor = vibrantColor.cgColor
+                self.artworkAmbientGlowView.layer.shadowRadius = 36.0
+                self.artworkAmbientGlowView.layer.shadowOpacity = 0.80
+                self.artworkAmbientGlowView.layer.shadowOffset = CGSize(width: 0, height: 8)
+                self.startGlowAnimation()
             }
         }
+    }
+    
+    private func startGlowAnimation() {
+        self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowPulse")
+        self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowAlpha")
+        self.artworkGlowGradientLayer.removeAnimation(forKey: "glowShift")
+        
+        let pulseAnim = CABasicAnimation(keyPath: "transform.scale")
+        pulseAnim.fromValue = 0.96
+        pulseAnim.toValue = 1.05
+        pulseAnim.duration = 3.8
+        pulseAnim.autoreverses = true
+        pulseAnim.repeatCount = .infinity
+        pulseAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        self.artworkAmbientGlowView.layer.add(pulseAnim, forKey: "glowPulse")
+        
+        let alphaAnim = CABasicAnimation(keyPath: "opacity")
+        alphaAnim.fromValue = 0.65
+        alphaAnim.toValue = 0.95
+        alphaAnim.duration = 4.2
+        alphaAnim.autoreverses = true
+        alphaAnim.repeatCount = .infinity
+        alphaAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        self.artworkAmbientGlowView.layer.add(alphaAnim, forKey: "glowAlpha")
+        
+        let shiftAnim = CABasicAnimation(keyPath: "startPoint")
+        shiftAnim.fromValue = CGPoint(x: 0.1, y: 0.1)
+        shiftAnim.toValue = CGPoint(x: 0.8, y: 0.9)
+        shiftAnim.duration = 6.0
+        shiftAnim.autoreverses = true
+        shiftAnim.repeatCount = .infinity
+        shiftAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        self.artworkGlowGradientLayer.add(shiftAnim, forKey: "glowShift")
     }
     
     private func formatTime(_ seconds: Double) -> String {
@@ -945,6 +1023,36 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         SGDoxMusicManager.shared.toggleAutoplay()
         self.updateContent()
         self.reloadQueueData()
+    }
+    
+    @objc private func downloadPressed() {
+        guard let track = SGDoxMusicManager.shared.currentTrack else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        
+        let isDown = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
+        if isDown {
+            SGDoxMusicOfflineManager.shared.deleteTrack(trackId: track.id)
+            let overlay = UndoOverlayController(presentationData: self.presentationData, content: .actionSucceeded(title: nil, text: "Трек удален из офлайн-памяти", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+            self.present(overlay, in: .window(.root))
+            self.updateContent()
+            self.reloadQueueData()
+        } else {
+            let hud = OverlayStatusController(theme: self.presentationData.theme, type: .loading(cancelled: nil))
+            self.present(hud, in: .window(.root))
+            SGDoxMusicOfflineManager.shared.downloadTrack(track: track) { [weak self, weak hud] success in
+                hud?.dismiss()
+                guard let self = self else { return }
+                if success {
+                    let overlay = UndoOverlayController(presentationData: self.presentationData, content: .actionSucceeded(title: nil, text: "Трек сохранен для прослушивания офлайн", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                    self.present(overlay, in: .window(.root))
+                } else {
+                    let overlay = UndoOverlayController(presentationData: self.presentationData, content: .info(title: "Ошибка", text: "Не удалось скачать аудиофайл", timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
+                    self.present(overlay, in: .window(.root))
+                }
+                self.updateContent()
+                self.reloadQueueData()
+            }
+        }
     }
     
     @objc private func playPausePressed() {
@@ -1079,6 +1187,7 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
     private let artistLabel = UILabel()
     private let durationLabel = UILabel()
     private let sourceIconView = UIImageView()
+    private let downloadedBadge = UIImageView()
     private var currentTrackId: String?
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -1102,6 +1211,13 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         self.artistLabel.lineBreakMode = .byTruncatingTail
         self.contentView.addSubview(self.artistLabel)
         
+        let downCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        self.downloadedBadge.image = UIImage(systemName: "arrow.down.circle.fill", withConfiguration: downCfg)
+        self.downloadedBadge.tintColor = UIColor(red: 0.18, green: 0.80, blue: 0.44, alpha: 0.90)
+        self.downloadedBadge.contentMode = .scaleAspectFit
+        self.downloadedBadge.isHidden = true
+        self.contentView.addSubview(self.downloadedBadge)
+        
         self.durationLabel.textColor = UIColor(white: 1.0, alpha: 0.45)
         self.durationLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)
         self.durationLabel.textAlignment = .right
@@ -1120,6 +1236,9 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         self.currentTrackId = track.id
         self.titleLabel.text = track.title
         self.artistLabel.text = track.artist
+        
+        let isDown = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
+        self.downloadedBadge.isHidden = !isDown
         
         let d = Int(track.duration)
         self.durationLabel.text = d > 0 ? String(format: "%d:%02d", d / 60, d % 60) : ""
@@ -1149,6 +1268,12 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         let textX = self.artworkImageView.frame.maxX + 12.0
         let textW = max(0, self.sourceIconView.frame.minX - textX - 8.0)
         self.titleLabel.frame = CGRect(x: textX, y: 11, width: textW, height: 20)
-        self.artistLabel.frame = CGRect(x: textX, y: 31, width: textW, height: 18)
+        
+        if !self.downloadedBadge.isHidden {
+            self.downloadedBadge.frame = CGRect(x: textX, y: 34, width: 13, height: 13)
+            self.artistLabel.frame = CGRect(x: textX + 17, y: 31, width: textW - 17, height: 18)
+        } else {
+            self.artistLabel.frame = CGRect(x: textX, y: 31, width: textW, height: 18)
+        }
     }
 }

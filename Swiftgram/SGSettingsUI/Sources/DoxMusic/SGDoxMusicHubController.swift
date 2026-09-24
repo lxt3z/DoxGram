@@ -224,6 +224,7 @@ private final class SGDoxTrackCell: UITableViewCell {
     let artworkView = UIImageView()
     let playingIndicator = UIImageView()
     let titleLabel = UILabel()
+    let downloadedBadge = UIImageView()
     let artistLabel = UILabel()
     let likeButton = UIButton(type: .system)
     let separatorView = UIView()
@@ -248,6 +249,12 @@ private final class SGDoxTrackCell: UITableViewCell {
         
         self.titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         self.contentView.addSubview(self.titleLabel)
+        
+        let downCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        self.downloadedBadge.image = UIImage(systemName: "arrow.down.circle.fill", withConfiguration: downCfg)
+        self.downloadedBadge.contentMode = .scaleAspectFit
+        self.downloadedBadge.isHidden = true
+        self.contentView.addSubview(self.downloadedBadge)
         
         self.artistLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         self.contentView.addSubview(self.artistLabel)
@@ -275,7 +282,12 @@ private final class SGDoxTrackCell: UITableViewCell {
         
         let textWidth = bounds.width - 70 - 48
         self.titleLabel.frame = CGRect(x: 70, y: 10, width: textWidth, height: 20)
-        self.artistLabel.frame = CGRect(x: 70, y: 30, width: textWidth, height: 18)
+        if !self.downloadedBadge.isHidden {
+            self.downloadedBadge.frame = CGRect(x: 70, y: 33, width: 13, height: 13)
+            self.artistLabel.frame = CGRect(x: 70 + 17, y: 30, width: textWidth - 17, height: 18)
+        } else {
+            self.artistLabel.frame = CGRect(x: 70, y: 30, width: textWidth, height: 18)
+        }
         
         self.likeButton.frame = CGRect(x: bounds.width - 44, y: 7, width: 36, height: 44)
         self.separatorView.frame = CGRect(x: 70, y: bounds.height - 0.5, width: bounds.width - 70, height: 0.5)
@@ -368,6 +380,12 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             let serviceIndex = IndexPath(row: 2, section: 0)
             if self.tableView.numberOfSections > 0 && self.tableView.numberOfRows(inSection: 0) > 2 {
                 self.tableView.reloadRows(at: [serviceIndex], with: .none)
+            }
+        }
+        
+        SGDoxMusicOfflineManager.shared.onDownloadsChanged = { [weak self] in
+            DispatchQueue.main.async {
+                self?.tableView.reloadData()
             }
         }
         
@@ -818,6 +836,10 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         
         cell.playingIndicator.isHidden = !isPlaying
         cell.playingIndicator.tintColor = theme.list.itemAccentColor
+        
+        let isDown = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
+        cell.downloadedBadge.isHidden = !isDown
+        cell.downloadedBadge.tintColor = theme.list.itemAccentColor
         
         let isFav = SGDoxMusicManager.shared.isFavorite(track: track)
         let heartConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
