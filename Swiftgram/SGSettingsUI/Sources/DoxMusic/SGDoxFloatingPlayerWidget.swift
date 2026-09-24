@@ -253,12 +253,36 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         let widgetWidth = min(size.width - horizontalMargin * 2.0, 420.0)
         let x = floor((size.width - widgetWidth) * 0.5)
         
-        // Floating tab bar clearance:
-        // Tab bar height is 64pt (56 + 8), bottom safe area inset is capped at 34.0 (hardware home indicator).
-        // Adding 14pt extra gap above the tab bar so it floats cleanly without touching or overlapping navigation.
-        let safeBottom = min(max(insets.bottom, 8.0), 34.0)
-        let bottomOffset = safeBottom + 64.0 + 14.0
-        let y = size.height - bottomOffset - widgetHeight
+        // Find actual tab bar in view hierarchy if possible
+        var tabBarTop: CGFloat?
+        if let superview = self.superview {
+            func findTabBar(in view: UIView) -> UIView? {
+                for sub in view.subviews {
+                    if sub !== self {
+                        let name = String(describing: type(of: sub))
+                        if (name.contains("TabBar") || name.contains("tabBar")) && sub.frame.height > 20.0 && sub.frame.minY > size.height * 0.5 {
+                            return sub
+                        }
+                        if let child = findTabBar(in: sub) {
+                            return child
+                        }
+                    }
+                }
+                return nil
+            }
+            if let tb = findTabBar(in: superview) {
+                tabBarTop = tb.frame.minY
+            }
+        }
+        
+        let y: CGFloat
+        if let tbTop = tabBarTop, tbTop > size.height * 0.5 {
+            y = tbTop - widgetHeight - 8.0
+        } else {
+            let safeBottom = min(max(insets.bottom, 8.0), 34.0)
+            let defaultTabBarHeight: CGFloat = 52.0
+            y = size.height - safeBottom - defaultTabBarHeight - widgetHeight - 8.0
+        }
         
         let targetFrame = CGRect(x: x, y: y, width: widgetWidth, height: widgetHeight)
         

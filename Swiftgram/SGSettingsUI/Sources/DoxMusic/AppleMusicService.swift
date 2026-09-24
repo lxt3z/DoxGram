@@ -53,27 +53,7 @@ public final class AppleMusicService: @unchecked Sendable {
     }
 
     @objc private func playerStateDidChange() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self, self.isUsingSystemPlayer else { return }
-            let state = self.player.playbackState
-            let time = self.player.currentPlaybackTime
-            
-            // If the player stopped/paused unexpectedly within the first 6.5s (FairPlay DRM cutoff)
-            if (state == .stopped || state == .paused || state == .interrupted) && time <= 6.5 {
-                if let track = self.currentTrack {
-                    self.playbackStartWatchdogTimer?.invalidate()
-                    self.playbackStartWatchdogTimer = nil
-                    self.canPlayCatalogContent = false
-                    self.isUsingSystemPlayer = false
-                    self.player.stop()
-                    self.fallbackPlayPreviewOrSearch(track: track) { [weak self] success in
-                        if !success {
-                            self?.onPlaybackFailed?(track)
-                        }
-                    }
-                }
-            }
-        }
+        // Track state observation if needed, without false-positive fallbacks
     }
     
     public var isAuthorized: Bool {
@@ -698,29 +678,9 @@ public final class AppleMusicService: @unchecked Sendable {
                     DispatchQueue.main.async {
                         guard let self = self else { return }
                         if error == nil {
-                            player.currentPlaybackTime = 0.0
                             player.play()
+                            player.currentPlaybackTime = 0.0
                             self.isUsingSystemPlayer = true
-                            
-                            // FairPlay DRM watchdog: if user doesn't have an active Apple Music subscription,
-                            // playback terminates after ~5 seconds. Detect this and automatically switch to Deezer/preview!
-                            self.playbackStartWatchdogTimer?.invalidate()
-                            self.playbackStartWatchdogTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 6.5, repeats: false) { [weak self] _ in
-                                guard let self = self, self.isUsingSystemPlayer else { return }
-                                let time = self.player.currentPlaybackTime
-                                let state = self.player.playbackState
-                                if (state == .stopped || state == .paused || state == .interrupted || time <= 1.0) {
-                                    self.canPlayCatalogContent = false
-                                    self.isUsingSystemPlayer = false
-                                    self.player.stop()
-                                    self.fallbackPlayPreviewOrSearch(track: track) { success in
-                                        if !success {
-                                            self.onPlaybackFailed?(track)
-                                        }
-                                    }
-                                }
-                            }
-                            
                             completion(true)
                         } else {
                             // Fallback to preview stream or search
@@ -851,7 +811,7 @@ public final class AppleMusicService: @unchecked Sendable {
         NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidStall), name: .AVPlayerItemPlaybackStalled, object: playerItem)
         NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidFail), name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
         
-        player.seek(to: .zero)
+        player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
         DispatchQueue.main.async {
             completion(true)
@@ -885,6 +845,16 @@ public final class AppleMusicService: @unchecked Sendable {
         }
         self.avPlayer?.pause()
     }
+
+    public func stop() {
+        self.playbackStartWatchdogTimer?.invalidate()
+        self.playbackStartWatchdogTimer = nil
+        self.player.stop()
+        self.isUsingSystemPlayer = false
+        self.avPlayer?.pause()
+        self.avPlayer = nil
+        self.currentTrack = nil
+    }
     
     public func resume() {
         if self.isUsingSystemPlayer {
@@ -898,7 +868,7 @@ public final class AppleMusicService: @unchecked Sendable {
         if self.isUsingSystemPlayer {
             self.player.currentPlaybackTime = seconds
         } else {
-            self.avPlayer?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+            self.avPlayer?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         }
     }
     

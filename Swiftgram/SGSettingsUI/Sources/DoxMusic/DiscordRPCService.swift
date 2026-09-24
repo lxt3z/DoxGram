@@ -35,6 +35,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     private var currentTrackDuration: Double = 0.0
     private var activeTrackId: String?
     private var activeStartTimestamp: Int64?
+    private var isAudioSyncedForCurrentTrack = false
     private var externalAssetCache: [String: String] = [:]
     private var resolvingUrls: Set<String> = []
     
@@ -240,6 +241,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         if !isPlaying || track?.id != self.activeTrackId {
             self.activeTrackId = track?.id
             self.activeStartTimestamp = nil
+            self.isAudioSyncedForCurrentTrack = false
         }
         self.currentPlayingTrack = track
         self.currentIsPlaying = isPlaying
@@ -309,7 +311,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         let now = Date().timeIntervalSince1970
         let startTimestamp: Int64
         let expectedStart = now - self.currentPlaybackTime
-        if self.activeTrackId == track.id, let existingStart = self.activeStartTimestamp, abs(Double(existingStart) / 1000.0 - expectedStart) < 3.0 {
+        if self.activeTrackId == track.id, let existingStart = self.activeStartTimestamp, self.isAudioSyncedForCurrentTrack, abs(Double(existingStart) / 1000.0 - expectedStart) < 2.0 {
             // Keep the exact same established startTimestamp for this track so Discord client timer stays rock-steady and does not drift
             startTimestamp = existingStart
         } else {
@@ -317,6 +319,9 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
             startTimestamp = computed
             self.activeTrackId = track.id
             self.activeStartTimestamp = computed
+            if self.currentPlaybackTime >= 0.15 {
+                self.isAudioSyncedForCurrentTrack = true
+            }
         }
         
         var timestamps: [String: Any] = [
@@ -338,32 +343,23 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         }
         
         if let artwork = track.artworkUrl, !artwork.isEmpty {
-            if let cachedMp = self.externalAssetCache[artwork] {
+            if artwork.hasPrefix("http://") || artwork.hasPrefix("https://") {
+                assets["large_image"] = artwork
+            } else if let cachedMp = self.externalAssetCache[artwork] {
                 assets["large_image"] = cachedMp
             } else if track.source == .spotify && artwork.contains("i.scdn.co/image/") {
                 let id = artwork.components(separatedBy: "/").last ?? ""
                 if !id.isEmpty {
                     assets["large_image"] = "spotify:\(id)"
                 }
-                self.resolveExternalAsset(imageUrl: artwork)
             } else if artwork.hasPrefix("mp:") {
                 assets["large_image"] = artwork
-            } else {
-                self.resolveExternalAsset(imageUrl: artwork)
             }
         }
         
         let doxgramIconUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Telegram/Telegram-iOS/SGDefault.alticon/SGDefault%403x.png"
-        if let cachedDox = self.externalAssetCache[doxgramIconUrl] {
-            assets["small_image"] = cachedDox
-            assets["small_text"] = "DoxGram iOS"
-        } else {
-            self.resolveExternalAsset(imageUrl: doxgramIconUrl)
-            if track.source == .spotify {
-                assets["small_image"] = "spotify"
-                assets["small_text"] = "DoxGram iOS"
-            }
-        }
+        assets["small_image"] = doxgramIconUrl
+        assets["small_text"] = "DoxGram iOS"
         
         if !assets.isEmpty {
             activity["assets"] = assets

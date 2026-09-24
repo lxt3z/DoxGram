@@ -1595,6 +1595,9 @@ public class Account {
         self.managedStickerPacksDisposable.set(manageStickerPacks(network: self.network, postbox: self.postbox).start())
         if !self.supplementary {
             self.viewTracker.chatHistoryPreloadManager.start()
+            for channelId in SGSimpleSettings.shared.autoDownloadChannels {
+                let _ = self.viewTracker.chatHistoryPreloadManager.addAdditionalPeerId(peerId: PeerId(channelId))
+            }
         }
     }
     

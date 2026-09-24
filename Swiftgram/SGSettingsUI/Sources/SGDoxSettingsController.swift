@@ -76,6 +76,7 @@ private enum SGDoxDisclosureLink: String {
     case doxMusic
     case discordRpcToken
     case deletedMediaVault
+    case autoDownloadChannels
     case streamerSettings
     case tgWsProxyWorkerDomain
     case globalAnimatedWallpaper
@@ -142,6 +143,10 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     entries.append(.toggle(id: id.count, section: .media, settingName: .keepEditHistory, value: SGSimpleSettings.shared.keepEditHistory, text: i18n("Settings.Ayugram.KeepEditHistory", lang), enabled: true))
     entries.append(.oneFromManySelector(id: id.count, section: .media, settingName: .ayugramRetention, text: i18n("Settings.Ayugram.Retention", lang), value: retentionText, enabled: true))
     entries.append(.disclosure(id: id.count, section: .media, link: .deletedMediaVault, text: i18n("Settings.Ayugram.DeletedMediaVault", lang)))
+    let autoDownloadCount = SGSimpleSettings.shared.autoDownloadChannels.count
+    let autoDownloadSubtitle = autoDownloadCount > 0 ? "\(autoDownloadCount)" : (isRu ? "Нет" : "None")
+    entries.append(.disclosure(id: id.count, section: .media, link: .autoDownloadChannels, text: "\(isRu ? "Автозагрузка медиа в каналах" : "Channel Media Auto-Download") (\(autoDownloadSubtitle))"))
+    entries.append(.notice(id: id.count, section: .media, text: isRu ? "Автоматически загружает фото и видео в фоновом режиме для выбранных каналов, даже если вы в них не заходите. Это сохраняет медиа в памяти, если пост будет удален автором." : "Automatically downloads photos and videos in the background for selected channels without opening them, preserving media if the post is deleted."))
 
     // MARK: - Streamer Mode
     entries.append(.header(id: id.count, section: .streamer, text: i18n("Settings.Ayugram.StreamerHeader", lang), badge: nil))
@@ -411,6 +416,62 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
             context.sharedContext.applicationBindings.presentNativeController(alert)
         case .deletedMediaVault:
             pushControllerImpl?(sgDeletedMediaController(context: context, peerId: nil))
+        case .autoDownloadChannels:
+            let openPicker: () -> Void = {
+                let controller = context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(
+                    context: context,
+                    filter: [.onlyChannels],
+                    hasContactSelector: false,
+                    title: isRu ? "Автозагрузка каналов" : "Auto-Download Channels",
+                    multipleSelection: true,
+                    immediatelyActivateMultipleSelection: true
+                ))
+                controller.multiplePeersSelected = { [weak controller] peers, _, _, _, _, _ in
+                    var current = SGSimpleSettings.shared.autoDownloadChannels
+                    for peer in peers {
+                        let pid = peer.id.toInt64()
+                        if !current.contains(pid) {
+                            current.append(pid)
+                        }
+                    }
+                    SGSimpleSettings.shared.autoDownloadChannels = current
+                    simplePromise.set(true)
+                    controller?.dismiss()
+                    let msg = isRu ? "Каналы добавлены: \(peers.count)" : "Channels added: \(peers.count)"
+                    let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: msg, cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                    presentControllerImpl?(overlay, nil)
+                }
+                pushControllerImpl?(controller)
+            }
+
+            let currentCount = SGSimpleSettings.shared.autoDownloadChannels.count
+            if currentCount == 0 {
+                openPicker()
+            } else {
+                let actionSheet = ActionSheetController(presentationData: presentationData)
+                var items: [ActionSheetItem] = []
+
+                items.append(ActionSheetButtonItem(title: isRu ? "Добавить каналы" : "Add Channels", color: .accent, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
+                    openPicker()
+                }))
+
+                items.append(ActionSheetButtonItem(title: isRu ? "Очистить список (\(currentCount))" : "Clear List (\(currentCount))", color: .destructive, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
+                    SGSimpleSettings.shared.autoDownloadChannels = []
+                    simplePromise.set(true)
+                    let msg = isRu ? "Список каналов очищен" : "Channel list cleared"
+                    let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: msg, cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                    presentControllerImpl?(overlay, nil)
+                }))
+
+                actionSheet.setItemGroups([ActionSheetItemGroup(items: items), ActionSheetItemGroup(items: [
+                    ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
+                        actionSheet?.dismissAnimated()
+                    })
+                ])])
+                presentControllerImpl?(actionSheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+            }
         case .streamerSettings:
             pushControllerImpl?(sgStreamerSettingsController(context: context))
         case .tgWsProxyWorkerDomain:

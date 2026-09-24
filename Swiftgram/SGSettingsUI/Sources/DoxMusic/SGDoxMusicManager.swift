@@ -275,6 +275,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private var lastReportedDuration: Double = 0.0
     private var lastReportedArtworkUrl: String?
     private var hasSyncedAudioStart: Bool = false
+    private var isTransitioningTrack: Bool = false
     
     private override init() {
         super.init()
@@ -392,7 +393,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             } else {
                 // If real audio output has not started yet (still buffering/loading),
                 // do not accumulate elapsed time ahead of audio output!
-                if currentRealTime == 0.0 && self.currentTime == 0.0 {
+                if (currentRealTime == nil || currentRealTime == 0.0) && self.playbackStartOffset == 0.0 {
                     self.playbackStartTimestamp = CACurrentMediaTime()
                     current = 0.0
                 } else {
@@ -590,6 +591,14 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     public func next() {
+        if self.isTransitioningTrack {
+            return
+        }
+        self.isTransitioningTrack = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.isTransitioningTrack = false
+        }
+        
         if self.repeatMode == .one, self.currentTrack != nil {
             self.seek(to: 0.0)
             self.resume()

@@ -494,13 +494,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func styleCapsuleButton(_ button: UIButton, title: String, icon: String) {
-        let config = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        let config = UIImage.SymbolConfiguration(pointSize: 11.5, weight: .semibold)
         button.setImage(UIImage(systemName: icon, withConfiguration: config), for: .normal)
         button.setTitle(" \(title)", for: .normal)
         button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 11.5, weight: .semibold)
         button.titleLabel?.adjustsFontSizeToFitWidth = true
-        button.titleLabel?.minimumScaleFactor = 0.75
+        button.titleLabel?.minimumScaleFactor = 0.65
         button.titleLabel?.lineBreakMode = .byClipping
         button.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
         button.tintColor = .white
@@ -508,7 +508,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         button.layer.cornerCurve = .continuous
         button.layer.borderWidth = 0.5
         button.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
-        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 4, bottom: 6, right: 4)
     }
     
     private func generateSliderThumb() -> UIImage {
@@ -589,9 +589,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let maxArtSide = min(bounds.width - 64, bounds.height * 0.40)
         let artSide = max(160, maxArtSide)
         let artY: CGFloat = 14.0
-        self.artworkContainerView.bounds = CGRect(x: 0, y: 0, width: artSide, height: artSide)
-        self.artworkContainerView.center = CGPoint(x: bounds.width * 0.5, y: artY + artSide * 0.5)
-        self.artworkImageView.frame = CGRect(x: 0, y: 0, width: artSide, height: artSide)
+        let artX = floor((bounds.width - artSide) * 0.5)
+        self.artworkContainerView.transform = .identity
+        self.artworkContainerView.frame = CGRect(x: artX, y: artY, width: artSide, height: artSide)
+        self.artworkImageView.frame = self.artworkContainerView.bounds
         
         // Info: Title & Artist
         let infoY = artY + artSide + 20.0
@@ -780,21 +781,17 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func updateArtworkScale(isPlaying: Bool, animated: Bool) {
-        let block = {
-            self.artworkContainerView.transform = .identity
-            if isPlaying {
-                self.artworkContainerView.layer.shadowOpacity = 0.55
-                self.artworkContainerView.layer.shadowRadius = 26
-            } else {
-                self.artworkContainerView.layer.shadowOpacity = 0.30
-                self.artworkContainerView.layer.shadowRadius = 16
-            }
-        }
+        let opacity: Float = isPlaying ? 0.55 : 0.30
+        let radius: CGFloat = isPlaying ? 26.0 : 16.0
         if animated {
-            UIView.animate(withDuration: 0.35, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState], animations: block)
-        } else {
-            block()
+            let anim = CABasicAnimation(keyPath: "shadowOpacity")
+            anim.fromValue = self.artworkContainerView.layer.shadowOpacity
+            anim.toValue = opacity
+            anim.duration = 0.3
+            self.artworkContainerView.layer.add(anim, forKey: "shadowOpacity")
         }
+        self.artworkContainerView.layer.shadowOpacity = opacity
+        self.artworkContainerView.layer.shadowRadius = radius
     }
     
     private func updateAmbientColor(from image: UIImage) {

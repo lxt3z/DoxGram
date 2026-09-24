@@ -3835,6 +3835,28 @@ func saveMessageMediaToAyugramStorage(msg: Message, mediaBox: MediaBox) {
     }
 }
 
+func autoDownloadChannelMediaIfNeeded(messages: [StoreMessage], transaction: Transaction, mediaBox: MediaBox) {
+    let channelIds = SGSimpleSettings.shared.autoDownloadChannels
+    guard !channelIds.isEmpty else { return }
+    
+    for message in messages {
+        guard case let .Id(id) = message.id else { continue }
+        let peerIdInt = id.peerId.toInt64()
+        guard channelIds.contains(peerIdInt) else { continue }
+        guard let peer = transaction.getPeer(id.peerId) else { continue }
+        
+        let msgRef = MessageReference(peer: peer, author: nil, id: id, timestamp: message.timestamp, incoming: true, secret: false, threadId: message.threadId)
+        
+        for media in message.media {
+            if let image = media as? TelegramMediaImage, let rep = image.representations.last {
+                let _ = fetchedMediaResource(mediaBox: mediaBox, userLocation: .peer(id.peerId), userContentType: .image, reference: ImageMediaReference.message(message: msgRef, media: image).resourceReference(rep.resource)).start()
+            } else if let file = media as? TelegramMediaFile {
+                let _ = fetchedMediaResource(mediaBox: mediaBox, userLocation: .peer(id.peerId), userContentType: MediaResourceUserContentType(file: file), reference: FileMediaReference.message(message: msgRef, media: file).resourceReference(file.resource)).start()
+            }
+        }
+    }
+}
+
 private final class OptimizeAddMessagesState {
     var messages: [StoreMessage]
     var location: AddMessagesLocation
@@ -4295,6 +4317,7 @@ func replayFinalState(
                 }
             
                 let _ = transaction.addMessages(messages, location: location)
+                autoDownloadChannelMediaIfNeeded(messages: messages, transaction: transaction, mediaBox: mediaBox)
                 if case .UpperHistoryBlock = location {
                     for message in messages {
                         let chatPeerId = message.id.peerId

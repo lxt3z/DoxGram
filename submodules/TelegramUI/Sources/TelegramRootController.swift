@@ -120,6 +120,12 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
                 floatingWidget.setHiddenForSubscreens(isSubscreen)
                 if !isSubscreen {
                     floatingWidget.superview?.bringSubviewToFront(floatingWidget)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self, weak floatingWidget] in
+                        guard let self = self, let floatingWidget = floatingWidget else { return }
+                        if let layout = self.validLayout {
+                            floatingWidget.updateLayout(size: layout.size, insets: layout.safeInsets, transition: .immediate)
+                        }
+                    }
                 }
             }
         })

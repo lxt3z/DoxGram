@@ -225,6 +225,7 @@ public class SGSimpleSettings {
         case discordRpcEnabled
         case discordRpcToken
         case discordRpcApplicationId
+        case autoDownloadChannels
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
@@ -418,7 +419,8 @@ public class SGSimpleSettings {
         Keys.animatedWallpaperQuality.rawValue: "720p",
         Keys.discordRpcEnabled.rawValue: false,
         Keys.discordRpcToken.rawValue: "",
-        Keys.discordRpcApplicationId.rawValue: "1351834928178167818"
+        Keys.discordRpcApplicationId.rawValue: "1351834928178167818",
+        Keys.autoDownloadChannels.rawValue: [Int64]()
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -774,6 +776,29 @@ public class SGSimpleSettings {
         set {
             UserDefaults.standard.set(newValue, forKey: Keys.hiddenChatsList.rawValue)
         }
+    }
+
+    public var autoDownloadChannels: [Int64] {
+        get {
+            return (UserDefaults.standard.array(forKey: Keys.autoDownloadChannels.rawValue) as? [Int64]) ?? []
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Keys.autoDownloadChannels.rawValue)
+        }
+    }
+
+    public func isAutoDownloadChannel(peerId: Int64) -> Bool {
+        return self.autoDownloadChannels.contains(peerId)
+    }
+
+    public func toggleAutoDownloadChannel(peerId: Int64) {
+        var list = self.autoDownloadChannels
+        if let idx = list.firstIndex(of: peerId) {
+            list.remove(at: idx)
+        } else {
+            list.append(peerId)
+        }
+        self.autoDownloadChannels = list
     }
 
     @UserDefault(key: Keys.tgWsProxyEnabled.rawValue)
