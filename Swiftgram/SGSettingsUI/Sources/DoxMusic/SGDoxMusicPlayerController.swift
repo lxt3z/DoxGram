@@ -5,6 +5,7 @@ import TelegramCore
 import AccountContext
 import TelegramPresentationData
 import UndoUI
+import OverlayStatusController
 import AppBundle
 
 public final class SGDoxMusicPlayerController: ViewController, UIGestureRecognizerDelegate, UITableViewDataSource, UITableViewDelegate {

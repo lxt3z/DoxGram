@@ -21,9 +21,9 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
     public let title: String
     public let artist: String
     public let album: String
-    public let artworkUrl: String?
+    public var artworkUrl: String?
     public let duration: Double
-    public let previewUrl: String?
+    public var previewUrl: String?
     public let source: SGDoxMusicSource
     public let spotifyUri: String?
     public let appleMusicId: String?
