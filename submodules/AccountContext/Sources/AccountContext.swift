@@ -1384,7 +1384,6 @@ public protocol SharedAccountContext: AnyObject {
     var immediateSGStatus: SGStatus { get }
     var SGIAP: SGIAPManager? { get }
     func makeSGProController(context: AccountContext) -> ViewController
-    func makeSGPayWallController(context: AccountContext) -> ViewController?
     func makeSGUpdateIOSController() -> ViewController
 
     var currentInAppNotificationSettings: Atomic<InAppNotificationSettings> { get }

@@ -635,11 +635,7 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
                 pushControllerImpl?(controller)
             // MARK: Swiftgram
             } else if icon.isSGPro && context.sharedContext.immediateSGStatus.status < 2 {
-                if let payWallController = context.sharedContext.makeSGPayWallController(context: context) {
-                    presentControllerImpl?(payWallController, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
-                } else {
-                    presentControllerImpl?(context.sharedContext.makeSGUpdateIOSController(), nil)
-                }
+                presentControllerImpl?(context.sharedContext.makeSGProController(context: context), ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
             } else {
                 currentAppIconName.set(icon.name)
                 context.sharedContext.applicationBindings.requestSetAlternateIconName(icon.isDefault ? nil : icon.name, { _ in

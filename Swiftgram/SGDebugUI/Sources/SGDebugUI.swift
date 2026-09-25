@@ -15,7 +15,6 @@ import TelegramUIPreferences
 // Optional
 import SGSimpleSettings
 import SGLogging
-import SGPayWall
 import OverlayStatusController
 #if DEBUG
 import FLEX

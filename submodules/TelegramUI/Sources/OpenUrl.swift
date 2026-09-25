@@ -931,11 +931,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                                 }
                                 return
                             case "pro", "premium", "buy":
-                                if let lastViewController = navigationController?.viewControllers.last as? ViewController, let payWallController = context.sharedContext.makeSGPayWallController(context: context) {
-                                    lastViewController.present(payWallController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
-                                } else {
-                                    navigationController?.pushViewController(context.sharedContext.makeSGProController(context: context))
-                                }
+                                navigationController?.pushViewController(context.sharedContext.makeSGProController(context: context))
                             case "restart":
                                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
                                 let lang = presentationData.strings.baseLanguageCode
