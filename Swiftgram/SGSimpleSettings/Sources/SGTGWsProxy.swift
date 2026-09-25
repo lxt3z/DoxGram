@@ -19,6 +19,12 @@ public final class SGTGWsProxy {
         config.timeoutIntervalForResource = 3600.0
         config.httpMaximumConnectionsPerHost = 64
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.allowsCellularAccess = true
+        if #available(iOS 13.0, *) {
+            config.allowsExpensiveNetworkAccess = true
+            config.allowsConstrainedNetworkAccess = true
+            config.waitsForConnectivity = true
+        }
         config.httpAdditionalHeaders = [
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
         ]
@@ -473,7 +479,7 @@ private final class SGTGWsSession {
         ]
         let dst = self.targetIp ?? defaultDcIps[self.targetDc] ?? "149.154.167.91"
 
-        if !customWorker.isEmpty {
+        if !customWorker.isEmpty && self.attemptCount == 0 {
             let cleaned = customWorker
                 .replacingOccurrences(of: "https://", with: "")
                 .replacingOccurrences(of: "http://", with: "")
@@ -487,8 +493,19 @@ private final class SGTGWsSession {
                 wsUrlString = "wss://\(cleaned)/apiws?dst=\(dst)&dc=\(self.targetDc)"
             }
         } else {
-            let domain = self.candidateDomains[self.currentDomainIndex]
-            if let targetIp = self.targetIp {
+            let domain = self.candidateDomains[self.currentDomainIndex % self.candidateDomains.count]
+            if domain == "web.telegram.org" {
+                let dcHost: String
+                switch self.targetDc {
+                case 1: dcHost = "pluto.web.telegram.org"
+                case 2: dcHost = "venus.web.telegram.org"
+                case 3: dcHost = "aurora.web.telegram.org"
+                case 4: dcHost = "vesta.web.telegram.org"
+                case 5: dcHost = "flora.web.telegram.org"
+                default: dcHost = "vesta.web.telegram.org"
+                }
+                wsUrlString = "wss://\(dcHost)/apiws"
+            } else if let targetIp = self.targetIp {
                 wsUrlString = "wss://kws\(self.targetDc).\(domain)/apiws?dst=\(targetIp)&dc=\(self.targetDc)"
             } else {
                 wsUrlString = "wss://kws\(self.targetDc).\(domain)/apiws"
@@ -502,7 +519,7 @@ private final class SGTGWsSession {
         }
 
         var request = URLRequest(url: url)
-        request.timeoutInterval = 6.0
+        request.timeoutInterval = 12.0
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
 
         let isFakeTLS = SGSimpleSettings.shared.tgWsProxyFakeTLS
@@ -683,11 +700,13 @@ private final class SGTGWsSession {
 
                 case let .failure(error):
                     let isCustom = !SGSimpleSettings.shared.tgWsProxyCustomWorker.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    let maxAttempts = isCustom ? 1 : min(self.candidateDomains.count, 8)
-                    if !self.hasReceivedWsData && self.attemptCount < maxAttempts && !isCustom {
+                    let maxAttempts = min(self.candidateDomains.count + (isCustom ? 1 : 0), 10)
+                    if !self.hasReceivedWsData && self.attemptCount < maxAttempts {
                         self.attemptCount += 1
-                        self.currentDomainIndex += 1
-                        SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS connect failed (\(error)), failing over to next domain (\(self.attemptCount)/\(maxAttempts))...")
+                        if !isCustom || self.attemptCount > 1 {
+                            self.currentDomainIndex += 1
+                        }
+                        SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS connect failed (\(error)), failing over (\(self.attemptCount)/\(maxAttempts))...")
                         self.stopPingTimer()
                         self.webSocketTask?.cancel(with: .goingAway, reason: nil)
                         self.webSocketTask = nil

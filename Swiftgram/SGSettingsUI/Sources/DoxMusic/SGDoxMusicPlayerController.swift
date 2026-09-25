@@ -1038,7 +1038,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.updateContent()
             self.reloadQueueData()
         } else {
-            let hud = OverlayStatusController(theme: self.presentationData.theme, type: .loading(cancelled: nil))
+            let hud = OverlayStatusController(style: .dark, type: .loading(cancelled: nil))
             self.present(hud, in: .window(.root))
             SGDoxMusicOfflineManager.shared.downloadTrack(track: track) { [weak self, weak hud] success in
                 hud?.dismiss()
