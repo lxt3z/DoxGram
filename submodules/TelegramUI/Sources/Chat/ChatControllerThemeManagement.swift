@@ -534,10 +534,16 @@ extension ChatControllerImpl {
             let hud = OverlayStatusController(style: .dark, type: .loading(cancelled: nil))
             strongSelf.present(hud, in: .window(.root))
             
-            SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: urlString, quality: quality) { [weak self, weak hud] success, _ in
+            SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: urlString, quality: quality) { [weak self, weak hud] success, errorText in
                 hud?.dismiss()
+                guard let strongSelf = self else { return }
                 if success {
-                    self?.chatDisplayNode.updateDoxVideoWallpaper()
+                    strongSelf.chatDisplayNode.updateDoxVideoWallpaper()
+                    let overlay = UndoOverlayController(presentationData: strongSelf.presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Видео-обои установлены" : "Video wallpaper applied", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                    strongSelf.present(overlay, in: .window(.root))
+                } else {
+                    let overlay = UndoOverlayController(presentationData: strongSelf.presentationData, content: .info(title: isRu ? "Ошибка" : "Error", text: errorText ?? (isRu ? "Не удалось загрузить видео" : "Failed to load video"), timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
+                    strongSelf.present(overlay, in: .window(.root))
                 }
             }
         }))
@@ -551,15 +557,20 @@ extension ChatControllerImpl {
             let hud = OverlayStatusController(style: .dark, type: .loading(cancelled: nil))
             strongSelf.present(hud, in: .window(.root))
             
-            SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: urlString, quality: quality) { [weak self, weak hud] success, _ in
+            SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: urlString, quality: quality) { [weak self, weak hud] success, errorText in
                 hud?.dismiss()
+                guard let strongSelf = self else { return }
                 if success {
-                    self?.chatDisplayNode.updateDoxVideoWallpaper()
+                    strongSelf.chatDisplayNode.updateDoxVideoWallpaper()
+                    let syncTag = SGDoxAnimatedWallpaperManager.shared.formatSyncTag(url: urlString, quality: quality)
+                    strongSelf.controllerInteraction?.sendMessage(syncTag, nil)
+                    let overlay = UndoOverlayController(presentationData: strongSelf.presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Обои установлены и отправлены собеседнику" : "Wallpaper applied and sent to chat", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                    strongSelf.present(overlay, in: .window(.root))
+                } else {
+                    let overlay = UndoOverlayController(presentationData: strongSelf.presentationData, content: .info(title: isRu ? "Ошибка" : "Error", text: errorText ?? (isRu ? "Не удалось загрузить видео" : "Failed to load video"), timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
+                    strongSelf.present(overlay, in: .window(.root))
                 }
             }
-            
-            let syncTag = SGDoxAnimatedWallpaperManager.shared.formatSyncTag(url: urlString, quality: quality)
-            strongSelf.controllerInteraction?.sendMessage(syncTag, nil)
         }))
         
         self.context.sharedContext.applicationBindings.presentNativeController(alert)

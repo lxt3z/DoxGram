@@ -217,53 +217,89 @@ public final class SGDoxAnimatedWallpaperManager {
         guard let host = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines))?.host?.lowercased() else {
             return false
         }
-        return host == "tiktok.com" || host.hasSuffix(".tiktok.com")
+        return host.contains("tiktok.com") || host.contains("tikwm.com") || host.contains("tiktokcdn")
     }
 
-    public func resolveTikTokUrl(_ urlString: String, completion: @escaping (String?, String?) -> Void) {
+    private func expandShortUrlIfNeeded(_ urlString: String, completion: @escaping (String) -> Void) {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let apiUrl = URL(string: "https://www.tikwm.com/api/?url=\(encoded)") else {
-            completion(nil, "Invalid TikTok URL")
+        guard let url = URL(string: trimmed),
+              let host = url.host?.lowercased(),
+              host.contains("vt.tiktok.com") || host.contains("vm.tiktok.com") else {
+            completion(trimmed)
             return
         }
-
-        var request = URLRequest(url: apiUrl)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 15.0
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 10.0
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-
-        let task = URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
-            guard let self = self else { return }
-            if error != nil {
-                self.resolveTikTokFallback(urlString: trimmed, completion: completion)
-                return
-            }
-            guard let data = data else {
-                self.resolveTikTokFallback(urlString: trimmed, completion: completion)
-                return
-            }
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let code = json["code"] as? Int, code == 0,
-                   let dataObj = json["data"] as? [String: Any] {
-                    let directUrl = (dataObj["hdplay"] as? String) ?? (dataObj["play"] as? String)
-                    if let directUrl = directUrl, !directUrl.isEmpty {
-                        completion(directUrl, nil)
-                        return
-                    }
-                }
-                self.resolveTikTokFallback(urlString: trimmed, completion: completion)
-            } catch {
-                self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+        
+        let task = URLSession.shared.dataTask(with: request) { _, response, _ in
+            if let http = response as? HTTPURLResponse, let location = http.allHeaderFields["Location"] as? String, !location.isEmpty {
+                completion(location)
+            } else if let resolvedUrl = response?.url?.absoluteString, !resolvedUrl.isEmpty, resolvedUrl != trimmed {
+                completion(resolvedUrl)
+            } else {
+                completion(trimmed)
             }
         }
         task.resume()
     }
 
+    public func resolveTikTokUrl(_ urlString: String, completion: @escaping (String?, String?) -> Void) {
+        self.expandShortUrlIfNeeded(urlString) { [weak self] expandedUrl in
+            guard let self = self else { return }
+            let trimmed = expandedUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let apiUrl = URL(string: "https://www.tikwm.com/api/?url=\(encoded)&web=1") else {
+                completion(nil, "Invalid TikTok URL")
+                return
+            }
+
+            var request = URLRequest(url: apiUrl)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 15.0
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+
+            let task = URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
+                guard let self = self else { return }
+                if error != nil {
+                    self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+                    return
+                }
+                guard let data = data else {
+                    self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+                    return
+                }
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let code = json["code"] as? Int, code == 0,
+                       let dataObj = json["data"] as? [String: Any] {
+                        var directUrl = (dataObj["hdplay"] as? String) ?? (dataObj["play"] as? String)
+                        if let dUrl = directUrl, !dUrl.isEmpty {
+                            if dUrl.hasPrefix("/") {
+                                directUrl = "https://tikwm.com" + dUrl
+                            }
+                            completion(directUrl, nil)
+                            return
+                        }
+                        if let id = dataObj["id"] as? String, !id.isEmpty {
+                            completion("https://tikwm.com/video/media/play/\(id).mp4", nil)
+                            return
+                        }
+                    }
+                    self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+                } catch {
+                    self.resolveTikTokFallback(urlString: trimmed, completion: completion)
+                }
+            }
+            task.resume()
+        }
+    }
+
     private func resolveTikTokFallback(urlString: String, completion: @escaping (String?, String?) -> Void) {
         guard let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let apiUrl = URL(string: "https://api.tiklydown.eu.org/api/download?url=\(encoded)") else {
+              let apiUrl = URL(string: "https://tikwm.com/api/?url=\(encoded)") else {
             completion(nil, "Не удалось распознать ссылку на TikTok")
             return
         }
@@ -271,7 +307,7 @@ public final class SGDoxAnimatedWallpaperManager {
         var request = URLRequest(url: apiUrl)
         request.httpMethod = "GET"
         request.timeoutInterval = 15.0
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
 
         let task = URLSession.shared.dataTask(with: request) { data, _, error in
             if let error = error {
@@ -280,13 +316,23 @@ public final class SGDoxAnimatedWallpaperManager {
             }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let videoObj = json["video"] as? [String: Any],
-                  let noWatermark = (videoObj["noWatermark"] as? String) ?? (videoObj["watermark"] as? String),
-                  !noWatermark.isEmpty else {
+                  let dataObj = json["data"] as? [String: Any] else {
                 completion(nil, "Не удалось извлечь видео из TikTok. Проверьте ссылку.")
                 return
             }
-            completion(noWatermark, nil)
+            var directUrl = (dataObj["hdplay"] as? String) ?? (dataObj["play"] as? String)
+            if let dUrl = directUrl, !dUrl.isEmpty {
+                if dUrl.hasPrefix("/") {
+                    directUrl = "https://tikwm.com" + dUrl
+                }
+                completion(directUrl, nil)
+                return
+            }
+            if let id = dataObj["id"] as? String, !id.isEmpty {
+                completion("https://tikwm.com/video/media/play/\(id).mp4", nil)
+                return
+            }
+            completion(nil, "Не удалось извлечь видео из TikTok. Проверьте ссылку.")
         }
         task.resume()
     }
@@ -321,12 +367,19 @@ public final class SGDoxAnimatedWallpaperManager {
             }
 
             self.ensureDirectoryExists()
-            let ext = finalUrl.pathExtension.isEmpty ? "mp4" : finalUrl.pathExtension
+            let rawExt = finalUrl.pathExtension.lowercased()
+            let ext = (rawExt.isEmpty || rawExt.count > 4 || rawExt.contains("?")) ? "mp4" : rawExt
             let destinationFile = self.wallpapersDirectory.appendingPathComponent("\(peerId).\(ext)")
 
             var request = URLRequest(url: finalUrl)
-            request.setValue("https://www.tiktok.com/", forHTTPHeaderField: "Referer")
-            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+            if finalUrlString.contains("tikwm.com") {
+                request.setValue("https://tikwm.com/", forHTTPHeaderField: "Referer")
+                request.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+            } else if finalUrlString.contains("tiktokcdn") {
+                request.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+            } else {
+                request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+            }
 
             let session = URLSession(configuration: .default)
             let task = session.downloadTask(with: request) { [weak self] tempUrl, _, error in
@@ -345,6 +398,15 @@ public final class SGDoxAnimatedWallpaperManager {
                     self.clearDownloading(for: peerId)
                     DispatchQueue.main.async {
                         completion(false, "Download failed")
+                    }
+                    return
+                }
+
+                if let attr = try? FileManager.default.attributesOfItem(atPath: tempUrl.path),
+                   let size = attr[.size] as? Int64, size < 1000 {
+                    self.clearDownloading(for: peerId)
+                    DispatchQueue.main.async {
+                        completion(false, "Downloaded file is invalid or empty")
                     }
                     return
                 }

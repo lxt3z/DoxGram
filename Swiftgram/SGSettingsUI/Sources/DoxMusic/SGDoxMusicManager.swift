@@ -344,11 +344,12 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.lastReportedDuration = self.duration
                 self.lastReportedArtworkUrl = artworkUrl
                 
-                // If starting a new track, wait for actual audio hardware start (>= 0.2s) in startTimeTracking
-                // to avoid Discord timer starting 2 seconds before sound reaches headphones.
-                // If paused, stopped, or already playing with valid audio time, update Discord immediately.
-                if !self.isPlaying || self.currentTime > 0.1 || self.hasSyncedAudioStart {
-                    DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
+                // If paused or stopped, update Discord immediately (to clear or show pause)
+                if !self.isPlaying {
+                    DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: false, currentTime: self.currentTime, duration: self.duration)
+                } else if self.hasSyncedAudioStart && self.currentTime > 0.1 {
+                    // Only broadcast active listening presence once actual audio has started
+                    DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: true, currentTime: self.currentTime, duration: self.duration)
                 }
             }
             for listener in self.stateListeners.values {
@@ -363,7 +364,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.playbackStartOffset = self.currentTime
         self.hasSyncedAudioStart = false
         
-        self.playbackTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        self.playbackTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             guard let self = self, self.isPlaying else { return }
             
             var currentRealTime: Double?
@@ -413,11 +414,11 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.currentTime = current
             }
             
-            // When real audio starts producing sound (>= 0.2s) and we haven't synced audio start,
-            // re-sync Discord RPC so its timeline starts synchronously with headphones/speakers
-            if current >= 0.2 && !self.hasSyncedAudioStart {
+            // When real audio starts producing sound (>= 0.15s) and we haven't synced audio start,
+            // force re-sync Discord RPC so its timeline starts synchronously with headphones/speakers
+            if current >= 0.15 && !self.hasSyncedAudioStart {
                 self.hasSyncedAudioStart = true
-                DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
+                DiscordRPCService.shared.forceResync(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: self.currentTime, duration: self.duration)
             }
             
             for listener in self.timeListeners.values {
@@ -439,6 +440,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     // MARK: - Playback
     
     public func play(track: SGDoxMusicTrack, queue: [SGDoxMusicTrack] = []) {
+        self.stopTimeTracking()
+        self.stopCurrentAudio()
+        
         if let current = self.currentTrack, current.id != track.id {
             self.history.append(current)
         }
@@ -448,6 +452,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.playbackStartTimestamp = CACurrentMediaTime()
         self.playbackStartOffset = 0.0
         self.hasSyncedAudioStart = false
+        self.isPlaying = false
         
         if !queue.isEmpty {
             var q = queue.filter { $0.id != track.id }
@@ -459,9 +464,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             self.queue = []
         }
         
-        self.stopCurrentAudio()
         UserDefaults.standard.set(false, forKey: "dox_music_is_dismissed")
         self.savePersistedState()
+        self.notifyStateChanged()
         
         // 1. Check if track is downloaded for offline playback
         if let localUrl = SGDoxMusicOfflineManager.shared.localAudioUrl(for: track.id) {
@@ -563,6 +568,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.pause()
         self.stopCurrentAudio()
         self.currentTrack = nil
+        self.currentTime = 0.0
+        self.hasSyncedAudioStart = false
         self.savePersistedState()
         self.notifyStateChanged()
     }
@@ -687,14 +694,15 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     public func seek(to seconds: Double) {
-        self.currentTime = seconds
+        let clampedSeconds = max(0.0, min(seconds, self.duration))
+        self.currentTime = clampedSeconds
         self.playbackStartTimestamp = CACurrentMediaTime()
-        self.playbackStartOffset = seconds
+        self.playbackStartOffset = clampedSeconds
         self.hasSyncedAudioStart = true
-        self.avPlayer?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
-        AppleMusicService.shared.seek(to: seconds)
+        self.avPlayer?.seek(to: CMTime(seconds: clampedSeconds, preferredTimescale: 600))
+        AppleMusicService.shared.seek(to: clampedSeconds)
         if self.isPlaying {
-            DiscordRPCService.shared.updatePlayback(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: seconds, duration: self.duration)
+            DiscordRPCService.shared.forceResync(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: clampedSeconds, duration: self.duration)
         }
         self.savePersistedState()
         self.notifyStateChanged()

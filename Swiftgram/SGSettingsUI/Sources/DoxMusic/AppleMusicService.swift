@@ -27,6 +27,9 @@ public final class AppleMusicService: @unchecked Sendable {
     private var playbackStartWatchdogTimer: Foundation.Timer?
     private var isObservingPlayerState = false
     private var isDeezerPreviewActive = false
+    private var isPreparing = false
+    private var lastSeekTime: Double?
+    private var lastSeekTimestamp: Double = 0.0
 
     private init() {
         self.setupPlayerNotifications()
@@ -612,12 +615,15 @@ public final class AppleMusicService: @unchecked Sendable {
     public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
         self.currentTrack = track
         self.isDeezerPreviewActive = false
+        self.isPreparing = true
+        self.lastSeekTime = nil
         self.playbackStartWatchdogTimer?.invalidate()
         self.playbackStartWatchdogTimer = nil
+        self.player.stop()
+        self.isUsingSystemPlayer = false
 
         // 1. If it has a local asset URL (ipod-library://)
         if let preview = track.previewUrl, let url = URL(string: preview), url.scheme == "ipod-library" {
-            self.isUsingSystemPlayer = false
             self.playPreview(url: url, completion: completion)
             return
         }
@@ -647,6 +653,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 player.prepareToPlay { [weak self] error in
                     DispatchQueue.main.async {
                         if error == nil {
+                            self?.isPreparing = false
                             player.currentPlaybackTime = 0.0
                             player.play()
                             self?.isUsingSystemPlayer = true
@@ -678,6 +685,7 @@ public final class AppleMusicService: @unchecked Sendable {
                     DispatchQueue.main.async {
                         guard let self = self else { return }
                         if error == nil {
+                            self.isPreparing = false
                             player.play()
                             player.currentPlaybackTime = 0.0
                             self.isUsingSystemPlayer = true
@@ -811,10 +819,7 @@ public final class AppleMusicService: @unchecked Sendable {
         NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidStall), name: .AVPlayerItemPlaybackStalled, object: playerItem)
         NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidFail), name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
         
-        guard SGDoxMusicManager.shared.isPlaying else {
-            completion(false)
-            return
-        }
+        self.isPreparing = false
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
         DispatchQueue.main.async {
@@ -859,6 +864,8 @@ public final class AppleMusicService: @unchecked Sendable {
         self.playbackStartWatchdogTimer = nil
         self.player.stop()
         self.isUsingSystemPlayer = false
+        self.isPreparing = false
+        self.lastSeekTime = nil
         self.avPlayer?.pause()
         self.avPlayer = nil
         self.currentTrack = nil
@@ -873,6 +880,8 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     public func seek(to seconds: Double) {
+        self.lastSeekTime = seconds
+        self.lastSeekTimestamp = CACurrentMediaTime()
         if self.isUsingSystemPlayer {
             self.player.currentPlaybackTime = seconds
         } else {
@@ -881,6 +890,17 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     public var currentPlaybackTime: Double {
+        if self.isPreparing {
+            return 0.0
+        }
+        if let seekTarget = self.lastSeekTime {
+            let elapsed = CACurrentMediaTime() - self.lastSeekTimestamp
+            if elapsed < 1.2 {
+                return max(0.0, seekTarget + elapsed)
+            } else {
+                self.lastSeekTime = nil
+            }
+        }
         if self.isUsingSystemPlayer {
             let time = self.player.currentPlaybackTime
             return (time.isFinite && !time.isNaN && time >= 0) ? time : 0.0

@@ -242,9 +242,16 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     
     // MARK: - Presence Update
     
+    public func forceResync(track: SGDoxMusicTrack?, isPlaying: Bool, currentTime: Double, duration: Double) {
+        self.activeStartTimestamp = nil
+        self.isAudioSyncedForCurrentTrack = false
+        self.updatePlayback(track: track, isPlaying: isPlaying, currentTime: currentTime, duration: duration)
+    }
+    
     public func updatePlayback(track: SGDoxMusicTrack?, isPlaying: Bool, currentTime: Double = 0.0, duration: Double = 0.0) {
         let dur = duration > 0 ? duration : (track?.duration ?? 0.0)
-        if !isPlaying || track?.id != self.activeTrackId {
+        let trackChanged = track?.id != self.activeTrackId
+        if !isPlaying || trackChanged {
             self.activeTrackId = track?.id
             self.activeStartTimestamp = nil
             self.isAudioSyncedForCurrentTrack = false
@@ -317,7 +324,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         let now = Date().timeIntervalSince1970
         let startTimestamp: Int64
         let expectedStart = now - self.currentPlaybackTime
-        if self.activeTrackId == track.id, let existingStart = self.activeStartTimestamp, self.isAudioSyncedForCurrentTrack, abs(Double(existingStart) / 1000.0 - expectedStart) < 2.0 {
+        if self.activeTrackId == track.id, let existingStart = self.activeStartTimestamp, self.isAudioSyncedForCurrentTrack, abs(Double(existingStart) / 1000.0 - expectedStart) < 0.75 {
             // Keep the exact same established startTimestamp for this track so Discord client timer stays rock-steady and does not drift
             startTimestamp = existingStart
         } else {
