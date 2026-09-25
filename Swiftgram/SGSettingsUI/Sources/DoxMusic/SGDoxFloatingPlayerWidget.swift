@@ -250,10 +250,14 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         if let superview = self.superview {
             func findTabBar(in view: UIView) -> UIView? {
                 for sub in view.subviews {
-                    if sub !== self {
-                        let name = String(describing: type(of: sub))
-                        if (name.contains("TabBar") || name.contains("tabBar")) && sub.frame.height > 20.0 && sub.frame.minY > size.height * 0.5 {
-                            return sub
+                    if sub !== self && !sub.isHidden && sub.alpha > 0.05 {
+                        let name = String(reflecting: type(of: sub))
+                        let simpleName = String(describing: type(of: sub))
+                        if (name.contains("TabBar") || simpleName.contains("TabBar") || name.contains("tabBar") || simpleName.contains("tabBar") || name.contains("GlassBackground") || name.contains("GlassControlPanel")) && sub.frame.height > 20.0 {
+                            let converted = view.convert(sub.frame, to: superview)
+                            if converted.minY > size.height * 0.4 && converted.height < 140.0 {
+                                return sub
+                            }
                         }
                         if let child = findTabBar(in: sub) {
                             return child
@@ -263,18 +267,23 @@ public final class SGDoxFloatingPlayerWidget: UIView {
                 return nil
             }
             if let tb = findTabBar(in: superview) {
-                tabBarTop = tb.frame.minY
+                let converted = tb.superview?.convert(tb.frame, to: superview) ?? tb.frame
+                if converted.minY > size.height * 0.4 {
+                    tabBarTop = converted.minY
+                }
             }
         }
         
         let spacing: CGFloat = 10.0
         let y: CGFloat
-        if let tbTop = tabBarTop, tbTop > size.height * 0.5 {
+        if let tbTop = tabBarTop, tbTop > size.height * 0.4 {
             y = tbTop - widgetHeight - spacing
         } else {
-            let safeBottom = min(max(insets.bottom, 8.0), 34.0)
-            let defaultTabBarHeight: CGFloat = 52.0
-            y = size.height - safeBottom - defaultTabBarHeight - widgetHeight - 12.0
+            let windowBottom = self.window?.safeAreaInsets.bottom ?? 0.0
+            let bottomInset = max(insets.bottom, windowBottom)
+            let actualBottom = bottomInset > 0.0 ? bottomInset : 34.0
+            let tabIslandHeight: CGFloat = 64.0
+            y = size.height - actualBottom - tabIslandHeight - widgetHeight - spacing
         }
         
         let targetFrame = CGRect(x: x, y: y, width: widgetWidth, height: widgetHeight)
