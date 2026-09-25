@@ -216,12 +216,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.view.addSubview(self.grabberView)
         
         // Dismiss Chevron Button
-        let chevronConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+        let chevronConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
         self.dismissButton.setImage(UIImage(systemName: "chevron.down", withConfiguration: chevronConfig), for: .normal)
-        self.dismissButton.tintColor = .white
-        self.dismissButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
-        self.dismissButton.layer.cornerRadius = 18
-        self.dismissButton.clipsToBounds = true
+        self.dismissButton.tintColor = UIColor(white: 1.0, alpha: 0.75)
+        self.dismissButton.backgroundColor = .clear
+        self.dismissButton.layer.cornerRadius = 0
+        self.dismissButton.clipsToBounds = false
         self.dismissButton.addTarget(self, action: #selector(self.dismissPressed), for: .touchUpInside)
         self.view.addSubview(self.dismissButton)
         
@@ -276,12 +276,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func setupNowPlayingPane() {
-        // Animated Ambient Glow behind Artwork
-        self.artworkAmbientGlowView.layer.cornerRadius = 44
+        // Animated Ambient Glow behind Artwork (Organic Radial Aura)
         self.artworkAmbientGlowView.clipsToBounds = false
-        self.artworkGlowGradientLayer.cornerRadius = 44
-        self.artworkGlowGradientLayer.startPoint = CGPoint(x: 0.1, y: 0.1)
-        self.artworkGlowGradientLayer.endPoint = CGPoint(x: 0.9, y: 0.9)
+        self.artworkGlowGradientLayer.type = .radial
+        self.artworkGlowGradientLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
+        self.artworkGlowGradientLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
+        self.artworkGlowGradientLayer.locations = [0.0, 0.45, 1.0]
         self.artworkAmbientGlowView.layer.addSublayer(self.artworkGlowGradientLayer)
         self.nowPlayingContainerView.addSubview(self.artworkAmbientGlowView)
 
@@ -567,7 +567,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.grabberView.frame = CGRect(x: (bounds.width - 38) * 0.5, y: topY + 6, width: 38, height: 5)
         
         let headerY = topY + 20
-        self.dismissButton.frame = CGRect(x: 18, y: headerY, width: 36, height: 36)
+        self.dismissButton.frame = CGRect(x: 16, y: headerY - 2, width: 40, height: 40)
         
         // Mode Switcher (Centered)
         let segW: CGFloat = 164.0
@@ -603,17 +603,21 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         guard bounds.width > 0 && bounds.height > 0 else { return }
         
         // Artwork: large square with dynamic height
-        let maxArtSide = min(bounds.width - 64, bounds.height * 0.40)
+        let maxArtSide = min(bounds.width - 64, bounds.height * 0.38)
         let artSide = max(160, maxArtSide)
-        let artY: CGFloat = 14.0
+        let artY: CGFloat = 20.0
         let artX = floor((bounds.width - artSide) * 0.5)
         self.artworkContainerView.transform = .identity
         self.artworkContainerView.frame = CGRect(x: artX, y: artY, width: artSide, height: artSide)
         self.artworkImageView.frame = self.artworkContainerView.bounds
         
-        let glowInset: CGFloat = -22.0
-        self.artworkAmbientGlowView.frame = self.artworkContainerView.frame.insetBy(dx: glowInset, dy: glowInset)
+        let glowSize: CGFloat = artSide * 1.10
+        let glowX = artX + (artSide - glowSize) * 0.5
+        let glowY = artY + (artSide - glowSize) * 0.5 + 8.0
+        self.artworkAmbientGlowView.frame = CGRect(x: glowX, y: glowY, width: glowSize, height: glowSize)
+        self.artworkAmbientGlowView.layer.cornerRadius = glowSize * 0.5
         self.artworkGlowGradientLayer.frame = self.artworkAmbientGlowView.bounds
+        self.artworkGlowGradientLayer.cornerRadius = glowSize * 0.5
         
         // Info: Title & Artist
         let infoY = artY + artSide + 20.0
@@ -863,8 +867,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             let newColors = [vibrantColor.cgColor, avgColor.cgColor, deepColor.cgColor]
             
             let glowColors = [
-                vibrantColor.withAlphaComponent(0.75).cgColor,
-                avgColor.withAlphaComponent(0.40).cgColor,
+                vibrantColor.withAlphaComponent(0.65).cgColor,
+                avgColor.withAlphaComponent(0.35).cgColor,
                 UIColor.clear.cgColor
             ]
             
@@ -881,9 +885,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 
                 self.artworkGlowGradientLayer.colors = glowColors
                 self.artworkAmbientGlowView.layer.shadowColor = vibrantColor.cgColor
-                self.artworkAmbientGlowView.layer.shadowRadius = 36.0
-                self.artworkAmbientGlowView.layer.shadowOpacity = 0.80
-                self.artworkAmbientGlowView.layer.shadowOffset = CGSize(width: 0, height: 8)
+                self.artworkAmbientGlowView.layer.shadowRadius = 32.0
+                self.artworkAmbientGlowView.layer.shadowOpacity = 0.65
+                self.artworkAmbientGlowView.layer.shadowOffset = CGSize(width: 0, height: 6)
                 self.startGlowAnimation()
             }
         }
@@ -892,34 +896,44 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func startGlowAnimation() {
         self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowPulse")
         self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowAlpha")
-        self.artworkGlowGradientLayer.removeAnimation(forKey: "glowShift")
+        self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowRadius")
+        self.artworkGlowGradientLayer.removeAnimation(forKey: "glowCenterShift")
         
         let pulseAnim = CABasicAnimation(keyPath: "transform.scale")
-        pulseAnim.fromValue = 0.96
+        pulseAnim.fromValue = 0.98
         pulseAnim.toValue = 1.05
-        pulseAnim.duration = 3.8
+        pulseAnim.duration = 4.2
         pulseAnim.autoreverses = true
         pulseAnim.repeatCount = .infinity
         pulseAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         self.artworkAmbientGlowView.layer.add(pulseAnim, forKey: "glowPulse")
         
         let alphaAnim = CABasicAnimation(keyPath: "opacity")
-        alphaAnim.fromValue = 0.65
+        alphaAnim.fromValue = 0.70
         alphaAnim.toValue = 0.95
-        alphaAnim.duration = 4.2
+        alphaAnim.duration = 3.5
         alphaAnim.autoreverses = true
         alphaAnim.repeatCount = .infinity
         alphaAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         self.artworkAmbientGlowView.layer.add(alphaAnim, forKey: "glowAlpha")
         
+        let radiusAnim = CABasicAnimation(keyPath: "shadowRadius")
+        radiusAnim.fromValue = 26.0
+        radiusAnim.toValue = 42.0
+        radiusAnim.duration = 4.8
+        radiusAnim.autoreverses = true
+        radiusAnim.repeatCount = .infinity
+        radiusAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        self.artworkAmbientGlowView.layer.add(radiusAnim, forKey: "glowRadius")
+        
         let shiftAnim = CABasicAnimation(keyPath: "startPoint")
-        shiftAnim.fromValue = CGPoint(x: 0.1, y: 0.1)
-        shiftAnim.toValue = CGPoint(x: 0.8, y: 0.9)
-        shiftAnim.duration = 6.0
+        shiftAnim.fromValue = CGPoint(x: 0.47, y: 0.47)
+        shiftAnim.toValue = CGPoint(x: 0.53, y: 0.53)
+        shiftAnim.duration = 6.2
         shiftAnim.autoreverses = true
         shiftAnim.repeatCount = .infinity
         shiftAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        self.artworkGlowGradientLayer.add(shiftAnim, forKey: "glowShift")
+        self.artworkGlowGradientLayer.add(shiftAnim, forKey: "glowCenterShift")
     }
     
     private func formatTime(_ seconds: Double) -> String {
