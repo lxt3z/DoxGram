@@ -15,7 +15,6 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     private let containerView = UIView()
     private let blurView = UIVisualEffectView()
     private let tintOverlayView = UIView()
-    private let glossLayer = CAGradientLayer()
     
     private let artworkImageView = UIImageView()
     private let textContainerView = UIView()
@@ -70,17 +69,6 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         
         self.containerView.addSubview(self.blurView)
         self.containerView.addSubview(self.tintOverlayView)
-        
-        // Specular glass highlight
-        self.glossLayer.colors = [
-            UIColor.white.withAlphaComponent(0.25).cgColor,
-            UIColor.white.withAlphaComponent(0.06).cgColor,
-            UIColor.clear.cgColor
-        ]
-        self.glossLayer.locations = [0.0, 0.45, 1.0]
-        self.glossLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
-        self.glossLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
-        self.containerView.layer.addSublayer(self.glossLayer)
         
         // Tap gesture to open player
         let tap = UITapGestureRecognizer(target: self, action: #selector(self.widgetTapped))
@@ -156,43 +144,39 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     private func applyTheme() {
         let isDark = self.theme.overallDarkAppearance
         
-        self.blurView.effect = UIBlurEffect(style: isDark ? .systemThinMaterialDark : .systemThinMaterialLight)
+        self.blurView.effect = UIBlurEffect(style: isDark ? .systemMaterialDark : .systemMaterialLight)
         
         if isDark {
-            self.tintOverlayView.backgroundColor = UIColor(white: 0.14, alpha: 0.45)
-            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
+            self.tintOverlayView.backgroundColor = UIColor(white: 0.08, alpha: 0.40)
+            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.14).cgColor
             self.containerView.layer.borderWidth = 0.5
             self.layer.shadowColor = UIColor.black.cgColor
-            self.layer.shadowOpacity = 0.28
+            self.layer.shadowOpacity = 0.30
             self.layer.shadowRadius = 18
             self.layer.shadowOffset = CGSize(width: 0, height: 6)
-            
-            self.glossLayer.isHidden = true
             
             self.titleLabel.textColor = .white
             self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.65)
             
-            self.playPauseContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.16)
+            self.playPauseContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
             self.playPauseButton.tintColor = .white
             self.nextButton.tintColor = UIColor.white.withAlphaComponent(0.85)
-            self.closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
+            self.closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
             self.closeButton.tintColor = UIColor.white.withAlphaComponent(0.65)
             
             self.artworkImageView.backgroundColor = UIColor(white: 0.20, alpha: 1.0)
             self.artworkImageView.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
             
-            self.progressView.trackTintColor = UIColor(white: 1.0, alpha: 0.12)
-            self.progressView.progressTintColor = UIColor(white: 1.0, alpha: 0.85)
+            self.progressView.trackTintColor = UIColor(white: 1.0, alpha: 0.08)
+            self.progressView.progressTintColor = UIColor(white: 1.0, alpha: 0.75)
         } else {
-            self.tintOverlayView.backgroundColor = UIColor(white: 1.0, alpha: 0.50)
-            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.65).cgColor
+            self.tintOverlayView.backgroundColor = UIColor(white: 1.0, alpha: 0.45)
+            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.40).cgColor
             self.containerView.layer.borderWidth = 0.5
             self.layer.shadowColor = UIColor.black.cgColor
-            self.layer.shadowOpacity = 0.10
-            self.layer.shadowRadius = 14
+            self.layer.shadowOpacity = 0.12
+            self.layer.shadowRadius = 16
             self.layer.shadowOffset = CGSize(width: 0, height: 4)
-            
-            self.glossLayer.isHidden = true
             
             let darkText = UIColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 1.0)
             self.titleLabel.textColor = darkText
@@ -331,7 +315,8 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.artistLabel.frame = CGRect(x: 0, y: 17, width: textWidth, height: 16)
         
         // Progress Bar
-        self.progressView.frame = CGRect(x: 20.0, y: widgetHeight - 5.0, width: widgetWidth - 40.0, height: 2.0)
+        self.progressView.frame = CGRect(x: 20.0, y: widgetHeight - 3.0, width: widgetWidth - 40.0, height: 1.5)
+        self.progressView.layer.cornerRadius = 0.75
     }
     
     private func updateContent(animated: Bool) {

@@ -64,6 +64,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let downloadButton = UIButton(type: .system)
     
     public var onDismiss: (() -> Void)?
+    public var onDismissBegin: (() -> Void)?
+    private var hasBegunDismissal = false
+    
+    private func triggerDismissBeginIfNeeded() {
+        guard !self.hasBegunDismissal else { return }
+        self.hasBegunDismissal = true
+        self.onDismissBegin?()
+    }
     
     // --- Queue Pane ---
     private let queueHeaderView = UIView()
@@ -174,23 +182,42 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     @objc private func handlePanGesture(_ recognizer: UIPanGestureRecognizer) {
         let translation = recognizer.translation(in: self.view)
-        if recognizer.state == .changed {
+        let velocity = recognizer.velocity(in: self.view)
+        
+        switch recognizer.state {
+        case .changed:
             if translation.y > 0 {
                 self.view.transform = CGAffineTransform(translationX: 0, y: translation.y)
+                let dismissFraction = min(1.0, max(0.0, translation.y / (self.view.bounds.height * 0.7)))
+                self.darkDimOverlay.alpha = 1.0 - dismissFraction * 0.6
+                self.backgroundBlurView.alpha = 1.0 - dismissFraction * 0.3
+            } else {
+                self.view.transform = .identity
             }
-        } else if recognizer.state == .ended || recognizer.state == .cancelled {
-            let velocity = recognizer.velocity(in: self.view)
-            if translation.y > 140 || velocity.y > 700 {
-                UIView.animate(withDuration: 0.22, animations: {
+        case .ended, .cancelled:
+            if translation.y > 120 || velocity.y > 600 {
+                self.triggerDismissBeginIfNeeded()
+                let remainingDistance = max(0, self.view.bounds.height - translation.y)
+                let velocityY = max(800.0, velocity.y)
+                let duration = max(0.18, min(0.28, Double(remainingDistance / velocityY)))
+                
+                UIView.animate(withDuration: duration, delay: 0, options: [.curveEaseOut], animations: {
                     self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
+                    self.darkDimOverlay.alpha = 0.0
+                    self.backgroundBlurView.alpha = 0.0
                 }) { [weak self] _ in
-                    self?.dismiss()
+                    guard let self = self else { return }
+                    self.dismiss(animated: false)
                 }
             } else {
-                UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+                UIView.animate(withDuration: 0.28, delay: 0, usingSpringWithDamping: 0.82, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
                     self.view.transform = .identity
+                    self.darkDimOverlay.alpha = 1.0
+                    self.backgroundBlurView.alpha = 1.0
                 })
             }
+        default:
+            break
         }
     }
     
@@ -215,13 +242,16 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.grabberView.layer.cornerRadius = 2.5
         self.view.addSubview(self.grabberView)
         
-        // Dismiss Chevron Button
-        let chevronConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
+        // Dismiss Chevron Button (Liquid Glass Circular Pill)
+        let chevronConfig = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
         self.dismissButton.setImage(UIImage(systemName: "chevron.down", withConfiguration: chevronConfig), for: .normal)
-        self.dismissButton.tintColor = UIColor(white: 1.0, alpha: 0.75)
-        self.dismissButton.backgroundColor = .clear
-        self.dismissButton.layer.cornerRadius = 0
-        self.dismissButton.clipsToBounds = false
+        self.dismissButton.tintColor = UIColor(white: 1.0, alpha: 0.85)
+        self.dismissButton.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.dismissButton.layer.cornerRadius = 16
+        self.dismissButton.layer.cornerCurve = .continuous
+        self.dismissButton.layer.borderWidth = 0.5
+        self.dismissButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
+        self.dismissButton.clipsToBounds = true
         self.dismissButton.addTarget(self, action: #selector(self.dismissPressed), for: .touchUpInside)
         self.view.addSubview(self.dismissButton)
         
@@ -550,8 +580,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
     }
     
+    public override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        self.triggerDismissBeginIfNeeded()
+    }
+    
     public override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        self.triggerDismissBeginIfNeeded()
         self.onDismiss?()
     }
     
@@ -567,7 +603,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.grabberView.frame = CGRect(x: (bounds.width - 38) * 0.5, y: topY + 6, width: 38, height: 5)
         
         let headerY = topY + 20
-        self.dismissButton.frame = CGRect(x: 16, y: headerY - 2, width: 40, height: 40)
+        self.dismissButton.frame = CGRect(x: 16, y: headerY + 2, width: 32, height: 32)
+        self.dismissButton.layer.cornerRadius = 16
         
         // Mode Switcher (Centered)
         let segW: CGFloat = 164.0
@@ -1003,6 +1040,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     // MARK: - Actions
     
     @objc private func dismissPressed() {
+        self.triggerDismissBeginIfNeeded()
         self.dismiss()
     }
     
