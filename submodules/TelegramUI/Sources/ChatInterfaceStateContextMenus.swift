@@ -1520,9 +1520,41 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                             controllerInteraction.presentControllerInCurrent(UndoOverlayController(presentationData: presentationData, content: .mediaSaved(text: isVideo ? presentationData.strings.Gallery_VideoSaved : presentationData.strings.Gallery_ImageSaved), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return true }), nil)
                         }
                     })
-                    f(.default)
-                })))
                 if !SGSimpleSettings.shared.contextShowSaveMedia { sgActions.append(actions.removeLast()) }
+                
+                if isVideo {
+                    let isRu = chatPresentationInterfaceState.strings.baseLanguageCode.hasPrefix("ru")
+                    actions.append(.action(ContextMenuActionItem(text: isRu ? "Установить как видео-обои" : "Set as Video Wallpaper", icon: { theme in
+                        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Save"), color: theme.actionSheet.primaryTextColor)
+                    }, action: { _, f in
+                        let rawPeerId = message.id.peerId.toInt64()
+                        if let file = message.media.first(where: { $0 is TelegramMediaFile }) as? TelegramMediaFile {
+                            let mediaBox = context.account.postbox.mediaBox
+                            let applyFile: (String) -> Void = { path in
+                                let fileUrl = URL(fileURLWithPath: path)
+                                SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: rawPeerId) { success, _ in
+                                    if success {
+                                        Queue.mainQueue().after(0.2) {
+                                            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                                            controllerInteraction.presentControllerInCurrent(UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Видео-обои установлены для этого чата" : "Video wallpaper set for this chat", cancel: nil, destructive: false), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return true }), nil)
+                                        }
+                                    }
+                                }
+                            }
+                            if let path = mediaBox.completedResourcePath(file.resource), FileManager.default.fileExists(atPath: path) {
+                                applyFile(path)
+                            } else {
+                                let _ = (mediaBox.resourceData(file.resource) |> deliverOnMainQueue).startStrict(next: { data in
+                                    if data.complete, let path = mediaBox.completedResourcePath(file.resource) {
+                                        applyFile(path)
+                                    }
+                                })
+                                let _ = mediaBox.fetchedResource(file.resource, parameters: nil).startStrict()
+                            }
+                        }
+                        f(.default)
+                    })))
+                }
             }
         }
         

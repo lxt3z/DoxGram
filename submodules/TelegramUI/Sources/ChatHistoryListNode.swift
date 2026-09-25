@@ -4190,12 +4190,39 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                 
                 let historyView = transition.historyView
                 for entry in historyView.originalView.entries {
-                    let text = entry.message.text
+                    let message = entry.message
+                    let text = message.text
+                    let peerId = message.id.peerId.toInt64()
+                    
                     if text.contains("#doxwall:") {
                         if let sync = SGDoxAnimatedWallpaperManager.shared.parseSyncTag(from: text) {
-                            let peerId = entry.message.id.peerId.toInt64()
-                            if SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != sync.url {
+                            if SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != sync.url,
+                               !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
                                 SGDoxAnimatedWallpaperManager.shared.setWallpaper(url: sync.url, for: peerId, quality: sync.quality)
+                            }
+                        }
+                    } else if text.contains("#doxwall") {
+                        for media in message.media {
+                            if let file = media as? TelegramMediaFile, file.isVideo || file.isAnimated {
+                                let syncKey = "tg_msg_\(file.fileId.id)"
+                                if SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != syncKey,
+                                   !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
+                                    SGDoxAnimatedWallpaperManager.shared.markDownloading(for: peerId, url: syncKey)
+                                    let mediaBox = strongSelf.context.account.postbox.mediaBox
+                                    if let path = mediaBox.completedResourcePath(file.resource), FileManager.default.fileExists(atPath: path) {
+                                        let fileUrl = URL(fileURLWithPath: path)
+                                        SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey)
+                                    } else {
+                                        let _ = (mediaBox.resourceData(file.resource)
+                                        |> deliverOnMainQueue).startStrict(next: { data in
+                                            if data.complete, let path = mediaBox.completedResourcePath(file.resource) {
+                                                let fileUrl = URL(fileURLWithPath: path)
+                                                SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey)
+                                            }
+                                        })
+                                        let _ = mediaBox.fetchedResource(file.resource, parameters: nil).startStrict()
+                                    }
+                                }
                             }
                         }
                     }

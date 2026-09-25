@@ -67,6 +67,25 @@ public final class SGDoxAnimatedWallpaperManager {
     private let cacheLock = NSLock()
     private var memoryCache: [String: (url: String, localPath: String, quality: String)] = [:]
     private var isCacheLoaded = false
+    private var activeDownloads = Set<String>()
+    
+    public func isDownloading(for peerId: Int64) -> Bool {
+        self.cacheLock.lock()
+        defer { self.cacheLock.unlock() }
+        return self.activeDownloads.contains(String(peerId))
+    }
+    
+    public func markDownloading(for peerId: Int64, url: String) {
+        self.cacheLock.lock()
+        self.activeDownloads.insert(String(peerId))
+        self.cacheLock.unlock()
+    }
+    
+    public func clearDownloading(for peerId: Int64) {
+        self.cacheLock.lock()
+        self.activeDownloads.remove(String(peerId))
+        self.cacheLock.unlock()
+    }
     
     private init() {
         self.ensureDirectoryExists()
@@ -149,7 +168,7 @@ public final class SGDoxAnimatedWallpaperManager {
 
     // MARK: - Local Video Picker (Gallery / Files)
 
-    public func setLocalWallpaper(from sourceUrl: URL, for peerId: Int64, completion: ((Bool, String?) -> Void)? = nil) {
+    public func setLocalWallpaper(from sourceUrl: URL, for peerId: Int64, customKey: String? = nil, completion: ((Bool, String?) -> Void)? = nil) {
         self.ensureDirectoryExists()
         let isSecurityScoped = sourceUrl.startAccessingSecurityScopedResource()
         defer {
@@ -169,19 +188,22 @@ public final class SGDoxAnimatedWallpaperManager {
 
             self.queue.async {
                 var data = self.getStoredData()
+                let key = customKey ?? ("file://" + sourceUrl.lastPathComponent)
                 data[String(peerId)] = [
-                    "url": "file://" + sourceUrl.lastPathComponent,
+                    "url": key,
                     "localPath": destinationFile.path,
                     "quality": "local"
                 ]
                 self.saveStoredData(data)
 
                 DispatchQueue.main.async {
+                    self.clearDownloading(for: peerId)
                     NotificationCenter.default.post(name: .doxChatWallpaperDidChange, object: nil, userInfo: ["peerId": peerId])
                     completion?(true, nil)
                 }
             }
         } catch {
+            self.clearDownloading(for: peerId)
             SGLogger.shared.log("SGDoxAnimatedWallpaperManager", "Local copy error: \(error.localizedDescription)")
             DispatchQueue.main.async {
                 completion?(false, error.localizedDescription)
@@ -287,9 +309,11 @@ public final class SGDoxAnimatedWallpaperManager {
             return
         }
 
+        self.markDownloading(for: peerId, url: trimmedUrl)
         self.resolveVideoUrlIfNeeded(urlString: trimmedUrl) { [weak self] resolvedUrlString, resolveError in
             guard let self = self else { return }
             guard let finalUrlString = resolvedUrlString, let finalUrl = URL(string: finalUrlString) else {
+                self.clearDownloading(for: peerId)
                 DispatchQueue.main.async {
                     completion(false, resolveError ?? "Не удалось получить видео по ссылке")
                 }
@@ -309,6 +333,7 @@ public final class SGDoxAnimatedWallpaperManager {
                 guard let self = self else { return }
 
                 if let error = error {
+                    self.clearDownloading(for: peerId)
                     SGLogger.shared.log("SGDoxAnimatedWallpaperManager", "Download error: \(error.localizedDescription)")
                     DispatchQueue.main.async {
                         completion(false, error.localizedDescription)
@@ -317,6 +342,7 @@ public final class SGDoxAnimatedWallpaperManager {
                 }
 
                 guard let tempUrl = tempUrl else {
+                    self.clearDownloading(for: peerId)
                     DispatchQueue.main.async {
                         completion(false, "Download failed")
                     }
@@ -340,11 +366,13 @@ public final class SGDoxAnimatedWallpaperManager {
                         self.saveStoredData(data)
 
                         DispatchQueue.main.async {
+                            self.clearDownloading(for: peerId)
                             NotificationCenter.default.post(name: .doxChatWallpaperDidChange, object: nil, userInfo: ["peerId": peerId])
                             completion(true, nil)
                         }
                     }
                 } catch {
+                    self.clearDownloading(for: peerId)
                     SGLogger.shared.log("SGDoxAnimatedWallpaperManager", "File error: \(error.localizedDescription)")
                     DispatchQueue.main.async {
                         completion(false, error.localizedDescription)

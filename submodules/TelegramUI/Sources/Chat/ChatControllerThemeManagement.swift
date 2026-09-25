@@ -397,12 +397,8 @@ extension ChatControllerImpl {
             actionSheet?.dismissAnimated()
             guard let self = self else { return }
             SGDoxVideoPickerHelper.shared.pickVideoFromGallery(from: self) { [weak self] selectedUrl in
-                guard let selectedUrl = selectedUrl else { return }
-                SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: rawPeerId) { [weak self] success, _ in
-                    if success {
-                        self?.chatDisplayNode.updateDoxVideoWallpaper()
-                    }
-                }
+                guard let strongSelf = self, let selectedUrl = selectedUrl else { return }
+                strongSelf.promptAndApplyDoxWallpaper(selectedUrl: selectedUrl, rawPeerId: rawPeerId)
             }
         }))
         
@@ -410,12 +406,8 @@ extension ChatControllerImpl {
             actionSheet?.dismissAnimated()
             guard let self = self else { return }
             SGDoxVideoPickerHelper.shared.pickVideoFromFiles(from: self) { [weak self] selectedUrl in
-                guard let selectedUrl = selectedUrl else { return }
-                SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: rawPeerId) { [weak self] success, _ in
-                    if success {
-                        self?.chatDisplayNode.updateDoxVideoWallpaper()
-                    }
-                }
+                guard let strongSelf = self, let selectedUrl = selectedUrl else { return }
+                strongSelf.promptAndApplyDoxWallpaper(selectedUrl: selectedUrl, rawPeerId: rawPeerId)
             }
         }))
         
@@ -441,6 +433,76 @@ extension ChatControllerImpl {
             ])
         ])
         self.present(actionSheet, in: .window(.root))
+    }
+    
+    private func promptAndApplyDoxWallpaper(selectedUrl: URL, rawPeerId: Int64) {
+        let presentationData = self.presentationData
+        let isRu = presentationData.strings.baseLanguageCode.hasPrefix("ru")
+        
+        let alert = UIAlertController(
+            title: isRu ? "Анимированные видео-обои" : "Animated Video Wallpapers",
+            message: isRu ? "Установить анимированные обои только для себя или для обоих участников чата?" : "Set animated wallpaper only for yourself or for both participants in this chat?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: isRu ? "Только для себя" : "For Me Only", style: .default, handler: { [weak self] _ in
+            guard let strongSelf = self else { return }
+            SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: rawPeerId) { [weak self] success, _ in
+                if success {
+                    self?.chatDisplayNode.updateDoxVideoWallpaper()
+                }
+            }
+        }))
+        
+        alert.addAction(UIAlertAction(title: isRu ? "Установить для обоих (DoxGram)" : "Set for Both (DoxGram)", style: .default, handler: { [weak self] _ in
+            guard let strongSelf = self else { return }
+            
+            // 1. Set locally immediately
+            SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: rawPeerId) { [weak self] success, _ in
+                if success {
+                    self?.chatDisplayNode.updateDoxVideoWallpaper()
+                }
+            }
+            
+            // 2. Send video into chat with #doxwall for automatic friend sync
+            strongSelf.sendDoxVideoWallpaperMessage(videoUrl: selectedUrl)
+        }))
+        
+        alert.addAction(UIAlertAction(title: presentationData.strings.Common_Cancel, style: .cancel, handler: nil))
+        
+        self.context.sharedContext.applicationBindings.presentNativeController(alert)
+    }
+    
+    private func sendDoxVideoWallpaperMessage(videoUrl: URL) {
+        let isSecurityScoped = videoUrl.startAccessingSecurityScopedResource()
+        defer {
+            if isSecurityScoped {
+                videoUrl.stopAccessingSecurityScopedResource()
+            }
+        }
+        
+        guard let data = try? Data(contentsOf: videoUrl), !data.isEmpty else { return }
+        
+        let _ = (legacyEnqueueGifMessage(account: self.context.account, data: data)
+        |> deliverOnMainQueue).startStandalone(next: { [weak self] message in
+            guard let self = self else { return }
+            var updatedMessage = message
+            if case let .message(_, attributes, inlineStickers, mediaReference, threadId, replyToMessageId, replyToStoryId, localGroupingKey, correlationId, bubbleUpEmojiOrStickersets) = message {
+                updatedMessage = .message(
+                    text: "🎬 Анимированные обои чата #doxwall",
+                    attributes: attributes,
+                    inlineStickers: inlineStickers,
+                    mediaReference: mediaReference,
+                    threadId: self.chatLocation.threadId,
+                    replyToMessageId: replyToMessageId,
+                    replyToStoryId: replyToStoryId,
+                    localGroupingKey: localGroupingKey,
+                    correlationId: correlationId,
+                    bubbleUpEmojiOrStickersets: bubbleUpEmojiOrStickersets
+                )
+            }
+            self.sendMessages([updatedMessage])
+        })
     }
     
     private func presentDoxAnimatedWallpaperUrlAlert(peerId: Int64) {
@@ -469,7 +531,7 @@ extension ChatControllerImpl {
                 return
             }
             let quality = SGDoxAnimatedWallpaperManager.shared.currentQuality
-            let hud = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
+            let hud = OverlayStatusController(style: .dark, type: .loading(cancelled: nil))
             strongSelf.present(hud, in: .window(.root))
             
             SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: urlString, quality: quality) { [weak self, weak hud] success, _ in
@@ -486,7 +548,7 @@ extension ChatControllerImpl {
                 return
             }
             let quality = SGDoxAnimatedWallpaperManager.shared.currentQuality
-            let hud = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
+            let hud = OverlayStatusController(style: .dark, type: .loading(cancelled: nil))
             strongSelf.present(hud, in: .window(.root))
             
             SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: urlString, quality: quality) { [weak self, weak hud] success, _ in
