@@ -30,6 +30,7 @@ public final class AppleMusicService: @unchecked Sendable {
     private var isPreparing = false
     private var lastSeekTime: Double?
     private var lastSeekTimestamp: Double = 0.0
+    private var activePlayGeneration: Int = 0
 
     private init() {
         self.setupPlayerNotifications()
@@ -613,18 +614,31 @@ public final class AppleMusicService: @unchecked Sendable {
     // MARK: - Playback (Full Songs via MPMusicPlayerController or Preview)
     
     public func play(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
+        self.activePlayGeneration += 1
+        let generation = self.activePlayGeneration
+        
         self.currentTrack = track
         self.isDeezerPreviewActive = false
         self.isPreparing = true
         self.lastSeekTime = nil
         self.playbackStartWatchdogTimer?.invalidate()
         self.playbackStartWatchdogTimer = nil
+        
+        // Fully stop and tear down previous audio session before starting a new track
         self.player.stop()
         self.isUsingSystemPlayer = false
+        
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemPlaybackStalled, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: nil)
+        
+        self.avPlayer?.pause()
+        self.avPlayer?.replaceCurrentItem(with: nil)
+        self.avPlayer = nil
 
         // 1. If it has a local asset URL (ipod-library://)
         if let preview = track.previewUrl, let url = URL(string: preview), url.scheme == "ipod-library" {
-            self.playPreview(url: url, completion: completion)
+            self.playPreview(url: url, generation: generation, completion: completion)
             return
         }
         
@@ -637,29 +651,26 @@ public final class AppleMusicService: @unchecked Sendable {
             // Check direct asset url
             if let item = query.items?.first, let assetUrl = item.value(forProperty: MPMediaItemPropertyAssetURL) as? URL {
                 self.isUsingSystemPlayer = false
-                self.playPreview(url: assetUrl, completion: completion)
+                self.playPreview(url: assetUrl, generation: generation, completion: completion)
                 return
             }
             
             // Play through media player query
-            DispatchQueue.main.async { [weak self] in
-                self?.avPlayer?.pause()
-                self?.avPlayer = nil
-            }
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
                 let player = self.player
                 player.setQueue(with: query)
                 player.prepareToPlay { [weak self] error in
                     DispatchQueue.main.async {
+                        guard let self = self, self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
                         if error == nil {
-                            self?.isPreparing = false
+                            self.isPreparing = false
                             player.currentPlaybackTime = 0.0
                             player.play()
-                            self?.isUsingSystemPlayer = true
+                            self.isUsingSystemPlayer = true
                             completion(true)
                         } else {
-                            self?.fallbackPlayPreviewOrSearch(track: track, completion: completion)
+                            self.fallbackPlayPreviewOrSearch(track: track, generation: generation, completion: completion)
                         }
                     }
                 }
@@ -671,10 +682,6 @@ public final class AppleMusicService: @unchecked Sendable {
         if let appleMusicId = track.appleMusicId,
            !appleMusicId.isEmpty && !appleMusicId.hasPrefix("local_") && !appleMusicId.hasPrefix("am_local_"),
            self.canPlayCatalogContent != false {
-            DispatchQueue.main.async { [weak self] in
-                self?.avPlayer?.pause()
-                self?.avPlayer = nil
-            }
             
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
@@ -683,7 +690,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 player.setQueue(with: [appleMusicId])
                 player.prepareToPlay { [weak self] error in
                     DispatchQueue.main.async {
-                        guard let self = self else { return }
+                        guard let self = self, self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
                         if error == nil {
                             self.isPreparing = false
                             player.play()
@@ -692,7 +699,7 @@ public final class AppleMusicService: @unchecked Sendable {
                             completion(true)
                         } else {
                             // Fallback to preview stream or search
-                            self.fallbackPlayPreviewOrSearch(track: track, completion: completion)
+                            self.fallbackPlayPreviewOrSearch(track: track, generation: generation, completion: completion)
                         }
                     }
                 }
@@ -701,7 +708,7 @@ public final class AppleMusicService: @unchecked Sendable {
         }
         
         // 4. Fallback to Deezer preview, iTunes preview, or online search
-        self.fallbackPlayPreviewOrSearch(track: track, completion: completion)
+        self.fallbackPlayPreviewOrSearch(track: track, generation: generation, completion: completion)
     }
 
     public func fetchDeezerPreview(artist: String, title: String, completion: @escaping @Sendable (URL?, String?) -> Void) {
@@ -738,45 +745,17 @@ public final class AppleMusicService: @unchecked Sendable {
         }.resume()
     }
     
-    private func fallbackPlayPreviewOrSearch(track: SGDoxMusicTrack, completion: @escaping @Sendable (Bool) -> Void) {
+    private func fallbackPlayPreviewOrSearch(track: SGDoxMusicTrack, generation: Int, completion: @escaping @Sendable (Bool) -> Void) {
+        guard self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
+        
         // Priority 1: High-speed, unthrottled Deezer MP3 preview (DRM-free and works reliably across CIS / Rostelecom)
         self.fetchDeezerPreview(artist: track.artist, title: track.title) { [weak self] deezerUrl, albumArt in
             guard let self = self else { return }
-            if let deezerUrl = deezerUrl {
-                if let art = albumArt, !art.isEmpty {
-                    SGDoxImageLoader.shared.loadImage(urlString: art) { img in
-                        if let img = img {
-                            SGDoxImageLoader.shared.storeImage(img, for: track.id)
-                            if let old = track.artworkUrl { SGDoxImageLoader.shared.storeImage(img, for: old) }
-                        }
-                    }
-                }
-                self.isDeezerPreviewActive = true
-                self.isUsingSystemPlayer = false
-                self.playPreview(url: deezerUrl, completion: completion)
-                return
-            }
-
-            // Priority 2: Pre-existing track preview URL
-            if let preview = track.previewUrl, let url = URL(string: preview) {
-                self.isUsingSystemPlayer = false
-                self.playPreview(url: url, completion: completion)
-                return
-            }
-            
-            // Priority 3: iTunes public catalog search
-            let cleanTitle = track.title
-                .replacingOccurrences(of: "\\(feat.*\\)", with: "", options: .regularExpression)
-                .replacingOccurrences(of: "\\[feat.*\\]", with: "", options: .regularExpression)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let query = "\(track.artist) \(cleanTitle)"
-            self.searchITunesPublic(query: query) { [weak self] results, _ in
-                guard let self = self else {
-                    DispatchQueue.main.async { completion(false) }
-                    return
-                }
-                if let first = results.first(where: { $0.previewUrl != nil }) ?? results.first, let preview = first.previewUrl, let url = URL(string: preview) {
-                    if let art = first.artworkUrl, !art.isEmpty {
+            DispatchQueue.main.async {
+                guard self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
+                
+                if let deezerUrl = deezerUrl {
+                    if let art = albumArt, !art.isEmpty {
                         SGDoxImageLoader.shared.loadImage(urlString: art) { img in
                             if let img = img {
                                 SGDoxImageLoader.shared.storeImage(img, for: track.id)
@@ -784,72 +763,123 @@ public final class AppleMusicService: @unchecked Sendable {
                             }
                         }
                     }
+                    self.isDeezerPreviewActive = true
                     self.isUsingSystemPlayer = false
-                    self.playPreview(url: url, completion: completion)
-                } else {
-                    // Secondary fallback: search just the title
-                    self.searchITunesPublic(query: cleanTitle) { [weak self] tResults, _ in
-                        guard let self = self, let first = tResults.first(where: { $0.previewUrl != nil }) ?? tResults.first, let preview = first.previewUrl, let url = URL(string: preview) else {
-                            DispatchQueue.main.async { completion(false) }
-                            return
+                    self.playPreview(url: deezerUrl, generation: generation, completion: completion)
+                    return
+                }
+
+                // Priority 2: Pre-existing track preview URL
+                if let preview = track.previewUrl, let url = URL(string: preview) {
+                    self.isUsingSystemPlayer = false
+                    self.playPreview(url: url, generation: generation, completion: completion)
+                    return
+                }
+                
+                // Priority 3: iTunes public catalog search
+                let cleanTitle = track.title
+                    .replacingOccurrences(of: "\\(feat.*\\)", with: "", options: .regularExpression)
+                    .replacingOccurrences(of: "\\[feat.*\\]", with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let query = "\(track.artist) \(cleanTitle)"
+                self.searchITunesPublic(query: query) { [weak self] results, _ in
+                    guard let self = self else {
+                        DispatchQueue.main.async { completion(false) }
+                        return
+                    }
+                    DispatchQueue.main.async {
+                        guard self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
+                        
+                        if let first = results.first(where: { $0.previewUrl != nil }) ?? results.first, let preview = first.previewUrl, let url = URL(string: preview) {
+                            if let art = first.artworkUrl, !art.isEmpty {
+                                SGDoxImageLoader.shared.loadImage(urlString: art) { img in
+                                    if let img = img {
+                                        SGDoxImageLoader.shared.storeImage(img, for: track.id)
+                                        if let old = track.artworkUrl { SGDoxImageLoader.shared.storeImage(img, for: old) }
+                                    }
+                                }
+                            }
+                            self.isUsingSystemPlayer = false
+                            self.playPreview(url: url, generation: generation, completion: completion)
+                        } else {
+                            // Secondary fallback: search just the title
+                            self.searchITunesPublic(query: cleanTitle) { [weak self] tResults, _ in
+                                guard let self = self else {
+                                    DispatchQueue.main.async { completion(false) }
+                                    return
+                                }
+                                DispatchQueue.main.async {
+                                    guard self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
+                                    guard let first = tResults.first(where: { $0.previewUrl != nil }) ?? tResults.first, let preview = first.previewUrl, let url = URL(string: preview) else {
+                                        completion(false)
+                                        return
+                                    }
+                                    self.isUsingSystemPlayer = false
+                                    self.playPreview(url: url, generation: generation, completion: completion)
+                                }
+                            }
                         }
-                        self.isUsingSystemPlayer = false
-                        self.playPreview(url: url, completion: completion)
                     }
                 }
             }
         }
     }
     
-    private func playPreview(url: URL, completion: @escaping @Sendable (Bool) -> Void) {
+    private func playPreview(url: URL, generation: Int, completion: @escaping @Sendable (Bool) -> Void) {
+        guard self.activePlayGeneration == generation else { return }
+        
         self.player.stop()
         self.isUsingSystemPlayer = false
+        
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemPlaybackStalled, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: nil)
+        
         self.avPlayer?.pause()
+        self.avPlayer?.replaceCurrentItem(with: nil)
+        self.avPlayer = nil
         
         let playerItem = AVPlayerItem(url: url)
         let player = AVPlayer(playerItem: playerItem)
         player.automaticallyWaitsToMinimizeStalling = true
         self.avPlayer = player
         
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemPlaybackStalled, object: nil)
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: nil)
-        
-        NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
-        NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidStall), name: .AVPlayerItemPlaybackStalled, object: playerItem)
-        NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidFail), name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidFinishPlaying(_:)), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.avPlayerDidFail(_:)), name: .AVPlayerItemFailedToPlayToEndTime, object: playerItem)
         
         self.isPreparing = false
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
         DispatchQueue.main.async {
+            guard self.activePlayGeneration == generation else {
+                player.pause()
+                player.replaceCurrentItem(with: nil)
+                return
+            }
             completion(true)
         }
     }
 
-    @objc private func avPlayerDidFinishPlaying() {
+    @objc private func avPlayerDidFinishPlaying(_ notification: Notification) {
         DispatchQueue.main.async { [weak self] in
-            guard SGDoxMusicManager.shared.isPlaying else { return }
-            self?.onTrackDidFinish?()
+            guard let self = self else { return }
+            guard let finishedItem = notification.object as? AVPlayerItem,
+                  finishedItem === self.avPlayer?.currentItem,
+                  SGDoxMusicManager.shared.isPlaying else { return }
+            self.onTrackDidFinish?()
         }
     }
 
-    @objc private func avPlayerDidStall() {
-        guard SGDoxMusicManager.shared.isPlaying else { return }
-        guard let track = self.currentTrack, !self.isDeezerPreviewActive else { return }
-        self.isDeezerPreviewActive = true
-        self.fetchDeezerPreview(artist: track.artist, title: track.title) { [weak self] deezerUrl, _ in
-            guard let self = self, let deezerUrl = deezerUrl else { return }
-            DispatchQueue.main.async {
-                guard SGDoxMusicManager.shared.isPlaying else { return }
-                self.playPreview(url: deezerUrl) { _ in }
+    @objc private func avPlayerDidFail(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            guard let failedItem = notification.object as? AVPlayerItem,
+                  failedItem === self.avPlayer?.currentItem,
+                  SGDoxMusicManager.shared.isPlaying else { return }
+            if let track = self.currentTrack {
+                self.onPlaybackFailed?(track)
             }
         }
-    }
-
-    @objc private func avPlayerDidFail() {
-        guard SGDoxMusicManager.shared.isPlaying else { return }
-        self.avPlayerDidStall()
     }
     
     public func pause() {
@@ -860,13 +890,20 @@ public final class AppleMusicService: @unchecked Sendable {
     }
 
     public func stop() {
+        self.activePlayGeneration += 1
         self.playbackStartWatchdogTimer?.invalidate()
         self.playbackStartWatchdogTimer = nil
         self.player.stop()
         self.isUsingSystemPlayer = false
         self.isPreparing = false
         self.lastSeekTime = nil
+        
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemPlaybackStalled, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: nil)
+        
         self.avPlayer?.pause()
+        self.avPlayer?.replaceCurrentItem(with: nil)
         self.avPlayer = nil
         self.currentTrack = nil
     }

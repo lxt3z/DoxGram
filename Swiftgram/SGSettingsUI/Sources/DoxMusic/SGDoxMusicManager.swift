@@ -276,6 +276,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private var lastReportedArtworkUrl: String?
     private var hasSyncedAudioStart: Bool = false
     private var isTransitioningTrack: Bool = false
+    private var activePlayGeneration: Int = 0
     
     private override init() {
         super.init()
@@ -440,6 +441,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     // MARK: - Playback
     
     public func play(track: SGDoxMusicTrack, queue: [SGDoxMusicTrack] = []) {
+        self.activePlayGeneration += 1
+        let generation = self.activePlayGeneration
+        
         self.stopTimeTracking()
         self.stopCurrentAudio()
         
@@ -477,7 +481,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         switch track.source {
         case .appleMusic:
             AppleMusicService.shared.play(track: track) { [weak self] success in
-                guard let self = self else { return }
+                guard let self = self, self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
                 self.isPlaying = success
                 if success {
                     self.startTimeTracking()
@@ -489,7 +493,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             }
         case .spotify:
             SpotifyService.shared.play(track: track) { [weak self] success in
-                guard let self = self else { return }
+                guard let self = self, self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
                 self.isPlaying = success
                 if success {
                     self.startTimeTracking()
@@ -505,12 +509,13 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     private func playLocalAudioFile(url: URL, track: SGDoxMusicTrack) {
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        
         let playerItem = AVPlayerItem(url: url)
         let player = AVPlayer(playerItem: playerItem)
         self.avPlayer = player
         
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying(_:)), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
         
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
@@ -527,11 +532,13 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             return
         }
         
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        
         let playerItem = AVPlayerItem(url: url)
         let player = AVPlayer(playerItem: playerItem)
         self.avPlayer = player
         
-        NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying(_:)), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
         
         player.seek(to: .zero)
         player.play()
@@ -541,8 +548,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.checkWaveReplenishmentIfNeeded()
     }
     
-    @objc private func playerDidFinishPlaying() {
-        guard self.isPlaying else { return }
+    @objc private func playerDidFinishPlaying(_ notification: Notification) {
+        guard let finishedItem = notification.object as? AVPlayerItem,
+              finishedItem === self.avPlayer?.currentItem,
+              self.isPlaying else { return }
         self.next()
     }
     
@@ -709,14 +718,17 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     private func stopCurrentAudio() {
+        self.activePlayGeneration += 1
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
         if let timeObserver = self.timeObserver {
             self.avPlayer?.removeTimeObserver(timeObserver)
             self.timeObserver = nil
         }
         self.avPlayer?.pause()
+        self.avPlayer?.replaceCurrentItem(with: nil)
         self.avPlayer = nil
-        AppleMusicService.shared.pause()
-        SpotifyService.shared.pause()
+        AppleMusicService.shared.stop()
+        SpotifyService.shared.stop()
     }
     
     // MARK: - Wave Engine (Волна)

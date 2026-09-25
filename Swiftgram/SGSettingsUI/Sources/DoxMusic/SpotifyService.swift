@@ -424,6 +424,9 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
         if let preview = track.previewUrl, let url = URL(string: preview) {
             DispatchQueue.main.async { [weak self] in
                 self?.avPlayer?.pause()
+                self?.avPlayer?.replaceCurrentItem(with: nil)
+                self?.avPlayer = nil
+                
                 let playerItem = AVPlayerItem(url: url)
                 let player = AVPlayer(playerItem: playerItem)
                 self?.avPlayer = player
@@ -453,6 +456,14 @@ public final class SpotifyService: NSObject, @unchecked Sendable {
     public func pause() {
         DispatchQueue.main.async { [weak self] in
             self?.avPlayer?.pause()
+        }
+    }
+    
+    public func stop() {
+        DispatchQueue.main.async { [weak self] in
+            self?.avPlayer?.pause()
+            self?.avPlayer?.replaceCurrentItem(with: nil)
+            self?.avPlayer = nil
         }
     }
     
