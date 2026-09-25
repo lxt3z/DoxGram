@@ -1520,6 +1520,8 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                             controllerInteraction.presentControllerInCurrent(UndoOverlayController(presentationData: presentationData, content: .mediaSaved(text: isVideo ? presentationData.strings.Gallery_VideoSaved : presentationData.strings.Gallery_ImageSaved), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return true }), nil)
                         }
                     })
+                    f(.default)
+                })))
                 if !SGSimpleSettings.shared.contextShowSaveMedia { sgActions.append(actions.removeLast()) }
                 
                 if isVideo {

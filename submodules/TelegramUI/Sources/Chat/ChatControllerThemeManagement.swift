@@ -446,7 +446,6 @@ extension ChatControllerImpl {
         )
         
         alert.addAction(UIAlertAction(title: isRu ? "Только для себя" : "For Me Only", style: .default, handler: { [weak self] _ in
-            guard let strongSelf = self else { return }
             SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: rawPeerId) { [weak self] success, _ in
                 if success {
                     self?.chatDisplayNode.updateDoxVideoWallpaper()
@@ -487,7 +486,7 @@ extension ChatControllerImpl {
         |> deliverOnMainQueue).startStandalone(next: { [weak self] message in
             guard let self = self else { return }
             var updatedMessage = message
-            if case let .message(_, attributes, inlineStickers, mediaReference, threadId, replyToMessageId, replyToStoryId, localGroupingKey, correlationId, bubbleUpEmojiOrStickersets) = message {
+            if case let .message(_, attributes, inlineStickers, mediaReference, _, replyToMessageId, replyToStoryId, localGroupingKey, correlationId, bubbleUpEmojiOrStickersets) = message {
                 updatedMessage = .message(
                     text: "🎬 Анимированные обои чата #doxwall",
                     attributes: attributes,
