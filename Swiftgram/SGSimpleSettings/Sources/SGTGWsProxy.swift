@@ -244,6 +244,7 @@ private final class SGTGWsSession {
 
     private var webSocketTask: URLSessionWebSocketTask?
     private var pingTimer: DispatchSourceTimer?
+    private var connectWatchdogTimer: DispatchSourceTimer?
     private var targetDc: Int = 4
     private var targetIp: String?
     private var isClosed: Bool = false
@@ -554,10 +555,31 @@ private final class SGTGWsSession {
             }
 
             self.startPingTimer()
+            self.startConnectWatchdogTimer()
             self.readFromWebSocket()
         } else {
             self.close()
         }
+    }
+
+    private func startConnectWatchdogTimer() {
+        self.stopConnectWatchdogTimer()
+        let timer = DispatchSource.makeTimerSource(queue: self.queue)
+        timer.schedule(deadline: .now() + 5.5)
+        timer.setEventHandler { [weak self] in
+            guard let self = self, !self.isClosed else { return }
+            if !self.hasReceivedWsData {
+                SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): Connect watchdog timed out (5.5s), triggering failover...")
+                self.handleWebSocketFailure(error: NSError(domain: "SGTGWsProxy", code: -1001, userInfo: [NSLocalizedDescriptionKey: "Connect watchdog timeout"]))
+            }
+        }
+        timer.resume()
+        self.connectWatchdogTimer = timer
+    }
+
+    private func stopConnectWatchdogTimer() {
+        self.connectWatchdogTimer?.cancel()
+        self.connectWatchdogTimer = nil
     }
 
     private func startPingTimer() {
@@ -657,6 +679,7 @@ private final class SGTGWsSession {
 
                 switch result {
                 case let .success(message):
+                    self.stopConnectWatchdogTimer()
                     if !self.hasReceivedWsData {
                         self.hasReceivedWsData = true
                         if self.currentDomainIndex < self.candidateDomains.count {
@@ -699,23 +722,28 @@ private final class SGTGWsSession {
                     }
 
                 case let .failure(error):
-                    let isCustom = !SGSimpleSettings.shared.tgWsProxyCustomWorker.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    let maxAttempts = min(self.candidateDomains.count + (isCustom ? 1 : 0), 10)
-                    if !self.hasReceivedWsData && self.attemptCount < maxAttempts {
-                        self.attemptCount += 1
-                        if !isCustom || self.attemptCount > 1 {
-                            self.currentDomainIndex += 1
-                        }
-                        SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS connect failed (\(error)), failing over (\(self.attemptCount)/\(maxAttempts))...")
-                        self.stopPingTimer()
-                        self.webSocketTask?.cancel(with: .goingAway, reason: nil)
-                        self.webSocketTask = nil
-                        self.connectWebSocket()
-                    } else {
-                        self.close()
-                    }
+                    self.handleWebSocketFailure(error: error)
                 }
             }
+        }
+    }
+
+    private func handleWebSocketFailure(error: Error) {
+        let isCustom = !SGSimpleSettings.shared.tgWsProxyCustomWorker.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let maxAttempts = min(self.candidateDomains.count + (isCustom ? 1 : 0), 10)
+        if !self.hasReceivedWsData && self.attemptCount < maxAttempts {
+            self.attemptCount += 1
+            if !isCustom || self.attemptCount > 1 {
+                self.currentDomainIndex += 1
+            }
+            SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS connect failed (\(error)), failing over (\(self.attemptCount)/\(maxAttempts))...")
+            self.stopPingTimer()
+            self.stopConnectWatchdogTimer()
+            self.webSocketTask?.cancel(with: .goingAway, reason: nil)
+            self.webSocketTask = nil
+            self.connectWebSocket()
+        } else {
+            self.close()
         }
     }
 
@@ -730,6 +758,7 @@ private final class SGTGWsSession {
         self.isClosed = true
 
         self.stopPingTimer()
+        self.stopConnectWatchdogTimer()
         self.connection.cancel()
         if #available(iOS 13.0, *) {
             self.webSocketTask?.cancel(with: .goingAway, reason: nil)
