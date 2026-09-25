@@ -38,6 +38,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     private var isAudioSyncedForCurrentTrack = false
     private var externalAssetCache: [String: String] = [:]
     private var resolvingUrls: Set<String> = []
+    private let doxgramIconUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Telegram/Telegram-iOS/SGDefault.alticon/SGDefault%403x.png"
     
     private override init() {
         super.init()
@@ -45,6 +46,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         self.urlSession = URLSession(configuration: config, delegate: self, delegateQueue: OperationQueue())
         
         if SGSimpleSettings.shared.discordRpcEnabled && !SGSimpleSettings.shared.discordRpcToken.isEmpty {
+            self.resolveExternalAsset(imageUrl: self.doxgramIconUrl)
             self.connect()
         }
     }
@@ -63,6 +65,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
             return
         }
         
+        self.resolveExternalAsset(imageUrl: self.doxgramIconUrl)
         self.disconnect(cleanStatus: false)
         self.status = .connecting
         
@@ -165,6 +168,9 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
                     }
                 }
                 self.status = .connected(username: username)
+                
+                // Pre-resolve DoxGram small icon right on connect
+                self.resolveExternalAsset(imageUrl: self.doxgramIconUrl)
                 
                 // Immediately send current presence if already playing
                 self.sendPresenceUpdate(track: self.currentPlayingTrack, isPlaying: self.currentIsPlaying)
@@ -343,23 +349,27 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         }
         
         if let artwork = track.artworkUrl, !artwork.isEmpty {
-            if artwork.hasPrefix("http://") || artwork.hasPrefix("https://") {
-                assets["large_image"] = artwork
-            } else if let cachedMp = self.externalAssetCache[artwork] {
+            if let cachedMp = self.externalAssetCache[artwork] {
                 assets["large_image"] = cachedMp
             } else if track.source == .spotify && artwork.contains("i.scdn.co/image/") {
                 let id = artwork.components(separatedBy: "/").last ?? ""
                 if !id.isEmpty {
                     assets["large_image"] = "spotify:\(id)"
                 }
+                self.resolveExternalAsset(imageUrl: artwork)
             } else if artwork.hasPrefix("mp:") {
                 assets["large_image"] = artwork
+            } else {
+                self.resolveExternalAsset(imageUrl: artwork)
             }
         }
         
-        let doxgramIconUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Telegram/Telegram-iOS/SGDefault.alticon/SGDefault%403x.png"
-        assets["small_image"] = doxgramIconUrl
-        assets["small_text"] = "DoxGram iOS"
+        if let cachedDox = self.externalAssetCache[self.doxgramIconUrl] {
+            assets["small_image"] = cachedDox
+            assets["small_text"] = "DoxGram iOS"
+        } else {
+            self.resolveExternalAsset(imageUrl: self.doxgramIconUrl)
+        }
         
         if !assets.isEmpty {
             activity["assets"] = assets
@@ -409,10 +419,27 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
             guard let self = self else { return }
             self.resolvingUrls.remove(imageUrl)
             
-            guard let data = data, error == nil,
-                  let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-                  let first = array.first,
-                  let path = first["external_asset_path"] as? String else {
+            guard let data = data, error == nil else {
+                return
+            }
+            
+            var assetPath: String?
+            if let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                for item in array {
+                    if let path = item["external_asset_path"] as? String {
+                        assetPath = path
+                        break
+                    }
+                }
+            } else if let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let path = dict["external_asset_path"] as? String {
+                    assetPath = path
+                } else if let items = dict["urls"] as? [[String: Any]] {
+                    assetPath = items.first?["external_asset_path"] as? String
+                }
+            }
+            
+            guard let path = assetPath, !path.isEmpty else {
                 return
             }
             
@@ -420,7 +447,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
             self.externalAssetCache[imageUrl] = mpUrl
             
             DispatchQueue.main.async {
-                if self.currentIsPlaying, (self.currentPlayingTrack?.artworkUrl == imageUrl || imageUrl.contains("SGDefault")) {
+                if self.currentIsPlaying, (self.currentPlayingTrack?.artworkUrl == imageUrl || imageUrl == self.doxgramIconUrl) {
                     self.sendPresenceUpdate(track: self.currentPlayingTrack, isPlaying: self.currentIsPlaying)
                 }
             }
