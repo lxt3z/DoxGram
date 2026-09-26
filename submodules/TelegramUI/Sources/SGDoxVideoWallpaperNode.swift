@@ -20,7 +20,9 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         super.init()
         self.isUserInteractionEnabled = false
         self.clipsToBounds = true
-        self.backgroundColor = .black
+        self.backgroundColor = .clear
+        self.isHidden = true
+        self.alpha = 0.0
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.appWillResignActive), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(self.appDidBecomeActive), name: UIApplication.didBecomeActiveNotification, object: nil)
@@ -43,11 +45,11 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
     
     public func setup(peerId: Int64) {
         if let localUrl = SGDoxAnimatedWallpaperManager.shared.localFileUrl(for: peerId) {
-            self.setup(with: localUrl)
             self.isHidden = false
+            self.alpha = 1.0
+            self.setup(with: localUrl)
         } else {
             self.clear()
-            self.isHidden = true
         }
     }
 
@@ -66,6 +68,8 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
     }
 
     public func setup(with fileUrl: URL) {
+        self.isHidden = false
+        self.alpha = 1.0
         if self.currentUrl == fileUrl, self.player != nil {
             self.play()
             return
@@ -124,6 +128,7 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         self.readyObserver = playerLayer.observe(\.isReadyForDisplay, options: [.new, .initial]) { [weak self] layer, _ in
             if layer.isReadyForDisplay {
                 DispatchQueue.main.async {
+                    self?.backgroundColor = .black
                     self?.onReady?()
                 }
             }
@@ -155,6 +160,10 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         self.player = nil
         self.currentUrl = nil
         self.isPlaying = false
+        self.onReady = nil
+        self.backgroundColor = .clear
+        self.isHidden = true
+        self.alpha = 0.0
     }
     
     public func play() {

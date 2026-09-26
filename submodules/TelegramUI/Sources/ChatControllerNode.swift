@@ -1071,10 +1071,15 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
     func updateDoxVideoWallpaper() {
         guard let peerId = self.chatLocation.peerId else {
             self.doxVideoWallpaperNode.clear()
+            self.doxVideoWallpaperNode.isHidden = true
+            self.doxVideoWallpaperNode.alpha = 0.0
             self.backgroundNode.alpha = 1.0
             return
         }
         if self.hasDoxVideoWallpaper {
+            self.backgroundNode.alpha = 1.0
+            self.doxVideoWallpaperNode.isHidden = false
+            self.doxVideoWallpaperNode.alpha = 1.0
             self.doxVideoWallpaperNode.onReady = { [weak self] in
                 self?.backgroundNode.alpha = 0.0
             }
@@ -1089,6 +1094,8 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             }
         } else {
             self.doxVideoWallpaperNode.clear()
+            self.doxVideoWallpaperNode.isHidden = true
+            self.doxVideoWallpaperNode.alpha = 0.0
             self.backgroundNode.alpha = 1.0
         }
     }
