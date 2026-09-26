@@ -525,6 +525,12 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying(_:)), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
         
+        let asset = AVURLAsset(url: url)
+        let assetDuration = CMTimeGetSeconds(asset.duration)
+        if assetDuration > 1.0 {
+            self.duration = assetDuration
+        }
+        
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
         self.isPlaying = true

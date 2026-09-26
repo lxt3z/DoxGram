@@ -24,15 +24,46 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let segmentContainerView = UIView()
     private let segmentIndicatorView = UIView()
     private let nowPlayingSegmentButton = UIButton(type: .system)
+    private let lyricsSegmentButton = UIButton(type: .system)
     private let queueSegmentButton = UIButton(type: .system)
     private let sourceBadgeContainer = UIView()
     private let sourceIconView = UIImageView()
     private let sourceLabel = UILabel()
     
-    // Content Containers (All-in-One: Now Playing vs Queue)
+    // Content Containers (All-in-One: Now Playing vs Lyrics vs Queue)
+    private enum PlayerMode: Int {
+        case nowPlaying = 0
+        case lyrics = 1
+        case queue = 2
+    }
+    private var currentMode: PlayerMode = .nowPlaying
     private let nowPlayingContainerView = UIView()
+    private let lyricsContainerView = UIView()
     private let queueContainerView = UIView()
-    private var isQueueMode = false
+    
+    // --- Lyrics Pane ---
+    private let lyricsHeaderView = UIView()
+    private let lyricsTrackTitle = UILabel()
+    private let lyricsTrackArtist = UILabel()
+    private let lyricsTableView = UITableView(frame: .zero, style: .plain)
+    private let lyricsPlainTextView = UITextView()
+    private let lyricsLoadingIndicator = UIActivityIndicatorView(style: .medium)
+    private let lyricsStatusLabel = UILabel()
+    
+    private let lyricsMiniBar = UIView()
+    private let lyricsMiniBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+    private let lyricsMiniSlider = UISlider()
+    private let lyricsMiniCurrentTime = UILabel()
+    private let lyricsMiniRemainingTime = UILabel()
+    private let lyricsMiniPrev = UIButton(type: .system)
+    private let lyricsMiniPlayPause = UIButton(type: .system)
+    private let lyricsMiniNext = UIButton(type: .system)
+    
+    private var currentLyrics: SGDoxLyrics?
+    private var activeLyricsIndex: Int = -1
+    private var isUserScrollingLyrics = false
+    private var userScrollTimer: Timer?
+    private let lyricsButton = UIButton(type: .system)
     
     // --- Now Playing Pane ---
     private let artworkAmbientGlowView = UIView()
@@ -161,6 +192,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 self.progressSlider.value = Float(current / d)
                 self.currentTimeLabel.text = self.formatTime(current)
                 self.remainingTimeLabel.text = "-\(self.formatTime(max(0, d - current)))"
+                
+                self.lyricsMiniSlider.value = Float(current / d)
+                self.lyricsMiniCurrentTime.text = self.formatTime(current)
+                self.lyricsMiniRemainingTime.text = "-\(self.formatTime(max(0, d - current)))"
+                
+                if self.currentMode == .lyrics {
+                    self.syncLyricsPosition(currentTime: current)
+                }
             }
         }
         
@@ -269,13 +308,19 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         self.nowPlayingSegmentButton.setTitle("Сейчас", for: .normal)
         self.nowPlayingSegmentButton.setTitleColor(.white, for: .normal)
-        self.nowPlayingSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.nowPlayingSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
         self.nowPlayingSegmentButton.addTarget(self, action: #selector(self.nowPlayingSegmentPressed), for: .touchUpInside)
         self.segmentContainerView.addSubview(self.nowPlayingSegmentButton)
         
+        self.lyricsSegmentButton.setTitle("Текст", for: .normal)
+        self.lyricsSegmentButton.setTitleColor(.white, for: .normal)
+        self.lyricsSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        self.lyricsSegmentButton.addTarget(self, action: #selector(self.lyricsSegmentPressed), for: .touchUpInside)
+        self.segmentContainerView.addSubview(self.lyricsSegmentButton)
+        
         self.queueSegmentButton.setTitle("Очередь", for: .normal)
         self.queueSegmentButton.setTitleColor(.white, for: .normal)
-        self.queueSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.queueSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
         self.queueSegmentButton.addTarget(self, action: #selector(self.queueSegmentPressed), for: .touchUpInside)
         self.segmentContainerView.addSubview(self.queueSegmentButton)
         
@@ -297,11 +342,16 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // 3. Content Panes
         self.view.addSubview(self.nowPlayingContainerView)
+        self.view.addSubview(self.lyricsContainerView)
         self.view.addSubview(self.queueContainerView)
+        
+        self.lyricsContainerView.alpha = 0.0
+        self.lyricsContainerView.isHidden = true
         self.queueContainerView.alpha = 0.0
         self.queueContainerView.isHidden = true
         
         self.setupNowPlayingPane()
+        self.setupLyricsPane()
         self.setupQueuePane()
     }
     
@@ -328,8 +378,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.artworkImageView.layer.cornerRadius = 24
         self.artworkImageView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
         self.artworkContainerView.addSubview(self.artworkImageView)
+        let artTap = UITapGestureRecognizer(target: self, action: #selector(self.artworkTapped))
+        self.artworkContainerView.isUserInteractionEnabled = true
+        self.artworkContainerView.addGestureRecognizer(artTap)
         
-        // Info Area: Title, Artist, Favorite
+        // Info Area: Title, Artist, Favorite, Lyrics
         self.nowPlayingContainerView.addSubview(self.infoContainerView)
         
         self.titleLabel.textColor = .white
@@ -341,6 +394,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.artistLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         self.artistLabel.lineBreakMode = .byTruncatingTail
         self.infoContainerView.addSubview(self.artistLabel)
+        
+        let quoteConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
+        self.lyricsButton.setImage(UIImage(systemName: "quote.bubble", withConfiguration: quoteConfig), for: .normal)
+        self.lyricsButton.tintColor = UIColor.white.withAlphaComponent(0.8)
+        self.lyricsButton.addTarget(self, action: #selector(self.lyricsSegmentPressed), for: .touchUpInside)
+        self.infoContainerView.addSubview(self.lyricsButton)
         
         let heartConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
         self.favoriteButton.setImage(UIImage(systemName: "heart", withConfiguration: heartConfig), for: .normal)
@@ -540,6 +599,123 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.queueContainerView.addSubview(self.queueMiniBar)
     }
     
+    private func setupLyricsPane() {
+        // Track Header Info
+        self.lyricsHeaderView.clipsToBounds = true
+        self.lyricsContainerView.addSubview(self.lyricsHeaderView)
+        
+        self.lyricsTrackTitle.textColor = .white
+        self.lyricsTrackTitle.font = UIFont.systemFont(ofSize: 17, weight: .bold)
+        self.lyricsTrackTitle.textAlignment = .center
+        self.lyricsTrackTitle.lineBreakMode = .byTruncatingTail
+        self.lyricsHeaderView.addSubview(self.lyricsTrackTitle)
+        
+        self.lyricsTrackArtist.textColor = UIColor.white.withAlphaComponent(0.65)
+        self.lyricsTrackArtist.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        self.lyricsTrackArtist.textAlignment = .center
+        self.lyricsTrackArtist.lineBreakMode = .byTruncatingTail
+        self.lyricsHeaderView.addSubview(self.lyricsTrackArtist)
+        
+        // Table View for Synced Lyrics
+        self.lyricsTableView.backgroundColor = .clear
+        self.lyricsTableView.separatorStyle = .none
+        self.lyricsTableView.dataSource = self
+        self.lyricsTableView.delegate = self
+        self.lyricsTableView.showsVerticalScrollIndicator = false
+        self.lyricsTableView.register(SGDoxLyricsCell.self, forCellReuseIdentifier: "SGDoxLyricsCell")
+        self.lyricsContainerView.addSubview(self.lyricsTableView)
+        
+        // Plain text view (if plain lyrics only)
+        self.lyricsPlainTextView.backgroundColor = .clear
+        self.lyricsPlainTextView.textColor = UIColor.white.withAlphaComponent(0.9)
+        self.lyricsPlainTextView.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        self.lyricsPlainTextView.isEditable = false
+        self.lyricsPlainTextView.isSelectable = false
+        self.lyricsPlainTextView.textAlignment = .center
+        self.lyricsPlainTextView.showsVerticalScrollIndicator = false
+        self.lyricsPlainTextView.isHidden = true
+        self.lyricsContainerView.addSubview(self.lyricsPlainTextView)
+        
+        // Loading & Status
+        self.lyricsLoadingIndicator.color = .white
+        self.lyricsLoadingIndicator.hidesWhenStopped = true
+        self.lyricsContainerView.addSubview(self.lyricsLoadingIndicator)
+        
+        self.lyricsStatusLabel.textColor = UIColor.white.withAlphaComponent(0.6)
+        self.lyricsStatusLabel.font = UIFont.systemFont(ofSize: 15, weight: .medium)
+        self.lyricsStatusLabel.textAlignment = .center
+        self.lyricsStatusLabel.numberOfLines = 0
+        self.lyricsStatusLabel.isHidden = true
+        self.lyricsContainerView.addSubview(self.lyricsStatusLabel)
+        
+        // Mini Bar at bottom of Lyrics
+        self.lyricsMiniBar.layer.cornerRadius = 18
+        self.lyricsMiniBar.layer.cornerCurve = .continuous
+        self.lyricsMiniBar.layer.borderWidth = 0.5
+        self.lyricsMiniBar.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
+        self.lyricsMiniBar.clipsToBounds = true
+        
+        self.lyricsMiniBlurView.effect = UIBlurEffect(style: .dark)
+        self.lyricsMiniBlurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        self.lyricsMiniBar.addSubview(self.lyricsMiniBlurView)
+        
+        let darkOverlay = UIView()
+        darkOverlay.backgroundColor = UIColor(white: 0.10, alpha: 0.65)
+        darkOverlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        self.lyricsMiniBar.addSubview(darkOverlay)
+        
+        // Progress slider
+        self.lyricsMiniSlider.minimumValue = 0.0
+        self.lyricsMiniSlider.maximumValue = 1.0
+        self.lyricsMiniSlider.minimumTrackTintColor = .white
+        self.lyricsMiniSlider.maximumTrackTintColor = UIColor(white: 1.0, alpha: 0.22)
+        self.lyricsMiniSlider.setThumbImage(self.generateMiniSliderThumb(), for: .normal)
+        self.lyricsMiniSlider.addTarget(self, action: #selector(self.miniSliderValueChanged), for: .valueChanged)
+        self.lyricsMiniSlider.addTarget(self, action: #selector(self.miniSliderTouchEnded), for: [.touchUpInside, .touchUpOutside])
+        self.lyricsMiniBar.addSubview(self.lyricsMiniSlider)
+        
+        self.lyricsMiniCurrentTime.textColor = UIColor(white: 1.0, alpha: 0.55)
+        self.lyricsMiniCurrentTime.font = UIFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        self.lyricsMiniCurrentTime.text = "0:00"
+        self.lyricsMiniBar.addSubview(self.lyricsMiniCurrentTime)
+        
+        self.lyricsMiniRemainingTime.textColor = UIColor(white: 1.0, alpha: 0.55)
+        self.lyricsMiniRemainingTime.font = UIFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        self.lyricsMiniRemainingTime.text = "-0:00"
+        self.lyricsMiniRemainingTime.textAlignment = .right
+        self.lyricsMiniBar.addSubview(self.lyricsMiniRemainingTime)
+        
+        let miniBtnConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .bold)
+        self.lyricsMiniPrev.setImage(UIImage(systemName: "backward.fill", withConfiguration: miniBtnConfig), for: .normal)
+        self.lyricsMiniPrev.tintColor = .white
+        self.lyricsMiniPrev.addTarget(self, action: #selector(self.previousPressed), for: .touchUpInside)
+        self.lyricsMiniBar.addSubview(self.lyricsMiniPrev)
+        
+        let miniPlayConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)
+        self.lyricsMiniPlayPause.setImage(UIImage(systemName: "play.fill", withConfiguration: miniPlayConfig), for: .normal)
+        self.lyricsMiniPlayPause.tintColor = .white
+        self.lyricsMiniPlayPause.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
+        self.lyricsMiniBar.addSubview(self.lyricsMiniPlayPause)
+        
+        self.lyricsMiniNext.setImage(UIImage(systemName: "forward.fill", withConfiguration: miniBtnConfig), for: .normal)
+        self.lyricsMiniNext.tintColor = .white
+        self.lyricsMiniNext.addTarget(self, action: #selector(self.nextPressed), for: .touchUpInside)
+        self.lyricsMiniBar.addSubview(self.lyricsMiniNext)
+        
+        self.lyricsContainerView.addSubview(self.lyricsMiniBar)
+    }
+    
+    private func generateMiniSliderThumb() -> UIImage {
+        let size = CGSize(width: 10, height: 10)
+        UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
+        let context = UIGraphicsGetCurrentContext()
+        context?.setFillColor(UIColor.white.cgColor)
+        context?.fillEllipse(in: CGRect(origin: .zero, size: size))
+        let img = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return img ?? UIImage()
+    }
+    
     private func styleCapsuleButton(_ button: UIButton, title: String, icon: String) {
         let config = UIImage.SymbolConfiguration(pointSize: 11.5, weight: .semibold)
         button.setImage(UIImage(systemName: icon, withConfiguration: config), for: .normal)
@@ -607,31 +783,42 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.dismissButton.layer.cornerRadius = 16
         
         // Mode Switcher (Centered)
-        let segW: CGFloat = 164.0
+        let segW: CGFloat = 192.0
         let segH: CGFloat = 32.0
         self.segmentContainerView.frame = CGRect(x: (bounds.width - segW) * 0.5, y: headerY + 2, width: segW, height: segH)
-        let itemW = segW * 0.5
+        let itemW = segW / 3.0
         self.nowPlayingSegmentButton.frame = CGRect(x: 0, y: 0, width: itemW, height: segH)
-        self.queueSegmentButton.frame = CGRect(x: itemW, y: 0, width: itemW, height: segH)
+        self.lyricsSegmentButton.frame = CGRect(x: itemW, y: 0, width: itemW, height: segH)
+        self.queueSegmentButton.frame = CGRect(x: itemW * 2.0, y: 0, width: itemW, height: segH)
         
-        let indicatorX = self.isQueueMode ? itemW + 2 : 2
+        let indicatorX: CGFloat
+        switch self.currentMode {
+        case .nowPlaying:
+            indicatorX = 2.0
+        case .lyrics:
+            indicatorX = itemW + 2.0
+        case .queue:
+            indicatorX = itemW * 2.0 + 2.0
+        }
         self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2, width: itemW - 4, height: segH - 4)
         
         // Source Badge (Right)
-        let sourceW: CGFloat = 78.0
+        let sourceW: CGFloat = 68.0
         let sourceH: CGFloat = 28.0
-        self.sourceBadgeContainer.frame = CGRect(x: bounds.width - sourceW - 16, y: headerY + 4, width: sourceW, height: sourceH)
-        self.sourceIconView.frame = CGRect(x: 8, y: 7, width: 14, height: 14)
-        self.sourceLabel.frame = CGRect(x: 26, y: 4, width: sourceW - 32, height: 20)
+        self.sourceBadgeContainer.frame = CGRect(x: bounds.width - sourceW - 14, y: headerY + 4, width: sourceW, height: sourceH)
+        self.sourceIconView.frame = CGRect(x: 7, y: 7, width: 14, height: 14)
+        self.sourceLabel.frame = CGRect(x: 24, y: 4, width: sourceW - 28, height: 20)
         
         let contentY = headerY + 46.0
         let contentH = bounds.height - contentY - max(safeArea.bottom, 16.0)
         let contentFrame = CGRect(x: 0, y: contentY, width: bounds.width, height: contentH)
         
         self.nowPlayingContainerView.frame = contentFrame
+        self.lyricsContainerView.frame = contentFrame
         self.queueContainerView.frame = contentFrame
         
         self.layoutNowPlayingPane(contentH: contentH)
+        self.layoutLyricsPane(contentH: contentH)
         self.layoutQueuePane(contentH: contentH)
     }
     
@@ -656,14 +843,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.artworkGlowGradientLayer.frame = self.artworkAmbientGlowView.bounds
         self.artworkGlowGradientLayer.cornerRadius = glowSize * 0.5
         
-        // Info: Title & Artist
+        // Info: Title, Artist, Lyrics & Favorite buttons
         let infoY = artY + artSide + 20.0
-        let heartSize: CGFloat = 36.0
+        let btnSize: CGFloat = 36.0
         self.infoContainerView.frame = CGRect(x: 32, y: infoY, width: bounds.width - 64, height: 50)
-        let titleW = bounds.width - 64 - heartSize - 12
+        let titleW = bounds.width - 64 - (btnSize * 2 + 10) - 12
         self.titleLabel.frame = CGRect(x: 0, y: 0, width: titleW, height: 28)
         self.artistLabel.frame = CGRect(x: 0, y: 28, width: titleW, height: 20)
-        self.favoriteButton.frame = CGRect(x: bounds.width - 64 - heartSize, y: 7, width: heartSize, height: heartSize)
+        self.lyricsButton.frame = CGRect(x: bounds.width - 64 - btnSize * 2 - 8, y: 7, width: btnSize, height: btnSize)
+        self.favoriteButton.frame = CGRect(x: bounds.width - 64 - btnSize, y: 7, width: btnSize, height: btnSize)
         
         // Progress Slider
         let sliderY = infoY + 56.0
@@ -691,6 +879,50 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         // Bottom Action Buttons
         let actionsY = controlsY + 76.0
         self.actionsStackView.frame = CGRect(x: 20, y: actionsY, width: bounds.width - 40, height: 36)
+    }
+    
+    private func layoutLyricsPane(contentH: CGFloat) {
+        let bounds = self.lyricsContainerView.bounds
+        guard bounds.width > 0 && bounds.height > 0 else { return }
+        
+        // Header
+        let headerH: CGFloat = 46.0
+        self.lyricsHeaderView.frame = CGRect(x: 24, y: 4, width: bounds.width - 48, height: headerH)
+        self.lyricsTrackTitle.frame = CGRect(x: 0, y: 0, width: bounds.width - 48, height: 24)
+        self.lyricsTrackArtist.frame = CGRect(x: 0, y: 24, width: bounds.width - 48, height: 18)
+        
+        // Mini Bar at bottom of Lyrics
+        let miniH: CGFloat = 78.0
+        let miniY = bounds.height - miniH - 10.0
+        self.lyricsMiniBar.frame = CGRect(x: 16, y: miniY, width: bounds.width - 32, height: miniH)
+        self.lyricsMiniBlurView.frame = self.lyricsMiniBar.bounds
+        
+        let miniBarW = self.lyricsMiniBar.bounds.width
+        self.lyricsMiniSlider.frame = CGRect(x: 14, y: 8, width: miniBarW - 28, height: 20)
+        self.lyricsMiniCurrentTime.frame = CGRect(x: 14, y: 26, width: 50, height: 14)
+        self.lyricsMiniRemainingTime.frame = CGRect(x: miniBarW - 64, y: 26, width: 50, height: 14)
+        
+        let miniControlsY: CGFloat = 38.0
+        let playBtnSize: CGFloat = 36.0
+        let sideBtnSize: CGFloat = 32.0
+        let midX = miniBarW * 0.5
+        self.lyricsMiniPlayPause.frame = CGRect(x: midX - playBtnSize * 0.5, y: miniControlsY, width: playBtnSize, height: playBtnSize)
+        self.lyricsMiniPrev.frame = CGRect(x: midX - playBtnSize * 0.5 - 40 - sideBtnSize, y: miniControlsY + 2, width: sideBtnSize, height: sideBtnSize)
+        self.lyricsMiniNext.frame = CGRect(x: midX + playBtnSize * 0.5 + 40, y: miniControlsY + 2, width: sideBtnSize, height: sideBtnSize)
+        
+        // Table View / Plain Text View
+        let tableY: CGFloat = headerH + 8.0
+        let tableH = max(60, miniY - tableY - 8.0)
+        let lyricsFrame = CGRect(x: 0, y: tableY, width: bounds.width, height: tableH)
+        self.lyricsTableView.frame = lyricsFrame
+        self.lyricsPlainTextView.frame = CGRect(x: 24, y: tableY, width: bounds.width - 48, height: tableH)
+        
+        // Vertical insets to allow first and last lines to center
+        let verticalInset = tableH * 0.35
+        self.lyricsTableView.contentInset = UIEdgeInsets(top: verticalInset, left: 0, bottom: verticalInset, right: 0)
+        
+        self.lyricsLoadingIndicator.center = CGPoint(x: bounds.width * 0.5, y: tableY + tableH * 0.4)
+        self.lyricsStatusLabel.frame = CGRect(x: 32, y: tableY + tableH * 0.35, width: bounds.width - 64, height: 60)
     }
     
     private func layoutQueuePane(contentH: CGFloat) {
@@ -748,9 +980,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         let d = manager.duration > 0 ? manager.duration : 30.0
         if !self.isDraggingSlider {
-            self.progressSlider.value = Float(manager.currentTime / d)
+            let progress = Float(manager.currentTime / d)
+            self.progressSlider.value = progress
             self.currentTimeLabel.text = self.formatTime(manager.currentTime)
             self.remainingTimeLabel.text = "-\(self.formatTime(max(0, d - manager.currentTime)))"
+            
+            self.lyricsMiniSlider.value = progress
+            self.lyricsMiniCurrentTime.text = self.formatTime(manager.currentTime)
+            self.lyricsMiniRemainingTime.text = "-\(self.formatTime(max(0, d - manager.currentTime)))"
         }
         
         if self.displayedTrackId != track.id {
@@ -760,6 +997,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             
             self.queueMiniTitle.text = track.title
             self.queueMiniArtist.text = track.artist
+            
+            self.lyricsTrackTitle.text = track.title
+            self.lyricsTrackArtist.text = track.artist
             
             // Artwork
             self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
@@ -772,6 +1012,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 self.backgroundImageView.image = img
                 self.updateAmbientColor(from: img)
             }
+            
+            // Reset and fetch lyrics
+            self.currentLyrics = nil
+            self.activeLyricsIndex = -1
+            self.loadLyricsIfNeeded()
         }
         
         // Source
@@ -792,6 +1037,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         let miniCfg = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
         self.queueMiniPlayPause.setImage(UIImage(systemName: playIconName, withConfiguration: miniCfg), for: .normal)
+        
+        let lyricsMiniCfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)
+        self.lyricsMiniPlayPause.setImage(UIImage(systemName: playIconName, withConfiguration: lyricsMiniCfg), for: .normal)
+        
+        self.lyricsButton.tintColor = (self.currentLyrics != nil) ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : UIColor.white.withAlphaComponent(0.8)
         
         // Favorite
         let isFav = manager.isFavorite(track: track)
@@ -980,61 +1230,204 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         return String(format: "%d:%02d", mins, secs)
     }
     
-    // MARK: - Segment Switching (Now Playing vs Queue)
+    // MARK: - Segment Switching (Now Playing vs Lyrics vs Queue)
     
     @objc private func nowPlayingSegmentPressed() {
-        guard self.isQueueMode else { return }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        self.isQueueMode = false
-        self.transitionPanes()
+        self.switchMode(to: .nowPlaying)
+    }
+    
+    @objc private func lyricsSegmentPressed() {
+        self.switchMode(to: .lyrics)
     }
     
     @objc private func queueSegmentPressed() {
-        guard !self.isQueueMode else { return }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        self.isQueueMode = true
-        self.reloadQueueData()
-        self.transitionPanes()
+        self.switchMode(to: .queue)
     }
     
-    private func transitionPanes() {
-        let segW = self.segmentContainerView.bounds.width
-        let itemW = segW * 0.5
-        let indicatorX = self.isQueueMode ? itemW + 2 : 2
+    @objc private func artworkTapped() {
+        self.switchMode(to: self.currentMode == .lyrics ? .nowPlaying : .lyrics)
+    }
+    
+    private func switchMode(to targetMode: PlayerMode) {
+        guard self.currentMode != targetMode else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let oldMode = self.currentMode
+        self.currentMode = targetMode
         
-        if self.isQueueMode {
-            self.queueContainerView.isHidden = false
-            self.queueContainerView.alpha = 0.0
-            self.queueContainerView.transform = CGAffineTransform(translationX: 30, y: 0)
-        } else {
-            self.nowPlayingContainerView.isHidden = false
-            self.nowPlayingContainerView.alpha = 0.0
-            self.nowPlayingContainerView.transform = CGAffineTransform(translationX: -30, y: 0)
+        if targetMode == .lyrics {
+            self.loadLyricsIfNeeded()
+        } else if targetMode == .queue {
+            self.reloadQueueData()
         }
+        
+        self.transitionPanes(from: oldMode, to: targetMode)
+    }
+    
+    private func transitionPanes(from oldMode: PlayerMode, to newMode: PlayerMode) {
+        let segW = self.segmentContainerView.bounds.width
+        let itemW = segW / 3.0
+        let indicatorX: CGFloat
+        switch newMode {
+        case .nowPlaying:
+            indicatorX = 2.0
+        case .lyrics:
+            indicatorX = itemW + 2.0
+        case .queue:
+            indicatorX = itemW * 2.0 + 2.0
+        }
+        
+        let containerForMode: (PlayerMode) -> UIView = { mode in
+            switch mode {
+            case .nowPlaying: return self.nowPlayingContainerView
+            case .lyrics: return self.lyricsContainerView
+            case .queue: return self.queueContainerView
+            }
+        }
+        
+        let oldView = containerForMode(oldMode)
+        let newView = containerForMode(newMode)
+        
+        newView.isHidden = false
+        newView.alpha = 0.0
+        
+        let movingRight = newMode.rawValue > oldMode.rawValue
+        let startX: CGFloat = movingRight ? 35.0 : -35.0
+        let exitX: CGFloat = movingRight ? -35.0 : 35.0
+        
+        newView.transform = CGAffineTransform(translationX: startX, y: 0)
         
         UIView.animate(withDuration: 0.32, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
             self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2, width: itemW - 4, height: self.segmentContainerView.bounds.height - 4)
             
-            if self.isQueueMode {
-                self.nowPlayingContainerView.alpha = 0.0
-                self.nowPlayingContainerView.transform = CGAffineTransform(translationX: -30, y: 0)
-                
-                self.queueContainerView.alpha = 1.0
-                self.queueContainerView.transform = .identity
-            } else {
-                self.queueContainerView.alpha = 0.0
-                self.queueContainerView.transform = CGAffineTransform(translationX: 30, y: 0)
-                
-                self.nowPlayingContainerView.alpha = 1.0
-                self.nowPlayingContainerView.transform = .identity
-            }
+            oldView.alpha = 0.0
+            oldView.transform = CGAffineTransform(translationX: exitX, y: 0)
+            
+            newView.alpha = 1.0
+            newView.transform = .identity
         }) { _ in
-            if self.isQueueMode {
-                self.nowPlayingContainerView.isHidden = true
-            } else {
-                self.queueContainerView.isHidden = true
+            oldView.isHidden = true
+            oldView.transform = .identity
+            if newMode == .lyrics {
+                self.syncLyricsPosition(currentTime: SGDoxMusicManager.shared.currentTime, animated: false)
             }
         }
+    }
+    
+    // MARK: - Lyrics Logic
+    
+    private func loadLyricsIfNeeded() {
+        guard let track = SGDoxMusicManager.shared.currentTrack else {
+            self.showLyricsStatus("Нет воспроизводимого трека")
+            return
+        }
+        
+        self.lyricsTrackTitle.text = track.title
+        self.lyricsTrackArtist.text = track.artist
+        
+        if let current = self.currentLyrics, current.trackId == track.id {
+            self.updateLyricsDisplay(current)
+            return
+        }
+        
+        self.currentLyrics = nil
+        self.activeLyricsIndex = -1
+        self.lyricsTableView.isHidden = true
+        self.lyricsPlainTextView.isHidden = true
+        self.lyricsStatusLabel.isHidden = true
+        self.lyricsLoadingIndicator.startAnimating()
+        
+        SGDoxLyricsService.shared.fetchLyrics(for: track) { [weak self] lyrics in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard let currentTrack = SGDoxMusicManager.shared.currentTrack, currentTrack.id == track.id else { return }
+                self.lyricsLoadingIndicator.stopAnimating()
+                
+                if let lyrics = lyrics, (!lyrics.lines.isEmpty || !(lyrics.plainLyrics?.isEmpty ?? true)) {
+                    self.currentLyrics = lyrics
+                    self.updateLyricsDisplay(lyrics)
+                    self.syncLyricsPosition(currentTime: SGDoxMusicManager.shared.currentTime, animated: false)
+                    self.lyricsButton.tintColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
+                } else {
+                    self.showLyricsStatus("Текст песни не найден")
+                    self.lyricsButton.tintColor = UIColor.white.withAlphaComponent(0.8)
+                }
+            }
+        }
+    }
+    
+    private func showLyricsStatus(_ text: String) {
+        self.lyricsLoadingIndicator.stopAnimating()
+        self.lyricsTableView.isHidden = true
+        self.lyricsPlainTextView.isHidden = true
+        self.lyricsStatusLabel.text = text
+        self.lyricsStatusLabel.isHidden = false
+    }
+    
+    private func updateLyricsDisplay(_ lyrics: SGDoxLyrics) {
+        self.lyricsStatusLabel.isHidden = true
+        if !lyrics.lines.isEmpty {
+            self.lyricsTableView.isHidden = false
+            self.lyricsPlainTextView.isHidden = true
+            self.lyricsTableView.reloadData()
+        } else if let plain = lyrics.plainLyrics, !plain.isEmpty {
+            self.lyricsTableView.isHidden = true
+            self.lyricsPlainTextView.isHidden = false
+            self.lyricsPlainTextView.text = plain
+        } else {
+            self.showLyricsStatus("Текст песни пуст")
+        }
+    }
+    
+    private func syncLyricsPosition(currentTime: Double, animated: Bool = true) {
+        guard let lyrics = self.currentLyrics, !lyrics.lines.isEmpty else { return }
+        
+        var newIndex = -1
+        for (i, line) in lyrics.lines.enumerated() {
+            if line.time <= currentTime {
+                newIndex = i
+            } else {
+                break
+            }
+        }
+        
+        if newIndex != self.activeLyricsIndex {
+            let previousIndex = self.activeLyricsIndex
+            self.activeLyricsIndex = newIndex
+            
+            var indexPathsToReload: [IndexPath] = []
+            if previousIndex >= 0 && previousIndex < lyrics.lines.count {
+                indexPathsToReload.append(IndexPath(row: previousIndex, section: 0))
+            }
+            if newIndex >= 0 && newIndex < lyrics.lines.count {
+                indexPathsToReload.append(IndexPath(row: newIndex, section: 0))
+            }
+            
+            for indexPath in indexPathsToReload {
+                if let cell = self.lyricsTableView.cellForRow(at: indexPath) as? SGDoxLyricsCell {
+                    cell.setIsActive(indexPath.row == newIndex, animated: animated)
+                }
+            }
+            
+            if !self.isUserScrollingLyrics && newIndex >= 0 && newIndex < lyrics.lines.count {
+                let targetIndexPath = IndexPath(row: newIndex, section: 0)
+                self.lyricsTableView.scrollToRow(at: targetIndexPath, at: .middle, animated: animated)
+            }
+        }
+    }
+    
+    @objc private func miniSliderValueChanged() {
+        self.isDraggingSlider = true
+        let duration = SGDoxMusicManager.shared.duration > 0 ? SGDoxMusicManager.shared.duration : 30.0
+        let target = Double(self.lyricsMiniSlider.value) * duration
+        self.lyricsMiniCurrentTime.text = self.formatTime(target)
+        self.syncLyricsPosition(currentTime: target)
+    }
+    
+    @objc private func miniSliderTouchEnded() {
+        self.isDraggingSlider = false
+        let duration = SGDoxMusicManager.shared.duration > 0 ? SGDoxMusicManager.shared.duration : 30.0
+        let target = Double(self.lyricsMiniSlider.value) * duration
+        SGDoxMusicManager.shared.seek(to: target)
     }
     
     // MARK: - Actions
@@ -1204,17 +1597,39 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.reloadQueueData()
     }
     
-    // MARK: - Table View (Queue)
+    // MARK: - Table Views (Queue & Lyrics)
     
     public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        if tableView == self.lyricsTableView {
+            return self.currentLyrics?.lines.count ?? 0
+        }
         return self.cachedQueue.count
     }
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        if tableView == self.lyricsTableView {
+            return UITableView.automaticDimension
+        }
+        return 60.0
+    }
+    
+    public func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
+        if tableView == self.lyricsTableView {
+            return 54.0
+        }
         return 60.0
     }
     
     public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if tableView == self.lyricsTableView {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "SGDoxLyricsCell", for: indexPath) as! SGDoxLyricsCell
+            if let lyrics = self.currentLyrics, indexPath.row < lyrics.lines.count {
+                let line = lyrics.lines[indexPath.row]
+                cell.configure(text: line.text, isActive: indexPath.row == self.activeLyricsIndex)
+            }
+            return cell
+        }
+        
         let cell = tableView.dequeueReusableCell(withIdentifier: "SGDoxPlayerQueueCell", for: indexPath) as! SGDoxPlayerQueueCell
         let track = self.cachedQueue[indexPath.row]
         cell.configure(track: track)
@@ -1223,12 +1638,35 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        
+        if tableView == self.lyricsTableView {
+            guard let lyrics = self.currentLyrics, indexPath.row < lyrics.lines.count else { return }
+            let line = lyrics.lines[indexPath.row]
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            SGDoxMusicManager.shared.seek(to: line.time)
+            self.isUserScrollingLyrics = false
+            self.userScrollTimer?.invalidate()
+            self.syncLyricsPosition(currentTime: line.time, animated: true)
+            return
+        }
+        
         guard indexPath.row < self.cachedQueue.count else { return }
         let selectedTrack = self.cachedQueue[indexPath.row]
         let remaining = Array(self.cachedQueue.suffix(from: indexPath.row + 1))
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         SGDoxMusicManager.shared.play(track: selectedTrack, queue: remaining)
         self.reloadQueueData()
+    }
+    
+    public func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        if scrollView == self.lyricsTableView {
+            self.isUserScrollingLyrics = true
+            self.userScrollTimer?.invalidate()
+            self.userScrollTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: false) { [weak self] _ in
+                self?.isUserScrollingLyrics = false
+                self?.syncLyricsPosition(currentTime: SGDoxMusicManager.shared.currentTime, animated: true)
+            }
+        }
     }
 }
 
@@ -1330,3 +1768,60 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         }
     }
 }
+
+// MARK: - In-Player Lyrics Cell
+
+private final class SGDoxLyricsCell: UITableViewCell {
+    private let lineLabel = UILabel()
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+        
+        self.lineLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
+        self.lineLabel.numberOfLines = 0
+        self.lineLabel.textAlignment = .left
+        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.4)
+        self.lineLabel.translatesAutoresizingMaskIntoConstraints = false
+        self.contentView.addSubview(self.lineLabel)
+        
+        NSLayoutConstraint.activate([
+            self.lineLabel.leadingAnchor.constraint(equalTo: self.contentView.leadingAnchor, constant: 32),
+            self.lineLabel.trailingAnchor.constraint(equalTo: self.contentView.trailingAnchor, constant: -32),
+            self.lineLabel.topAnchor.constraint(equalTo: self.contentView.topAnchor, constant: 14),
+            self.lineLabel.bottomAnchor.constraint(equalTo: self.contentView.bottomAnchor, constant: -14)
+        ])
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    func configure(text: String, isActive: Bool) {
+        self.lineLabel.text = text
+        self.setIsActive(isActive, animated: false)
+    }
+    
+    func setIsActive(_ isActive: Bool, animated: Bool) {
+        let targetColor = isActive ? UIColor.white : UIColor.white.withAlphaComponent(0.4)
+        let targetScale: CGFloat = isActive ? 1.05 : 1.0
+        
+        if animated {
+            UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
+                self.lineLabel.textColor = targetColor
+                self.lineLabel.transform = isActive ? CGAffineTransform(scaleX: targetScale, y: targetScale) : .identity
+            })
+        } else {
+            self.lineLabel.textColor = targetColor
+            self.lineLabel.transform = isActive ? CGAffineTransform(scaleX: targetScale, y: targetScale) : .identity
+        }
+    }
+    
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        self.lineLabel.transform = .identity
+        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.4)
+    }
+}
+

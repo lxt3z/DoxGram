@@ -45,6 +45,24 @@ public final class SGDoxMusicOfflineManager: @unchecked Sendable {
         return nil
     }
     
+    public func localArtworkUrl(for trackId: String) -> URL? {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        let cleanId = self.sanitizeId(trackId)
+        let fileUrl = self.offlineDirectory.appendingPathComponent("\(cleanId).jpg")
+        if FileManager.default.fileExists(atPath: fileUrl.path) {
+            return fileUrl
+        }
+        return nil
+    }
+    
+    public func localArtwork(for trackId: String) -> UIImage? {
+        if let url = self.localArtworkUrl(for: trackId) {
+            return UIImage(contentsOfFile: url.path)
+        }
+        return nil
+    }
+    
     public func downloadedTracks() -> [SGDoxMusicTrack] {
         self.lock.lock()
         defer { self.lock.unlock() }
@@ -132,6 +150,9 @@ public final class SGDoxMusicOfflineManager: @unchecked Sendable {
                     self.saveMetadata()
                     self.lock.unlock()
                     
+                    // Pre-fetch and cache lyrics for offline usage
+                    SGDoxLyricsService.shared.fetchLyrics(for: savedTrack) { _ in }
+                    
                     DispatchQueue.main.async {
                         self.onDownloadsChanged?()
                         completion(true)
@@ -154,6 +175,7 @@ public final class SGDoxMusicOfflineManager: @unchecked Sendable {
         
         try? FileManager.default.removeItem(at: audioUrl)
         try? FileManager.default.removeItem(at: artUrl)
+        SGDoxLyricsService.shared.deleteLyrics(for: trackId)
         
         self.downloadedTrackMap.removeValue(forKey: trackId)
         self.saveMetadata()

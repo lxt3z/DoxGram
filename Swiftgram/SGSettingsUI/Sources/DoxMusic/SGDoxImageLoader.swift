@@ -72,6 +72,13 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         return self.memoryCache.object(forKey: trimmed as NSString)
     }
     
+    private func diskFileName(for key: String) -> String {
+        let clean = key.components(separatedBy: CharacterSet.alphanumerics.inverted).joined(separator: "_")
+        let hash = String(format: "%08x", key.hashValue)
+        let prefix = String(clean.prefix(32))
+        return "art_\(prefix)_\(hash).jpg"
+    }
+
     public func loadImage(urlString: String, targetSize: CGSize? = nil, scale: CGFloat = 2.0, completion: @escaping @MainActor (UIImage?) -> Void) {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -83,6 +90,16 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         if let cached = self.memoryCache.object(forKey: cacheKey) {
             self.dispatchMain(image: cached, completion: completion)
             return
+        }
+        
+        let fileName = self.diskFileName(for: trimmed)
+        if let dir = self.diskCacheDirectory {
+            let diskPath = dir.appendingPathComponent(fileName).path
+            if let img = UIImage(contentsOfFile: diskPath) {
+                self.memoryCache.setObject(img, forKey: cacheKey)
+                self.dispatchMain(image: img, completion: completion)
+                return
+            }
         }
         
         // Handle local file URLs
@@ -158,6 +175,10 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                             guard let self = self else { return }
                             if let fbData = fbData, let fbImg = UIImage(data: fbData) {
                                 self.memoryCache.setObject(fbImg, forKey: cacheKey, cost: fbData.count)
+                                if let dir = self.diskCacheDirectory {
+                                    let fileUrl = dir.appendingPathComponent(fileName)
+                                    try? fbData.write(to: fileUrl, options: .atomic)
+                                }
                                 self.dispatchMain(image: fbImg, completion: completion)
                             } else {
                                 self.dispatchMain(image: nil, completion: completion)
@@ -172,11 +193,24 @@ public final class SGDoxImageLoader: @unchecked Sendable {
             }
             
             self.memoryCache.setObject(image, forKey: cacheKey, cost: data.count)
+            if let dir = self.diskCacheDirectory {
+                let fileUrl = dir.appendingPathComponent(fileName)
+                try? data.write(to: fileUrl, options: .atomic)
+            }
             self.dispatchMain(image: image, completion: completion)
         }.resume()
     }
     
     public func loadArtwork(for track: SGDoxMusicTrack, targetSize: CGSize? = nil, completion: @escaping @MainActor (UIImage?) -> Void) {
+        // 0. Check offline manager downloaded artwork
+        if let offlineArtUrl = SGDoxMusicOfflineManager.shared.localArtworkUrl(for: track.id),
+           let img = UIImage(contentsOfFile: offlineArtUrl.path) {
+            self.storeImage(img, for: track.id)
+            if let artUrl = track.artworkUrl { self.storeImage(img, for: artUrl) }
+            self.dispatchMain(image: img, completion: completion)
+            return
+        }
+
         // 1. Direct memory cache check
         if let artUrl = track.artworkUrl, let cached = self.cachedImage(for: artUrl) {
             self.dispatchMain(image: cached, completion: completion)
