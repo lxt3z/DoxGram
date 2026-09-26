@@ -6977,7 +6977,6 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 strongSelf.themeAndStringsUpdated()
                 strongSelf.controllerInteraction?.updatedPresentationData = strongSelf.updatedPresentationData
                 strongSelf.presentationDataPromise.set(.single(strongSelf.presentationData))
-                strongSelf.chatTitleView?.update(presentationData: strongSelf.presentationData)
             }
         )
     }
