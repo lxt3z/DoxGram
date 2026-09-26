@@ -419,7 +419,7 @@ public class WallpaperGalleryController: ViewController {
         }
         if case let .peer(peer, _) = self.mode {
             if case .user = peer {
-                doneButtonType = .setPeer(peer.compactDisplayTitle, self.context.isPremium)
+                doneButtonType = .setPeer(peer.compactDisplayTitle, true)
             } else {
                 doneButtonType = .setChannel
             }
@@ -461,20 +461,6 @@ public class WallpaperGalleryController: ViewController {
         }
 
         let strongSelf = self
-        if forBoth && !strongSelf.context.isPremium {
-            let context = strongSelf.context
-            var replaceImpl: ((ViewController) -> Void)?
-            let controller = context.sharedContext.makePremiumDemoController(context: context, subject: .wallpapers, forceDark: false, action: {
-                let controller = context.sharedContext.makePremiumIntroController(context: context, source: .wallpapers, forceDark: false, dismissed: nil)
-                replaceImpl?(controller)
-            }, dismissed: nil)
-            replaceImpl = { [weak controller] c in
-                controller?.replace(with: c)
-            }
-            strongSelf.push(controller)
-
-            return
-        }
 
         if let centralItemNode = strongSelf.galleryNode.pager.centralItemNode() as? WallpaperGalleryItemNode {
             if centralItemNode.cropNode.scrollNode.view.isDecelerating {

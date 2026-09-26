@@ -10,13 +10,17 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
     private var playerLayer: AVPlayerLayer?
     private var endObserver: Any?
     private var statusObserver: NSKeyValueObservation?
+    private var readyObserver: NSKeyValueObservation?
     private var isPlaying: Bool = false
     private var currentUrl: URL?
+    
+    public var onReady: (() -> Void)?
     
     public override init() {
         super.init()
         self.isUserInteractionEnabled = false
         self.clipsToBounds = true
+        self.backgroundColor = .black
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.appWillResignActive), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(self.appDidBecomeActive), name: UIApplication.didBecomeActiveNotification, object: nil)
@@ -29,6 +33,8 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         }
         self.statusObserver?.invalidate()
         self.statusObserver = nil
+        self.readyObserver?.invalidate()
+        self.readyObserver = nil
         self.player?.pause()
         self.player = nil
     }
@@ -112,6 +118,15 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         playerLayer.frame = self.bounds
         self.layer.addSublayer(playerLayer)
         
+        self.readyObserver?.invalidate()
+        self.readyObserver = playerLayer.observe(\.isReadyForDisplay, options: [.new, .initial]) { [weak self] layer, _ in
+            if layer.isReadyForDisplay {
+                DispatchQueue.main.async {
+                    self?.onReady?()
+                }
+            }
+        }
+        
         self.player = player
         self.playerLayer = playerLayer
         
@@ -130,6 +145,8 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         }
         self.statusObserver?.invalidate()
         self.statusObserver = nil
+        self.readyObserver?.invalidate()
+        self.readyObserver = nil
         self.player?.pause()
         self.playerLayer?.removeFromSuperlayer()
         self.playerLayer = nil

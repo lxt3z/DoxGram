@@ -144,14 +144,14 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     private func applyTheme() {
         let isDark = self.theme.overallDarkAppearance
         
-        self.blurView.effect = UIBlurEffect(style: isDark ? .systemMaterialDark : .systemMaterialLight)
+        self.blurView.effect = UIBlurEffect(style: isDark ? .systemUltraThinMaterialDark : .systemUltraThinMaterialLight)
         
         if isDark {
-            self.tintOverlayView.backgroundColor = UIColor(white: 0.08, alpha: 0.40)
+            self.tintOverlayView.backgroundColor = UIColor(white: 0.05, alpha: 0.20)
             self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.14).cgColor
             self.containerView.layer.borderWidth = 0.5
             self.layer.shadowColor = UIColor.black.cgColor
-            self.layer.shadowOpacity = 0.30
+            self.layer.shadowOpacity = 0.25
             self.layer.shadowRadius = 18
             self.layer.shadowOffset = CGSize(width: 0, height: 6)
             
@@ -164,17 +164,17 @@ public final class SGDoxFloatingPlayerWidget: UIView {
             self.closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
             self.closeButton.tintColor = UIColor.white.withAlphaComponent(0.65)
             
-            self.artworkImageView.backgroundColor = UIColor(white: 0.20, alpha: 1.0)
+            self.artworkImageView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
             self.artworkImageView.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
             
             self.progressView.trackTintColor = UIColor(white: 1.0, alpha: 0.08)
-            self.progressView.progressTintColor = UIColor(white: 1.0, alpha: 0.75)
+            self.progressView.progressTintColor = UIColor.white.withAlphaComponent(0.85)
         } else {
-            self.tintOverlayView.backgroundColor = UIColor(white: 1.0, alpha: 0.45)
-            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.40).cgColor
+            self.tintOverlayView.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+            self.containerView.layer.borderColor = UIColor(white: 0.0, alpha: 0.08).cgColor
             self.containerView.layer.borderWidth = 0.5
             self.layer.shadowColor = UIColor.black.cgColor
-            self.layer.shadowOpacity = 0.12
+            self.layer.shadowOpacity = 0.10
             self.layer.shadowRadius = 16
             self.layer.shadowOffset = CGSize(width: 0, height: 4)
             
@@ -182,16 +182,16 @@ public final class SGDoxFloatingPlayerWidget: UIView {
             self.titleLabel.textColor = darkText
             self.artistLabel.textColor = UIColor(red: 0.44, green: 0.46, blue: 0.50, alpha: 1.0)
             
-            self.playPauseContainer.backgroundColor = UIColor(white: 0.0, alpha: 0.08)
+            self.playPauseContainer.backgroundColor = UIColor(white: 0.0, alpha: 0.06)
             self.playPauseButton.tintColor = darkText
             self.nextButton.tintColor = UIColor(red: 0.30, green: 0.32, blue: 0.36, alpha: 1.0)
-            self.closeButton.backgroundColor = UIColor(white: 0.0, alpha: 0.06)
+            self.closeButton.backgroundColor = UIColor(white: 0.0, alpha: 0.05)
             self.closeButton.tintColor = UIColor(red: 0.45, green: 0.47, blue: 0.52, alpha: 1.0)
             
             self.artworkImageView.backgroundColor = UIColor(white: 0.90, alpha: 1.0)
-            self.artworkImageView.layer.borderColor = UIColor(white: 0.0, alpha: 0.08).cgColor
+            self.artworkImageView.layer.borderColor = UIColor(white: 0.0, alpha: 0.06).cgColor
             
-            self.progressView.trackTintColor = UIColor(white: 0.0, alpha: 0.08)
+            self.progressView.trackTintColor = UIColor(white: 0.0, alpha: 0.06)
             self.progressView.progressTintColor = self.theme.list.itemAccentColor
         }
     }
@@ -427,6 +427,11 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     
     @objc private func playPausePressed() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let isNowPlaying = !SGDoxMusicManager.shared.isPlaying
+        let iconName = isNowPlaying ? "pause.fill" : "play.fill"
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
+        self.playPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: playConfig), for: .normal)
+        
         UIView.animate(withDuration: 0.1, animations: {
             self.playPauseButton.transform = CGAffineTransform(scaleX: 0.86, y: 0.86)
         }) { _ in

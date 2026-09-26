@@ -2517,7 +2517,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 
         if initialDisplayHeader && displayAuthorInfo {
             if let peer = firstMessage.peers[firstMessage.id.peerId] as? TelegramChannel, case .broadcast = peer.info, item.content.firstMessage.adAttribute == nil, !overrideEffectiveAuthor {
-                authorNameString = EnginePeer(peer).displayTitle(strings: item.presentationData.strings, displayOrder: item.presentationData.nameDisplayOrder)
+                if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideGroupNames {
+                    authorNameString = "Channel"
+                } else {
+                    authorNameString = EnginePeer(peer).displayTitle(strings: item.presentationData.strings, displayOrder: item.presentationData.nameDisplayOrder)
+                }
                 
                 let peer = (peer as Peer)
                 let nameColors: PeerNameColors.Colors?
@@ -2531,7 +2535,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 }
                 authorNameColor = nameColors?.main
             } else if let effectiveAuthor = effectiveAuthor {
-                authorNameString = EnginePeer(effectiveAuthor).displayTitle(strings: item.presentationData.strings, displayOrder: item.presentationData.nameDisplayOrder)
+                if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideNames {
+                    authorNameString = "User"
+                } else {
+                    authorNameString = EnginePeer(effectiveAuthor).displayTitle(strings: item.presentationData.strings, displayOrder: item.presentationData.nameDisplayOrder)
+                }
                 
                 let nameColors: PeerNameColors.Colors
                 switch effectiveAuthor.nameColor {

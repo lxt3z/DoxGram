@@ -181,6 +181,9 @@ public final class SGAyugramStorage {
         self.lock.unlock()
         if changed {
             SGAyugramLogger.log("Screen capture state changed to: \(captured)")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name("SGStreamerStateChanged"), object: nil)
+            }
         }
     }
 

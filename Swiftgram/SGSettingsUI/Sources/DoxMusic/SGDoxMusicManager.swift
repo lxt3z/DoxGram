@@ -176,38 +176,14 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     public func updateTrackArtwork(trackId: String, newArtworkUrl: String) {
         DispatchQueue.main.async {
             var changed = false
-            if let idx = self.favorites.firstIndex(where: { $0.id == trackId }) {
-                let old = self.favorites[idx]
-                let updated = SGDoxMusicTrack(
-                    id: old.id,
-                    title: old.title,
-                    artist: old.artist,
-                    album: old.album,
-                    artworkUrl: newArtworkUrl,
-                    duration: old.duration,
-                    previewUrl: old.previewUrl,
-                    source: old.source,
-                    spotifyUri: old.spotifyUri,
-                    appleMusicId: old.appleMusicId,
-                    telegramFile: old.telegramFile
-                )
-                self.favorites[idx] = updated
-                changed = true
+            for idx in 0..<self.favorites.count {
+                if self.favorites[idx].id == trackId {
+                    self.favorites[idx].artworkUrl = newArtworkUrl
+                    changed = true
+                }
             }
             if let curr = self.currentTrack, curr.id == trackId {
-                self.currentTrack = SGDoxMusicTrack(
-                    id: curr.id,
-                    title: curr.title,
-                    artist: curr.artist,
-                    album: curr.album,
-                    artworkUrl: newArtworkUrl,
-                    duration: curr.duration,
-                    previewUrl: curr.previewUrl,
-                    source: curr.source,
-                    spotifyUri: curr.spotifyUri,
-                    appleMusicId: curr.appleMusicId,
-                    telegramFile: curr.telegramFile
-                )
+                self.currentTrack?.artworkUrl = newArtworkUrl
                 changed = true
             }
             if changed {
@@ -222,20 +198,34 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             AppleMusicService.shared.fetchLibrarySongs { [weak self] amTracks in
                 guard let self = self, !amTracks.isEmpty else { return }
                 var updated = self.favorites
+                var hasChanges = false
                 for t in amTracks {
-                    if let existingIdx = updated.firstIndex(where: { $0.id == t.id || ($0.title == t.title && $0.artist == t.artist) }) {
-                        let existing = updated[existingIdx]
+                    if let existingIdx = updated.firstIndex(where: { $0.id == t.id || ($0.title.lowercased() == t.title.lowercased() && $0.artist.lowercased() == t.artist.lowercased()) }) {
+                        var existing = updated[existingIdx]
+                        var itemChanged = false
                         if (existing.previewUrl == nil || existing.previewUrl?.isEmpty == true) && t.previewUrl != nil {
-                            updated[existingIdx] = t
+                            existing.previewUrl = t.previewUrl
+                            itemChanged = true
+                        }
+                        if (existing.artworkUrl == nil || existing.artworkUrl?.isEmpty == true || existing.artworkUrl?.hasPrefix("am_local_") == true) && t.artworkUrl != nil && t.artworkUrl?.hasPrefix("am_local_") == false {
+                            existing.artworkUrl = t.artworkUrl
+                            itemChanged = true
+                        }
+                        if itemChanged {
+                            updated[existingIdx] = existing
+                            hasChanges = true
                         }
                     } else {
                         updated.append(t)
+                        hasChanges = true
                     }
                 }
-                DispatchQueue.main.async {
-                    self.favorites = updated
-                    self.saveFavorites()
-                    self.notifyStateChanged()
+                if hasChanges {
+                    DispatchQueue.main.async {
+                        self.favorites = updated
+                        self.saveFavorites()
+                        self.notifyStateChanged()
+                    }
                 }
             }
         }
@@ -244,20 +234,34 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             SpotifyService.shared.fetchLikedTracks { [weak self] spTracks in
                 guard let self = self, !spTracks.isEmpty else { return }
                 var updated = self.favorites
+                var hasChanges = false
                 for t in spTracks {
-                    if let existingIdx = updated.firstIndex(where: { $0.id == t.id || ($0.title == t.title && $0.artist == t.artist) }) {
-                        let existing = updated[existingIdx]
+                    if let existingIdx = updated.firstIndex(where: { $0.id == t.id || ($0.title.lowercased() == t.title.lowercased() && $0.artist.lowercased() == t.artist.lowercased()) }) {
+                        var existing = updated[existingIdx]
+                        var itemChanged = false
                         if (existing.previewUrl == nil || existing.previewUrl?.isEmpty == true) && t.previewUrl != nil {
-                            updated[existingIdx] = t
+                            existing.previewUrl = t.previewUrl
+                            itemChanged = true
+                        }
+                        if (existing.artworkUrl == nil || existing.artworkUrl?.isEmpty == true) && t.artworkUrl != nil {
+                            existing.artworkUrl = t.artworkUrl
+                            itemChanged = true
+                        }
+                        if itemChanged {
+                            updated[existingIdx] = existing
+                            hasChanges = true
                         }
                     } else {
                         updated.append(t)
+                        hasChanges = true
                     }
                 }
-                DispatchQueue.main.async {
-                    self.favorites = updated
-                    self.saveFavorites()
-                    self.notifyStateChanged()
+                if hasChanges {
+                    DispatchQueue.main.async {
+                        self.favorites = updated
+                        self.saveFavorites()
+                        self.notifyStateChanged()
+                    }
                 }
             }
         }
@@ -265,7 +269,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     private var timeObserver: Any?
     private var avPlayer: AVPlayer?
-    private var playbackTimer: Foundation.Timer?
+    private var playbackTimer: DispatchSourceTimer?
     private var playbackStartTimestamp: Double = 0.0
     private var playbackStartOffset: Double = 0.0
     private var stateListeners: [UUID: () -> Void] = [:]
@@ -365,7 +369,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.playbackStartOffset = self.currentTime
         self.hasSyncedAudioStart = false
         
-        self.playbackTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(250))
+        timer.setEventHandler { [weak self] in
             guard let self = self, self.isPlaying else { return }
             
             var currentRealTime: Double?
@@ -431,10 +437,12 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.next()
             }
         }
+        self.playbackTimer = timer
+        timer.resume()
     }
     
     private func stopTimeTracking() {
-        self.playbackTimer?.invalidate()
+        self.playbackTimer?.cancel()
         self.playbackTimer = nil
     }
     

@@ -34,6 +34,7 @@ public final class AppleMusicService: @unchecked Sendable {
 
     private init() {
         self.setupPlayerNotifications()
+        self.setupLibraryNotifications()
         self.checkCatalogSubscription()
     }
 
@@ -54,6 +55,24 @@ public final class AppleMusicService: @unchecked Sendable {
             name: .MPMusicPlayerControllerPlaybackStateDidChange,
             object: self.player
         )
+    }
+
+    private func setupLibraryNotifications() {
+        MPMediaLibrary.default().beginGeneratingLibraryChangeNotifications()
+        NotificationCenter.default.addObserver(
+            forName: .MPMediaLibraryDidChange,
+            object: nil,
+            queue: .main
+        ) { _ in
+            SGDoxMusicManager.shared.syncFavoritesWithServices()
+        }
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            SGDoxMusicManager.shared.syncFavoritesWithServices()
+        }
     }
 
     @objc private func playerStateDidChange() {

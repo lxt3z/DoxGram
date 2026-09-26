@@ -591,9 +591,7 @@ public final class AvatarNode: ASDisplayNode {
             var synchronousLoad = synchronousLoad
             var overrideImage = overrideImage
             if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideAvatars {
-                if peer?.id.namespace == Namespaces.Peer.CloudUser || (SGSimpleSettings.shared.streamerHideGroupNames && (peer?.id.namespace == Namespaces.Peer.CloudGroup || peer?.id.namespace == Namespaces.Peer.CloudChannel)) {
-                    overrideImage = .anonymousSavedMessagesIcon(isColored: false)
-                }
+                overrideImage = .anonymousSavedMessagesIcon(isColored: false)
             }
             var representation: TelegramMediaImageRepresentation?
             var icon = AvatarNodeIcon.none
@@ -723,10 +721,8 @@ public final class AvatarNode: ASDisplayNode {
             storeUnrounded: Bool = false
         ) {
             if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideAvatars {
-                if peer?.id.namespace == Namespaces.Peer.CloudUser || (SGSimpleSettings.shared.streamerHideGroupNames && (peer?.id.namespace == Namespaces.Peer.CloudGroup || peer?.id.namespace == Namespaces.Peer.CloudChannel)) {
-                    self.imageNode.contents = nil
-                    return
-                }
+                self.setPeer(context: context, theme: theme, peer: peer, authorOfMessage: authorOfMessage, overrideImage: .anonymousSavedMessagesIcon(isColored: false), clipStyle: clipStyle, synchronousLoad: synchronousLoad, displayDimensions: displayDimensions, storeUnrounded: storeUnrounded)
+                return
             }
             let smallProfileImage = peer?.smallProfileImage
             let params = Params(
@@ -810,9 +806,7 @@ public final class AvatarNode: ASDisplayNode {
             var synchronousLoad = synchronousLoad
             var overrideImage = overrideImage
             if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideAvatars {
-                if peer?.id.namespace == Namespaces.Peer.CloudUser || (SGSimpleSettings.shared.streamerHideGroupNames && (peer?.id.namespace == Namespaces.Peer.CloudGroup || peer?.id.namespace == Namespaces.Peer.CloudChannel)) {
-                    overrideImage = .anonymousSavedMessagesIcon(isColored: false)
-                }
+                overrideImage = .anonymousSavedMessagesIcon(isColored: false)
             }
             var representation: TelegramMediaImageRepresentation?
             var icon = AvatarNodeIcon.none

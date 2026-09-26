@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import AsyncDisplayKit
 import Display
+import SGSimpleSettings
 import TelegramCore
 import SwiftSignalKit
 import TelegramPresentationData
@@ -626,6 +627,17 @@ public class ChatMessageReplyInfoNode: ASDisplayNode {
                     if file.isInstantVideo {
                         hasRoundImage = true
                     }
+                }
+            }
+            
+            if SGSimpleSettings.shared.isStreamerActive {
+                if SGSimpleSettings.shared.streamerHideNames {
+                    titleString = NSAttributedString(string: "User", font: titleFont, textColor: titleColor)
+                }
+                if SGSimpleSettings.shared.streamerHideMessages {
+                    messageText = NSAttributedString(string: "••••••••", font: textFont, textColor: textColor)
+                    updatedMediaReference = nil
+                    imageDimensions = nil
                 }
             }
             

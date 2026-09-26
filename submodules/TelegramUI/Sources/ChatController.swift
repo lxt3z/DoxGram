@@ -587,6 +587,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     
     // MARK: Swiftgram
     private var sgShowHiddenPinnedMessagesObserver: NSObjectProtocol?
+    private var sgStreamerStateObserver: NSObjectProtocol?
     public var overlayTitle: String? {
          var title: String?
         if let threadInfo = self.contentData?.state.threadInfo {
@@ -6966,6 +6967,19 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 })
             }
         )
+
+        self.sgStreamerStateObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SGStreamerStateChanged"),
+            object: nil,
+            queue: .main,
+            using: { [weak self] _ in
+                guard let strongSelf = self else { return }
+                strongSelf.themeAndStringsUpdated()
+                strongSelf.controllerInteraction?.updatedPresentationData = strongSelf.updatedPresentationData
+                strongSelf.presentationDataPromise.set(.single(strongSelf.presentationData))
+                strongSelf.chatTitleView?.update(presentationData: strongSelf.presentationData)
+            }
+        )
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -7021,6 +7035,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     deinit {
         // MARK: Swiftgram
         if let observer = sgShowHiddenPinnedMessagesObserver { NotificationCenter.default.removeObserver(observer) }
+        if let observer = sgStreamerStateObserver { NotificationCenter.default.removeObserver(observer) }
         let _ = ChatControllerCount.modify { value in
             return value - 1
         }

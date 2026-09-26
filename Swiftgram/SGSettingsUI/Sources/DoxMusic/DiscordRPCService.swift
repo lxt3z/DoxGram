@@ -53,13 +53,19 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     
     // MARK: - Connection Lifecycle
     
+    public static func cleanToken(_ token: String) -> String {
+        return token
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'`“”«»"))
+    }
+    
     public func connect() {
         guard SGSimpleSettings.shared.discordRpcEnabled else {
             self.disconnect()
             return
         }
         
-        let token = SGSimpleSettings.shared.discordRpcToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let token = DiscordRPCService.cleanToken(SGSimpleSettings.shared.discordRpcToken)
         guard !token.isEmpty else {
             self.status = .error("Токен Discord не указан")
             return
@@ -211,7 +217,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     }
     
     private func sendIdentify() {
-        let token = SGSimpleSettings.shared.discordRpcToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let token = DiscordRPCService.cleanToken(SGSimpleSettings.shared.discordRpcToken)
         guard !token.isEmpty else { return }
         
         let activity = self.buildActivity(track: self.currentPlayingTrack, isPlaying: self.currentIsPlaying)
@@ -226,7 +232,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
                 "token": token,
                 "properties": [
                     "os": "iOS",
-                    "browser": "DoxGram iOS",
+                    "browser": "Discord iOS",
                     "device": "iPhone"
                 ],
                 "presence": [
@@ -234,7 +240,8 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
                     "status": "online",
                     "since": 0,
                     "afk": false
-                ]
+                ],
+                "intents": 0
             ]
         ]
         self.sendJson(payload)
@@ -474,10 +481,30 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         }
     }
     
+    // MARK: - URLSessionWebSocketDelegate
+    
+    public func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        let reasonStr = reason.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        SGLogger.shared.log("DiscordRPC", "WebSocket closed with code: \(closeCode.rawValue), reason: \(reasonStr)")
+        let rawCode = closeCode.rawValue
+        if rawCode == 4004 {
+            self.status = .error("Неверный токен Discord (4004)")
+            self.stopHeartbeat()
+        } else if rawCode == 4013 {
+            self.status = .error("Неверные intents (4013)")
+            self.stopHeartbeat()
+        } else if rawCode == 4014 {
+            self.status = .error("Disallowed intent (4014)")
+            self.stopHeartbeat()
+        } else {
+            self.scheduleReconnect()
+        }
+    }
+    
     // MARK: - Validation REST API
     
     public func validateToken(_ token: String, completion: @escaping @MainActor (Bool, String?) -> Void) {
-        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = DiscordRPCService.cleanToken(token)
         guard !trimmed.isEmpty, let url = URL(string: "https://discord.com/api/v10/users/@me") else {
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
@@ -487,52 +514,81 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
             return
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(trimmed, forHTTPHeaderField: "Authorization")
+        let sendRequest: (String, Bool) -> Void = { [weak self] authHeader, canFallback in
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Discord/220.0", forHTTPHeaderField: "User-Agent")
+            
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            completion(false, error.localizedDescription)
+                        }
+                    }
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            completion(false, "Нет ответа от сервера")
+                        }
+                    }
+                    return
+                }
+                
+                if httpResponse.statusCode == 200, let data = data,
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let username = json["username"] as? String {
+                    let globalName = json["global_name"] as? String
+                    let displayName = (globalName != nil && !globalName!.isEmpty) ? "\(globalName!) (@\(username))" : username
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            completion(true, displayName)
+                        }
+                    }
+                } else if httpResponse.statusCode == 401 && canFallback && !authHeader.hasPrefix("Bot ") {
+                    // Try bot token format
+                    var botRequest = URLRequest(url: url)
+                    botRequest.httpMethod = "GET"
+                    botRequest.setValue("Bot \(trimmed)", forHTTPHeaderField: "Authorization")
+                    botRequest.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Discord/220.0", forHTTPHeaderField: "User-Agent")
+                    URLSession.shared.dataTask(with: botRequest) { botData, botResp, _ in
+                        if let botResp = botResp as? HTTPURLResponse, botResp.statusCode == 200,
+                           let botData = botData,
+                           let json = try? JSONSerialization.jsonObject(with: botData) as? [String: Any],
+                           let username = json["username"] as? String {
+                            DispatchQueue.main.async {
+                                MainActor.assumeIsolated {
+                                    completion(true, "Bot: \(username)")
+                                }
+                            }
+                        } else {
+                            DispatchQueue.main.async {
+                                MainActor.assumeIsolated {
+                                    completion(false, "Неверный токен Discord (401 Unauthorized)")
+                                }
+                            }
+                        }
+                    }.resume()
+                } else if httpResponse.statusCode == 401 {
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            completion(false, "Неверный токен Discord (401 Unauthorized)")
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            completion(false, "Ошибка сервера (Код: \(httpResponse.statusCode))")
+                        }
+                    }
+                }
+            }.resume()
+        }
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        completion(false, error.localizedDescription)
-                    }
-                }
-                return
-            }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        completion(false, "Нет ответа от сервера")
-                    }
-                }
-                return
-            }
-            
-            if httpResponse.statusCode == 200, let data = data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let username = json["username"] as? String {
-                let globalName = json["global_name"] as? String
-                let displayName = (globalName != nil && !globalName!.isEmpty) ? "\(globalName!) (@\(username))" : username
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        completion(true, displayName)
-                    }
-                }
-            } else if httpResponse.statusCode == 401 {
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        completion(false, "Неверный токен Discord (401 Unauthorized)")
-                    }
-                }
-            } else {
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        completion(false, "Ошибка сервера (Код: \(httpResponse.statusCode))")
-                    }
-                }
-            }
-        }.resume()
+        sendRequest(trimmed, true)
     }
 }

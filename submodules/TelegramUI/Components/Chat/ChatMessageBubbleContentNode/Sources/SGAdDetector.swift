@@ -442,6 +442,104 @@ public struct SGAdDetector {
         "скачать впн"
     ]
 
+    private static let adultAndLeakPromoKeywords: [String] = [
+        "ai-игрушка",
+        "ai игрушка",
+        "ии-игрушка",
+        "ии игрушка",
+        "твоя личная ai",
+        "твоя личная ии",
+        "виртуальная девушка",
+        "ai девушка",
+        "ии девушка",
+        "нейросеть без цензуры",
+        "чат-бот 18+",
+        "чат бот 18+",
+        "раздеватор",
+        "раздень подругу",
+        "раздевает по фото",
+        "раздеть по фото",
+        "слив тик-токерши",
+        "слив тиктокерши",
+        "сливы тиктокерш",
+        "слив онлифанс",
+        "слив onlyfans",
+        "сливы онлифанс",
+        "сливы блогерш",
+        "слив стримерш",
+        "сливы стримерш",
+        "сливы школьниц",
+        "слитые фото",
+        "слитый архив",
+        "слив переписок",
+        "слив домашнего",
+        "слив архива",
+        "сливы малолеток",
+        "слив малолетки",
+        "интимки",
+        "интим фото",
+        "интим видео",
+        "фулл в закрепе",
+        "фулл по ссылке",
+        "полное видео в закрепе",
+        "продолжение в источнике",
+        "продолжение по ссылке",
+        "без цензуры в закрепе",
+        "видео без цензуры",
+        "запрещенка",
+        "запрещёнка",
+        "порно видео",
+        "порнуха"
+    ]
+
+    private static func normalizeLeetspeak(_ text: String) -> String {
+        var result = text.lowercased()
+        
+        let digitMap: [Character: Character] = [
+            "0": "о",
+            "1": "и",
+            "3": "з",
+            "4": "ч",
+            "6": "б",
+            "8": "в"
+        ]
+        var chars: [Character] = []
+        for ch in result {
+            if let mapped = digitMap[ch] {
+                chars.append(mapped)
+            } else {
+                chars.append(ch)
+            }
+        }
+        result = String(chars)
+        
+        let latinToCyrillic: [(String, String)] = [
+            ("sl", "сл"),
+            ("sh", "ш"),
+            ("ch", "ч"),
+            ("a", "а"),
+            ("b", "б"),
+            ("c", "с"),
+            ("e", "е"),
+            ("k", "к"),
+            ("m", "м"),
+            ("h", "н"),
+            ("o", "о"),
+            ("p", "р"),
+            ("r", "р"),
+            ("s", "с"),
+            ("t", "т"),
+            ("u", "у"),
+            ("x", "х"),
+            ("y", "у")
+        ]
+        for (lat, cyr) in latinToCyrillic {
+            result = result.replacingOccurrences(of: lat, with: cyr)
+        }
+        
+        return result
+    }
+
     private static var adCheckCache: [MessageId: Bool] = [:]
     private static let cacheLock = NSLock()
 
@@ -503,9 +601,31 @@ public struct SGAdDetector {
             }
         }
         
+        let normalizedText = normalizeLeetspeak(fullText)
+        
+        // Adult, leaks & AI toy spam (with leetspeak normalization)
+        for keyword in adultAndLeakPromoKeywords {
+            if fullText.contains(keyword) || normalizedText.contains(keyword) {
+                return true
+            }
+        }
+        
+        let hasLeakOrAdultTerm = normalizedText.contains("слив") || normalizedText.contains("порн") || normalizedText.contains("интим") || normalizedText.contains("онлифанс") || normalizedText.contains("раздеват")
+        if hasLeakOrAdultTerm {
+            let spamContext = ["ссылк", "переход", "канал", "закреп", "источник", "бот", "bot", "t.me", "http", "👉", "👇", "доступ", "архив", "папк", "бесплатн", "продолжен"]
+            for ctx in spamContext {
+                if fullText.contains(ctx) || normalizedText.contains(ctx) {
+                    return true
+                }
+            }
+            if message.attributes.contains(where: { $0 is ReplyMarkupMessageAttribute }) {
+                return true
+            }
+        }
+        
         // 1. Official ad token / ERID marker
         for token in officialAdTokens {
-            if fullText.contains(token) {
+            if fullText.contains(token) || normalizedText.contains(token) {
                 return true
             }
         }

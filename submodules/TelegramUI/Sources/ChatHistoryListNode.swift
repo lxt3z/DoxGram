@@ -4189,39 +4189,72 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                 strongSelf.historyView = transition.historyView
                 
                 let historyView = transition.historyView
+                var newestDoxwallEntry: (message: Message, tagUrl: String?, quality: String?, file: TelegramMediaFile?)? = nil
+                
                 for entry in historyView.originalView.entries {
                     let message = entry.message
                     let text = message.text
                     let peerId = message.id.peerId.toInt64()
                     
+                    if text.contains("#doxwall:reset") {
+                        let resetTs = Double(message.timestamp)
+                        if resetTs > SGDoxAnimatedWallpaperManager.shared.resetTimestamp(for: peerId) {
+                            SGDoxAnimatedWallpaperManager.shared.removeWallpaper(for: peerId)
+                            SGDoxAnimatedWallpaperManager.shared.setResetTimestamp(resetTs, for: peerId)
+                        }
+                    }
+                    
                     if text.contains("#doxwall:") {
                         if let sync = SGDoxAnimatedWallpaperManager.shared.parseSyncTag(from: text) {
-                            if SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != sync.url,
-                               !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
-                                SGDoxAnimatedWallpaperManager.shared.setWallpaper(url: sync.url, for: peerId, quality: sync.quality)
+                            if newestDoxwallEntry == nil || message.timestamp > newestDoxwallEntry!.message.timestamp {
+                                newestDoxwallEntry = (message, sync.url, sync.quality, nil)
                             }
                         }
                     } else if text.contains("#doxwall") {
                         for media in message.media {
                             if let file = media as? TelegramMediaFile, file.isVideo || file.isAnimated {
-                                let syncKey = "tg_msg_\(file.fileId.id)"
-                                if SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != syncKey,
-                                   !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
-                                    SGDoxAnimatedWallpaperManager.shared.markDownloading(for: peerId, url: syncKey)
-                                    let mediaBox = strongSelf.context.account.postbox.mediaBox
-                                    if let path = mediaBox.completedResourcePath(file.resource), FileManager.default.fileExists(atPath: path) {
-                                        let fileUrl = URL(fileURLWithPath: path)
-                                        SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey)
-                                    } else {
-                                        let _ = (mediaBox.resourceData(file.resource)
-                                        |> deliverOnMainQueue).startStrict(next: { data in
-                                            if data.complete, let path = mediaBox.completedResourcePath(file.resource) {
-                                                let fileUrl = URL(fileURLWithPath: path)
-                                                SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey)
-                                            }
-                                        })
-                                        let _ = mediaBox.fetchedResource(file.resource, parameters: nil).startStrict()
-                                    }
+                                if newestDoxwallEntry == nil || message.timestamp > newestDoxwallEntry!.message.timestamp {
+                                    newestDoxwallEntry = (message, nil, nil, file)
+                                }
+                                break
+                            }
+                        }
+                    }
+                }
+                
+                if let candidate = newestDoxwallEntry {
+                    let peerId = candidate.message.id.peerId.toInt64()
+                    let msgTimestamp = candidate.message.timestamp
+                    let resetTs = SGDoxAnimatedWallpaperManager.shared.resetTimestamp(for: peerId)
+                    let currentAppliedTs = SGDoxAnimatedWallpaperManager.shared.wallpaperTimestamp(for: peerId)
+                    
+                    if Double(msgTimestamp) > resetTs {
+                        if let tagUrl = candidate.tagUrl {
+                            let quality = candidate.quality ?? "720p"
+                            if (SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != tagUrl || msgTimestamp > currentAppliedTs),
+                               !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
+                                SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
+                                SGDoxAnimatedWallpaperManager.shared.setWallpaper(url: tagUrl, for: peerId, quality: quality)
+                            }
+                        } else if let file = candidate.file {
+                            let syncKey = "tg_msg_\(file.fileId.id)"
+                            if (SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != syncKey || msgTimestamp > currentAppliedTs),
+                               !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
+                                SGDoxAnimatedWallpaperManager.shared.markDownloading(for: peerId, url: syncKey)
+                                SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
+                                let mediaBox = strongSelf.context.account.postbox.mediaBox
+                                if let path = mediaBox.completedResourcePath(file.resource), FileManager.default.fileExists(atPath: path) {
+                                    let fileUrl = URL(fileURLWithPath: path)
+                                    SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey)
+                                } else {
+                                    let _ = (mediaBox.resourceData(file.resource)
+                                    |> deliverOnMainQueue).startStrict(next: { data in
+                                        if data.complete, let path = mediaBox.completedResourcePath(file.resource) {
+                                            let fileUrl = URL(fileURLWithPath: path)
+                                            SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey)
+                                        }
+                                    })
+                                    let _ = mediaBox.fetchedResource(file.resource, parameters: nil).startStrict()
                                 }
                             }
                         }

@@ -1075,8 +1075,10 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             return
         }
         if self.hasDoxVideoWallpaper {
+            self.doxVideoWallpaperNode.onReady = { [weak self] in
+                self?.backgroundNode.alpha = 0.0
+            }
             self.doxVideoWallpaperNode.setup(peerId: peerId.toInt64())
-            self.backgroundNode.alpha = 0.0
             if let topBackgroundEdgeEffectNode = self.topBackgroundEdgeEffectNode {
                 self.topBackgroundEdgeEffectNode = nil
                 topBackgroundEdgeEffectNode.view.removeFromSuperview()

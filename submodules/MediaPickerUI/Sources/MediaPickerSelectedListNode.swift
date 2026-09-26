@@ -2,6 +2,8 @@ import Foundation
 import UIKit
 import AsyncDisplayKit
 import Display
+import AVFoundation
+import SGSimpleSettings
 import SwiftSignalKit
 import Postbox
 import TelegramCore
@@ -609,6 +611,9 @@ final class MediaPickerSelectedListNode: ASDisplayNode, ASScrollViewDelegate, AS
     }
     
     fileprivate var wallpaperBackgroundNode: WallpaperBackgroundNode?
+    private var videoPlayer: AVPlayer?
+    private var videoPlayerLayer: AVPlayerLayer?
+    private var videoEndObserver: Any?
     private let scrollNode: ASScrollNode
     private var backgroundNodes: [Int: MessageBackgroundNode] = [:]
     private var itemNodes: [String: MediaPickerSelectedItemNode] = [:]
@@ -633,7 +638,7 @@ final class MediaPickerSelectedListNode: ASDisplayNode, ASScrollViewDelegate, AS
         return self.ready.get()
     }
     
-    init(context: AccountContext, persistentItems: Bool, isExternalPreview: Bool, isObscuredExternalPreview: Bool) {
+    init(context: AccountContext, persistentItems: Bool, isExternalPreview: Bool, isObscuredExternalPreview: Bool, peerId: Int64? = nil) {
         self.context = context
         self.persistentItems = persistentItems
         self.isExternalPreview = isExternalPreview
@@ -649,8 +654,38 @@ final class MediaPickerSelectedListNode: ASDisplayNode, ASScrollViewDelegate, AS
             wallpaperBackgroundNode.backgroundColor = .black
             self.wallpaperBackgroundNode = wallpaperBackgroundNode
             self.addSubnode(wallpaperBackgroundNode)
+            
+            let effectivePeerId = peerId ?? 0
+            if let videoUrl = SGDoxAnimatedWallpaperManager.shared.localFileUrl(for: effectivePeerId) ?? SGDoxAnimatedWallpaperManager.shared.localFileUrl(for: 0) {
+                let asset = AVURLAsset(url: videoUrl)
+                let item = AVPlayerItem(asset: asset)
+                let player = AVPlayer(playerItem: item)
+                player.isMuted = true
+                player.actionAtItemEnd = .none
+                let playerLayer = AVPlayerLayer(player: player)
+                playerLayer.videoGravity = .resizeAspectFill
+                self.layer.insertSublayer(playerLayer, at: 0)
+                self.videoPlayer = player
+                self.videoPlayerLayer = playerLayer
+                self.videoEndObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak player] _ in
+                    player?.seek(to: .zero)
+                    player?.play()
+                }
+                player.play()
+                wallpaperBackgroundNode.alpha = 0.0
+            }
         }
         self.addSubnode(self.scrollNode)
+    }
+    
+    deinit {
+        if let videoEndObserver = self.videoEndObserver {
+            NotificationCenter.default.removeObserver(videoEndObserver)
+        }
+        self.videoPlayer?.pause()
+        self.videoPlayer = nil
+        self.videoPlayerLayer?.removeFromSuperlayer()
+        self.videoPlayerLayer = nil
     }
     
     override func didLoad() {
@@ -1338,6 +1373,10 @@ final class MediaPickerSelectedListNode: ASDisplayNode, ASScrollViewDelegate, AS
             wallpaperBackgroundNode.updateBubbleTheme(bubbleTheme: theme, bubbleCorners: bubbleCorners)
             transition.updateFrame(node: wallpaperBackgroundNode, frame: CGRect(origin: CGPoint(x: inset, y: 0.0), size: CGSize(width: size.width - inset * 2.0, height: size.height)))
             wallpaperBackgroundNode.updateLayout(size: CGSize(width: size.width - inset * 2.0, height: size.height), displayMode: .aspectFill, transition: transition)
+        }
+        
+        if let videoPlayerLayer = self.videoPlayerLayer {
+            transition.updateFrame(layer: videoPlayerLayer, frame: CGRect(origin: CGPoint(x: inset, y: 0.0), size: CGSize(width: size.width - inset * 2.0, height: size.height)))
         }
         
         self.updateItems(transition: itemsTransition)

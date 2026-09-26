@@ -297,10 +297,10 @@ public final class WallpaperGalleryToolbarNode: ASDisplayNode, WallpaperGalleryT
         switch self.doneButtonType {
         case .set:
             applyTitle = strings.Wallpaper_ApplyForAll
-        case let .setPeer(name, isPremium):
+        case let .setPeer(name, _):
             applyTitle = strings.Wallpaper_ApplyForMe
             applyForBothTitle = strings.Wallpaper_ApplyForBoth(name).string
-            applyForBothLocked = !isPremium
+            applyForBothLocked = false
         case .setChannel:
             applyTitle = strings.Wallpaper_ApplyForChannel
         case .proceed:

@@ -169,6 +169,9 @@ extension ChatControllerImpl {
             if let cachedUserData = strongSelf.contentData?.state.peerView?.cachedData as? CachedUserData {
                 canResetWallpaper = cachedUserData.wallpaper != nil
             }
+            if !canResetWallpaper {
+                canResetWallpaper = SGDoxAnimatedWallpaperManager.shared.hasChatSpecificWallpaper(for: peer.id.toInt64())
+            }
             
             let controller = ChatThemeScreen(
                 context: context,
@@ -272,6 +275,8 @@ extension ChatControllerImpl {
                     guard let self, let peerId else {
                         return
                     }
+                    SGDoxAnimatedWallpaperManager.shared.removeWallpaper(for: peerId.toInt64())
+                    self.chatDisplayNode.updateDoxVideoWallpaper()
                     let _ = self.context.engine.themes.setChatWallpaper(peerId: peerId, wallpaper: nil, forBoth: false).startStandalone()
                 },
                 completion: { [weak self] chatTheme in

@@ -686,7 +686,9 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         
         if isReplyThread {
             let titleString: String
-            if let author = message.effectiveAuthor {
+            if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideNames {
+                titleString = "User"
+            } else if let author = message.effectiveAuthor {
                 titleString = EnginePeer(author).displayTitle(strings: strings, displayOrder: nameDisplayOrder)
             } else {
                 titleString = ""
@@ -719,7 +721,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
             mediaUpdated = true
         }
         
-        let hasSpoiler = message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute })
+        let hasSpoiler = message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) || (SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideMessages)
         
         var updateImageSignal: Signal<(TransformImageArguments) -> DrawingContext?, NoError>?
         var updatedFetchMediaSignal: Signal<EngineFetchResourceSourceType, EngineFetchResourceError>?
@@ -803,8 +805,15 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
             messageText = renderInstantPagePreviewIcons(mutableTextString, font: textFont, textColor: textColor)
         }
         
+        let finalMessageText: NSAttributedString
+        if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideMessages {
+            finalMessageText = NSAttributedString(string: "••••••••", font: textFont, textColor: theme.chat.inputPanel.primaryTextColor)
+        } else {
+            finalMessageText = messageText
+        }
+        
         let textConstrainedSize = CGSize(width: width - textLineInset - contentLeftInset - rightInset - textRightInset - 10.0, height: CGFloat.greatestFiniteMagnitude)
-        let (textLayout, textApply) = makeTextLayout(TextNodeLayoutArguments(attributedString: messageText, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: textConstrainedSize, alignment: .natural, cutout: nil, insets: UIEdgeInsets(top: 2.0, left: 0.0, bottom: 2.0, right: 0.0)))
+        let (textLayout, textApply) = makeTextLayout(TextNodeLayoutArguments(attributedString: finalMessageText, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: textConstrainedSize, alignment: .natural, cutout: nil, insets: UIEdgeInsets(top: 2.0, left: 0.0, bottom: 2.0, right: 0.0)))
         
         let spoilerTextLayoutAndApply: (TextNodeLayout, (TextNodeWithEntities.Arguments?) -> TextNodeWithEntities)?
         if !textLayout.spoilers.isEmpty {

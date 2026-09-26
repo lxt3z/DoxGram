@@ -28,6 +28,7 @@ swift_library(
         "//submodules/TelegramUI/Components/Chat/AccessoryPanelNode",
         "//submodules/TelegramUI/Components/CompositeTextNode",
         "//submodules/TelegramNotices",
+        "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
     ],
     visibility = [
         "//visibility:public",

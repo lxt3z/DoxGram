@@ -245,6 +245,7 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
             SGSimpleSettings.shared.keepEditHistory = value
         case .streamerMode:
             SGSimpleSettings.shared.streamerMode = value
+            NotificationCenter.default.post(name: Notification.Name("SGStreamerStateChanged"), object: nil)
         case .hideAds:
             SGSimpleSettings.shared.hideAds = value
         case .hideChannelAds:

@@ -193,13 +193,17 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                     self?.storeImage(img, for: track.id)
                     completion(img)
                 } else {
-                    self?.searchArtworkOnline(for: track, completion: completion)
+                    self?.resolveArtwork(for: track, targetSize: targetSize, completion: completion)
                 }
             }
             return
         }
         
-        // 3. Check disk cache for persistent ID or track ID
+        self.resolveArtwork(for: track, targetSize: targetSize, completion: completion)
+    }
+    
+    private func resolveArtwork(for track: SGDoxMusicTrack, targetSize: CGSize? = nil, completion: @escaping @MainActor (UIImage?) -> Void) {
+        // 1. Check disk cache
         if let dir = self.diskCacheDirectory {
             let pidStr = track.id.replacingOccurrences(of: "am_local_", with: "").replacingOccurrences(of: "local_", with: "")
             let candidates = ["am_art_\(track.id).jpg", "am_art_\(pidStr).jpg"]
@@ -214,31 +218,96 @@ public final class SGDoxImageLoader: @unchecked Sendable {
             }
         }
         
-        // 4. Try MPMediaQuery if local ID
-        if track.id.hasPrefix("am_local_") || (track.appleMusicId?.hasPrefix("local_") == true) || (track.appleMusicId?.hasPrefix("am_local_") == true) {
-            let pidStr = (track.appleMusicId ?? track.id).replacingOccurrences(of: "am_local_", with: "").replacingOccurrences(of: "local_", with: "")
-            if let pid = UInt64(pidStr) {
-                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                    guard let self = self else { return }
+        // 2. Try local MPMediaLibrary by persistentID or (Title + Artist)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            var foundLocalArt: UIImage?
+            if track.id.hasPrefix("am_local_") || (track.appleMusicId?.hasPrefix("local_") == true) || (track.appleMusicId?.hasPrefix("am_local_") == true) {
+                let pidStr = (track.id.hasPrefix("am_local_") ? track.id : (track.appleMusicId ?? track.id))
+                    .replacingOccurrences(of: "am_local_", with: "")
+                    .replacingOccurrences(of: "local_", with: "")
+                if let pid = UInt64(pidStr) {
                     let query = MPMediaQuery.songs()
                     query.addFilterPredicate(MPMediaPropertyPredicate(value: NSNumber(value: pid), forProperty: MPMediaItemPropertyPersistentID))
-                    if let item = query.items?.first, let art = item.artwork?.image(at: targetSize ?? CGSize(width: 300, height: 300)) {
-                        self.storeImage(art, for: track.id)
-                        let _ = self.saveImageToDisk(art, name: "am_art_\(pid).jpg")
-                        self.dispatchMain(image: art, completion: completion)
+                    if let item = query.items?.first {
+                        let reqSize = targetSize ?? CGSize(width: 300, height: 300)
+                        foundLocalArt = item.artwork?.image(at: reqSize) ?? item.artwork?.image(at: CGSize(width: 500, height: 500))
+                    }
+                }
+            }
+            
+            // Fallback: match by title and artist in MPMediaQuery
+            if foundLocalArt == nil {
+                let query = MPMediaQuery.songs()
+                if let songs = query.items {
+                    let targetTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                    let targetArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                    if let matched = songs.first(where: { song in
+                        guard let sTitle = song.title?.lowercased() else { return false }
+                        if sTitle != targetTitle && !sTitle.contains(targetTitle) && !targetTitle.contains(sTitle) {
+                            return false
+                        }
+                        if let sArtist = song.artist?.lowercased() {
+                            return sArtist == targetArtist || sArtist.contains(targetArtist) || targetArtist.contains(sArtist)
+                        }
+                        return true
+                    }) {
+                        let reqSize = targetSize ?? CGSize(width: 300, height: 300)
+                        foundLocalArt = matched.artwork?.image(at: reqSize) ?? matched.artwork?.image(at: CGSize(width: 500, height: 500))
+                    }
+                }
+            }
+            
+            if let art = foundLocalArt {
+                self.storeImage(art, for: track.id)
+                if let diskUrl = self.saveImageToDisk(art, name: "am_art_\(track.id).jpg") {
+                    SGDoxMusicManager.shared.updateTrackArtwork(trackId: track.id, newArtworkUrl: diskUrl.absoluteString)
+                }
+                self.dispatchMain(image: art, completion: completion)
+                return
+            }
+            
+            // 3. Fallback online search
+            self.searchArtworkOnline(for: track, completion: completion)
+        }
+    }
+    
+    private func searchArtworkOnline(for track: SGDoxMusicTrack, completion: @escaping @MainActor (UIImage?) -> Void) {
+        // If track has a direct Apple Music catalog ID, lookup directly
+        if let appleId = track.appleMusicId, let _ = UInt64(appleId), !appleId.hasPrefix("local_"), !appleId.hasPrefix("am_local_") {
+            let lookupUrlStr = "https://itunes.apple.com/lookup?id=\(appleId)&country=RU"
+            if let lookupUrl = URL(string: lookupUrlStr) {
+                self.session.dataTask(with: URLRequest(url: lookupUrl)) { [weak self] data, _, _ in
+                    guard let self = self else { return }
+                    if let data = data,
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let results = json["results"] as? [[String: Any]],
+                       let first = results.first,
+                       let artUrl100 = first["artworkUrl100"] as? String {
+                        let highRes = artUrl100.replacingOccurrences(of: "100x100bb", with: "600x600bb")
+                        self.loadImage(urlString: highRes) { img in
+                            if let img = img {
+                                self.storeImage(img, for: track.id)
+                                let _ = self.saveImageToDisk(img, name: "am_art_\(track.id).jpg")
+                                SGDoxMusicManager.shared.updateTrackArtwork(trackId: track.id, newArtworkUrl: highRes)
+                                completion(img)
+                            } else {
+                                self.searchByTitleArtistOnline(for: track, completion: completion)
+                            }
+                        }
                         return
                     }
-                    self.searchArtworkOnline(for: track, completion: completion)
-                }
+                    self.searchByTitleArtistOnline(for: track, completion: completion)
+                }.resume()
                 return
             }
         }
         
-        // 5. Fallback online search
-        self.searchArtworkOnline(for: track, completion: completion)
+        self.searchByTitleArtistOnline(for: track, completion: completion)
     }
     
-    private func searchArtworkOnline(for track: SGDoxMusicTrack, completion: @escaping @MainActor (UIImage?) -> Void) {
+    private func searchByTitleArtistOnline(for track: SGDoxMusicTrack, completion: @escaping @MainActor (UIImage?) -> Void) {
         var cleanTitle = track.title
         cleanTitle = cleanTitle.replacingOccurrences(of: "(?i)\\s*\\((?:feat|ft|with)\\..*?\\)", with: "", options: .regularExpression)
         cleanTitle = cleanTitle.replacingOccurrences(of: "(?i)\\s*\\[(?:feat|ft|with)\\..*?\\]", with: "", options: .regularExpression)

@@ -19,6 +19,7 @@ import AccessoryPanelNode
 import TelegramNotices
 import AppBundle
 import CompositeTextNode
+import SGSimpleSettings
 
 public final class ReplyAccessoryPanelNode: AccessoryPanelNode {
     private let messageDisposable = MetaDisposable()
@@ -321,6 +322,17 @@ public final class ReplyAccessoryPanelNode: AccessoryPanelNode {
                     let textColor = strongSelf.theme.chat.inputPanel.primaryTextColor
                     let itemText = stringWithAppliedEntities(trimToLineCount(pollOption.text, lineCount: 1), entities: pollOption.entities, baseColor: textColor, linkColor: textColor, baseFont: textFont, linkFont: textFont, boldFont: textFont, italicFont: textFont, boldItalicFont: textFont, fixedFont: textFont, blockQuoteFont: textFont, underlineLinks: false, message: message)
                     strongSelf.textNode.attributedText = itemText
+                }
+                
+                if SGSimpleSettings.shared.isStreamerActive {
+                    if SGSimpleSettings.shared.streamerHideNames {
+                        titleText = [.text(NSAttributedString(string: "User", font: Font.medium(15.0), textColor: strongSelf.theme.chat.inputPanel.panelControlAccentColor))]
+                    }
+                    if SGSimpleSettings.shared.streamerHideMessages {
+                        strongSelf.textNode.attributedText = NSAttributedString(string: "••••••••", font: textFont, textColor: strongSelf.theme.chat.inputPanel.primaryTextColor)
+                        applyImage = nil
+                        strongSelf.imageNode.isHidden = true
+                    }
                 }
                 
                 strongSelf.titleNode.components = titleText

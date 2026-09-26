@@ -87,6 +87,7 @@ public func sgStreamerSettingsController(context: AccountContext) -> ViewControl
                 SGSimpleSettings.shared.streamerHideNotifications = value
             }
             simplePromise.set(true)
+            NotificationCenter.default.post(name: Notification.Name("SGStreamerStateChanged"), object: nil)
         }
     )
     
