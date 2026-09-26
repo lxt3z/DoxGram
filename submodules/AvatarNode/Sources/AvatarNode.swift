@@ -721,7 +721,7 @@ public final class AvatarNode: ASDisplayNode {
             storeUnrounded: Bool = false
         ) {
             if SGSimpleSettings.shared.isStreamerActive && SGSimpleSettings.shared.streamerHideAvatars {
-                self.setPeer(context: context, theme: theme, peer: peer, authorOfMessage: authorOfMessage, overrideImage: .anonymousSavedMessagesIcon(isColored: false), clipStyle: clipStyle, synchronousLoad: synchronousLoad, displayDimensions: displayDimensions, storeUnrounded: storeUnrounded)
+                self.setPeer(context: genericContext, theme: theme, peer: peer, authorOfMessage: authorOfMessage, overrideImage: .anonymousSavedMessagesIcon(isColored: false), clipStyle: clipStyle, synchronousLoad: synchronousLoad, displayDimensions: displayDimensions, storeUnrounded: storeUnrounded)
                 return
             }
             let smallProfileImage = peer?.smallProfileImage
