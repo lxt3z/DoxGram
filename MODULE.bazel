@@ -49,14 +49,6 @@ local_path_override(
     path = "./build-system/bazel-rules/apple_support",
 )
 
-# MARK: Swiftgram
-new_git_repository(
-    name = "flex_sdk",
-    remote = "https://github.com/FLEXTool/FLEX.git",
-    commit = "2bfba6715eff664ef84a02e8eb0ad9b5a609c684",
-    build_file = "@//Swiftgram/FLEX:FLEX.BUILD"
-)
-
 http_file(
     name = "cmake_tar_gz",
     sha256 = "3be85f5b999e327b1ac7d804cbc9acd767059e9f603c42ec2765f6ab68fbd367",
