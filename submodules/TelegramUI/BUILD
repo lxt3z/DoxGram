@@ -18,7 +18,6 @@ sgdeps = [
     "//Swiftgram/Wrap:Wrap",
     "//Swiftgram/SGDeviceToken:SGDeviceToken",
     "//Swiftgram/SGInputToolbar:SGInputToolbar",
-    "//Swiftgram/SGIAP:SGIAP",
     "//Swiftgram/SGProUI:SGProUI",
     "//Swiftgram/SGKeychainBackupManager:SGKeychainBackupManager",
     "//Swiftgram/SGGHSettings:SGGHSettings",

@@ -1,5 +1,4 @@
 import SGSimpleSettings
-import SGIAP
 import Foundation
 import UIKit
 import AsyncDisplayKit
@@ -1382,7 +1381,6 @@ public protocol SharedAccountContext: AnyObject {
     var immediateExperimentalUISettings: ExperimentalUISettings { get }
     // MARK: Swiftgram
     var immediateSGStatus: SGStatus { get }
-    var SGIAP: SGIAPManager? { get }
     func makeSGProController(context: AccountContext) -> ViewController
     func makeSGUpdateIOSController() -> ViewController
 

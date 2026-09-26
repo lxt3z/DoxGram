@@ -1,5 +1,4 @@
 // MARK: Swiftgram
-import SGIAP
 import SGProUI
 import SGSimpleSettings
 //
@@ -296,7 +295,6 @@ public final class SharedAccountContextImpl: SharedAccountContext {
         return self.immediateSGStatusValue.with { $0 }
     }
     private var sgStatusDisposable: Disposable?
-    public var SGIAP: SGIAPManager?
     
     public var presentGlobalController: (ViewController, Any?) -> Void = { _, _ in }
     public var presentCrossfadeController: () -> Void = {}
@@ -552,7 +550,6 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                 SGSimpleSettings.shared.status = settings.status
             }
         })
-        self.initSGIAP(isMainApp: applicationBindings.isMainApp)
         //
         
         let _ = self.contactDataManager?.personNameDisplayOrder().start(next: { order in
@@ -4671,14 +4668,7 @@ private func useFlatModalCallsPresentation(context: AccountContext) -> Bool {
 
 // MARK: Swiftgram
 extension SharedAccountContextImpl {
-    func initSGIAP(isMainApp: Bool) {
-        if isMainApp {
-            self.SGIAP = SGIAPManager()
-        } else {
-            self.SGIAP = nil
-        }
-    }
-    
+
     public func makeSGProController(context: AccountContext) -> ViewController {
         let controller = sgProController(context: context)
         return controller

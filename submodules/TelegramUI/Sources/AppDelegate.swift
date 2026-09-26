@@ -1,10 +1,4 @@
 // MARK: Swiftgram
-import StoreKit
-import SGIAP
-import SGAPI
-import SGDeviceToken
-import SGAPIToken
-
 import SGActionRequestHandlerSanitizer
 import SGGHSettings
 import SGAPIWebSettings
@@ -1427,13 +1421,6 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     let _ = (context.context.sharedContext.presentationData.start(next: { presentationData in
                         SGLocalizationManager.shared.downloadLocale(presentationData.strings.baseLanguageCode)
                     }))
-                    if #available(iOS 13.0, *) {
-                        let _ = Task {
-                            let primaryContext = await self.getPrimaryContext(anyContext: context.context)
-                            SGLogger.shared.log("SGIAP", "Verifying Status \(primaryContext.sharedContext.immediateSGStatus.status) for: \(primaryContext.account.peerId.id._internalGetInt64Value())")
-                            let _ = await self.fetchSGStatus(primaryContext: primaryContext)
-                        }
-                    }
                     
                 }))
             } else {
@@ -1506,10 +1493,6 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         }))
         
         
-        // MARK: Swiftgram
-        if #available(iOS 13.0, *) {
-            self.setupIAP()
-        }
 
 
         let logoutDataSignal: Signal<(AccountManager, Set<PeerId>), NoError> = self.sharedContextPromise.get()
@@ -3434,117 +3417,5 @@ final class UpdateSettings: Codable, Equatable {
     
     static func ==(lhs: UpdateSettings, rhs: UpdateSettings) -> Bool {
         return lhs.url == rhs.url
-    }
-}
-
-// MARK: Swiftgram
-@available(iOS 13.0, *)
-extension AppDelegate {
-
-    func setupIAP() {
-        NotificationCenter.default.addObserver(forName: .SGIAPHelperPurchaseNotification, object: nil, queue: nil) { [weak self] notification in
-            SGLogger.shared.log("SGIAP", "Got SGIAPHelperPurchaseNotification")
-            guard let strongSelf = self else { return }
-            if let transactions = notification.object as? [SKPaymentTransaction] {
-                let _ = (strongSelf.context.get()
-                |> take(1)
-                |> deliverOnMainQueue).start(next: { [weak strongSelf] context in
-                    guard let veryStrongSelf = strongSelf else {
-                        SGLogger.shared.log("SGIAP", "Finishing transactions \(transactions.map({ $0.transactionIdentifier ?? "nil" }).joined(separator: ", "))")
-                        let defaultPaymentQueue = SKPaymentQueue.default()
-                        for transaction in transactions {
-                            defaultPaymentQueue.finishTransaction(transaction)
-                        }
-                        return
-                    }
-                    guard let context = context else {
-                        SGLogger.shared.log("SGIAP", "Empty app context (how?)")
-                        
-                        SGLogger.shared.log("SGIAP", "Finishing transactions \(transactions.map({ $0.transactionIdentifier ?? "nil" }).joined(separator: ", "))")
-                        let defaultPaymentQueue = SKPaymentQueue.default()
-                        for transaction in transactions {
-                            defaultPaymentQueue.finishTransaction(transaction)
-                        }
-                        return
-                    }
-                    SGLogger.shared.log("SGIAP", "Got context for SGIAPHelperPurchaseNotification")
-                    let _ = Task {
-                        await veryStrongSelf.sendReceiptForVerification(primaryContext: context.context)
-                        await veryStrongSelf.fetchSGStatus(primaryContext: context.context)
-                        
-                        SGLogger.shared.log("SGIAP", "Finishing transactions \(transactions.map({ $0.transactionIdentifier ?? "nil" }).joined(separator: ", "))")
-                        let defaultPaymentQueue = SKPaymentQueue.default()
-                        for transaction in transactions {
-                            defaultPaymentQueue.finishTransaction(transaction)
-                        }
-                    }
-                })
-            } else {
-                SGLogger.shared.log("SGIAP", "Wrong object in SGIAPHelperPurchaseNotification")
-                #if DEBUG
-                preconditionFailure("Wrong object in SGIAPHelperPurchaseNotification")
-                #endif
-            }
-        }
-    }
-    
-    func getPrimaryContext(anyContext context: AccountContext, fallbackToCurrent: Bool = false) async -> AccountContext {
-        var primaryUserId: Int64 = Int64(SGSimpleSettings.shared.primaryUserId) ?? 0
-        if primaryUserId == 0 {
-            primaryUserId = context.account.peerId.id._internalGetInt64Value()
-        }
-
-        var primaryContext = try? await getContextForUserId(context: context, userId: primaryUserId).awaitable()
-        if let primaryContext = primaryContext {
-            SGLogger.shared.log("SGIAP", "Got primary context for user id: \(primaryContext.account.peerId.id._internalGetInt64Value())")
-            return primaryContext
-        } else {
-            primaryContext = context
-            let newPrimaryUserId = context.account.peerId.id._internalGetInt64Value()
-            SGLogger.shared.log("SGIAP", "Primary context for user id \(primaryUserId) is nil! Falling back to current context with user id: \(newPrimaryUserId)")
-            return context
-        }
-    }
-    
-    func sendReceiptForVerification(primaryContext: AccountContext) async {
-        guard let receiptData = getPurchaceReceiptData() else {
-            return
-        }
-        
-        let encodedReceiptData = receiptData.base64EncodedData(options: [])
-
-        var deviceToken: String?
-        var apiToken: String?
-        do {
-            async let deviceTokenTask = getDeviceToken().awaitable()
-            async let apiTokenTask = getSGApiToken(context: primaryContext).awaitable()
-            
-            (deviceToken, apiToken) = try await (deviceTokenTask, apiTokenTask)
-        } catch {
-            SGLogger.shared.log("SGIAP", "Error getting device token or API token: \(error)")
-            return
-        }
-
-        if let deviceToken, let apiToken {
-            do {
-                let _ = try await postSGReceipt(token: apiToken,
-                                                deviceToken: deviceToken,
-                                                encodedReceiptData: encodedReceiptData).awaitable()
-            } catch let error as SignalCompleted {
-                let _ = error
-            } catch {
-                SGLogger.shared.log("SGIAP", "Error: \(error)")
-            }
-        }
-    }
-    
-    func fetchSGStatus(primaryContext: AccountContext) async {
-        // TODO(swiftgram): Stuck on getting shouldKeepConnection
-        // Perhaps, we can drop on some timeout?
-        let _ = try? await updateSGStatusInteractively(accountManager: primaryContext.sharedContext.accountManager, { value in
-            var value = value
-            value.status = 2
-            return value
-        }).awaitable()
     }
 }
