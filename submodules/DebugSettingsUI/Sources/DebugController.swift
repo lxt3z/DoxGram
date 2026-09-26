@@ -2,7 +2,6 @@
 import SGLogging
 import SGLoggingComposer
 import SGSimpleSettings
-import SGDebugUI
 
 import Foundation
 import UIKit
@@ -63,7 +62,6 @@ private enum DebugControllerSection: Int32 {
 }
 
 private enum DebugControllerEntry: ItemListNodeEntry {
-    case SGDebug(PresentationTheme)
     case sendSGLogs(PresentationTheme)
     case testStickerImport(PresentationTheme)
     case sendLogs(PresentationTheme)
@@ -134,7 +132,7 @@ private enum DebugControllerEntry: ItemListNodeEntry {
     
     var section: ItemListSectionId {
         switch self {
-        case .sendSGLogs, .SGDebug:
+        case .sendSGLogs:
             return DebugControllerSection.swiftgram.rawValue
         case .testStickerImport:
             return DebugControllerSection.sticker.rawValue
@@ -164,8 +162,6 @@ private enum DebugControllerEntry: ItemListNodeEntry {
     var stableId: Int {
         switch self {
         // MARK: Swiftgram
-        case .SGDebug:
-            return -110
         case .sendSGLogs:
             return -100
         case .testStickerImport:
@@ -310,13 +306,6 @@ private enum DebugControllerEntry: ItemListNodeEntry {
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! DebugControllerArguments
         switch self {
-        case .SGDebug:
-            return ItemListDisclosureItem(presentationData: presentationData, title: "Swiftgram Debug", label: "", sectionId: self.section, style: .blocks, action: {
-                guard let context = arguments.context else {
-                    return
-                }
-                arguments.pushController(sgDebugController(context: context))
-            })
         case .testStickerImport:
             return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: "Simulate Stickers Import", kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
                 guard let context = arguments.context else {
@@ -1577,7 +1566,6 @@ private func debugControllerEntries(context: AccountContext?, sharedContext: Sha
     let isMainApp = sharedContext.applicationBindings.isMainApp
     
     // MARK: Swiftgram
-    entries.append(.SGDebug(presentationData.theme))
     entries.append(.sendSGLogs(presentationData.theme))
     
 //    entries.append(.testStickerImport(presentationData.theme))

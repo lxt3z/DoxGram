@@ -7,7 +7,6 @@ sgdeps = [
 
     "//Swiftgram/SGRegDate:SGRegDate",
     "//Swiftgram/SGRegDateScheme:SGRegDateScheme",
-    "//Swiftgram/SGDebugUI:SGDebugUI",
 ]
 
 

@@ -1,4 +1,3 @@
-import SGDebugUI
 import SGSettingsUI
 import SGSimpleSettings
 import UndoUI
@@ -916,9 +915,6 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                                     navigationController?.pushViewController(debugController)
                                     return
                                 }
-                            case "sgdebug", "sg_debug":
-                                navigationController?.pushViewController(sgDebugController(context: context))
-                                return
                             case "settings":
                                 navigationController?.pushViewController(sgSettingsController(context: context))
                                 return
