@@ -37,6 +37,8 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         self.readyObserver = nil
         self.player?.pause()
         self.player = nil
+        self.playerLayer?.removeFromSuperlayer()
+        self.playerLayer = nil
     }
     
     public func setup(peerId: Int64) {

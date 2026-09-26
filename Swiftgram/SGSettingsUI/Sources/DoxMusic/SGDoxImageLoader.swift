@@ -48,6 +48,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         return dir
     }
     
+    @discardableResult
     public func saveImageToDisk(_ image: UIImage, name: String) -> URL? {
         guard let dir = self.diskCacheDirectory, let data = image.jpegData(compressionQuality: 0.85) else { return nil }
         let fileUrl = dir.appendingPathComponent(name)
@@ -122,7 +123,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                     var loadedImg: UIImage?
                     if let item = query.items?.first, let art = item.artwork?.image(at: targetSize ?? CGSize(width: 300, height: 300)) {
                         self.memoryCache.setObject(art, forKey: cacheKey)
-                        let _ = self.saveImageToDisk(art, name: "am_art_\(pid).jpg")
+                        self.saveImageToDisk(art, name: "am_art_\(pid).jpg")
                         loadedImg = art
                     }
                     self.dispatchMain(image: loadedImg, completion: completion)
@@ -275,7 +276,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
     
     private func searchArtworkOnline(for track: SGDoxMusicTrack, completion: @escaping @MainActor (UIImage?) -> Void) {
         // If track has a direct Apple Music catalog ID, lookup directly
-        if let appleId = track.appleMusicId, let _ = UInt64(appleId), !appleId.hasPrefix("local_"), !appleId.hasPrefix("am_local_") {
+        if let appleId = track.appleMusicId, UInt64(appleId) != nil, !appleId.hasPrefix("local_"), !appleId.hasPrefix("am_local_") {
             let lookupUrlStr = "https://itunes.apple.com/lookup?id=\(appleId)&country=RU"
             if let lookupUrl = URL(string: lookupUrlStr) {
                 self.session.dataTask(with: URLRequest(url: lookupUrl)) { [weak self] data, _, _ in
@@ -289,7 +290,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                         self.loadImage(urlString: highRes) { img in
                             if let img = img {
                                 self.storeImage(img, for: track.id)
-                                let _ = self.saveImageToDisk(img, name: "am_art_\(track.id).jpg")
+                                self.saveImageToDisk(img, name: "am_art_\(track.id).jpg")
                                 SGDoxMusicManager.shared.updateTrackArtwork(trackId: track.id, newArtworkUrl: highRes)
                                 completion(img)
                             } else {
@@ -329,7 +330,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                     if let img = img {
                         self.storeImage(img, for: track.id)
                         if let old = track.artworkUrl { self.storeImage(img, for: old) }
-                        let _ = self.saveImageToDisk(img, name: "am_art_\(track.id).jpg")
+                        self.saveImageToDisk(img, name: "am_art_\(track.id).jpg")
                         SGDoxMusicManager.shared.updateTrackArtwork(trackId: track.id, newArtworkUrl: artUrl)
                     }
                     completion(img)
@@ -370,7 +371,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                 if let img = img {
                     self.storeImage(img, for: track.id)
                     if let old = track.artworkUrl { self.storeImage(img, for: old) }
-                    let _ = self.saveImageToDisk(img, name: "am_art_\(track.id).jpg")
+                    self.saveImageToDisk(img, name: "am_art_\(track.id).jpg")
                     SGDoxMusicManager.shared.updateTrackArtwork(trackId: track.id, newArtworkUrl: validArtUrl)
                 }
                 completion(img)

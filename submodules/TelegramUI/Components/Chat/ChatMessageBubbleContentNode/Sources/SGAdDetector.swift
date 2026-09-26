@@ -493,6 +493,14 @@ public struct SGAdDetector {
     ]
 
     private static func normalizeLeetspeak(_ text: String) -> String {
+        let hasPotentialLeetspeak = text.unicodeScalars.contains { scalar in
+            let v = scalar.value
+            return (v >= 48 && v <= 57) || (v >= 97 && v <= 122) || (v >= 65 && v <= 90)
+        }
+        if !hasPotentialLeetspeak {
+            return text
+        }
+        
         var result = text.lowercased()
         
         let digitMap: [Character: Character] = [
@@ -504,6 +512,7 @@ public struct SGAdDetector {
             "8": "в"
         ]
         var chars: [Character] = []
+        chars.reserveCapacity(result.count)
         for ch in result {
             if let mapped = digitMap[ch] {
                 chars.append(mapped)
@@ -534,7 +543,9 @@ public struct SGAdDetector {
             ("y", "у")
         ]
         for (lat, cyr) in latinToCyrillic {
-            result = result.replacingOccurrences(of: lat, with: cyr)
+            if result.contains(lat) {
+                result = result.replacingOccurrences(of: lat, with: cyr)
+            }
         }
         
         return result

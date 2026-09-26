@@ -514,7 +514,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
             return
         }
         
-        let sendRequest: (String, Bool) -> Void = { [weak self] authHeader, canFallback in
+        let sendRequest: (String, Bool) -> Void = { authHeader, canFallback in
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
             request.setValue(authHeader, forHTTPHeaderField: "Authorization")

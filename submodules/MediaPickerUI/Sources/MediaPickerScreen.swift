@@ -581,7 +581,7 @@ public final class MediaPickerScreenImpl: ViewController, MediaPickerScreen, Att
                 if case .selected = self.currentDisplayMode {
                     isObscuredExternalPreview = true
                 }
-                let previewNode = MediaPickerSelectedListNode(context: controller.context, persistentItems: persistentItems, isExternalPreview: true, isObscuredExternalPreview: isObscuredExternalPreview)
+                let previewNode = MediaPickerSelectedListNode(context: controller.context, persistentItems: persistentItems, isExternalPreview: true, isObscuredExternalPreview: isObscuredExternalPreview, peerId: controller.peer?.id.toInt64())
                 let clippingRect = CGRect(origin: CGPoint(x: 0.0, y: navigationHeight), size: CGSize(width: layout.size.width, height: max(0.0, layout.size.height - navigationHeight - layout.intrinsicInsets.bottom - layout.additionalInsets.bottom - 1.0)))
                 previewNode.globalClippingRect = self.view.convert(clippingRect, to: nil)
                 previewNode.interaction = self.controller?.interaction

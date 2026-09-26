@@ -747,10 +747,20 @@ final class MediaPickerSelectedListNode: ASDisplayNode, ASScrollViewDelegate, AS
             initiated()
             
             if let wallpaperBackgroundNode = strongSelf.wallpaperBackgroundNode {
-                wallpaperBackgroundNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25, completion: { _ in
-                    completion()
-                })
-                wallpaperBackgroundNode.layer.animateScale(from: 1.2, to: 1.0, duration: 0.33, timingFunction: kCAMediaTimingFunctionSpring)
+                if strongSelf.videoPlayer == nil {
+                    wallpaperBackgroundNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25, completion: { _ in
+                        completion()
+                    })
+                    wallpaperBackgroundNode.layer.animateScale(from: 1.2, to: 1.0, duration: 0.33, timingFunction: kCAMediaTimingFunctionSpring)
+                } else {
+                    if let videoPlayerLayer = strongSelf.videoPlayerLayer {
+                        videoPlayerLayer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25, completion: { _ in
+                            completion()
+                        })
+                    } else {
+                        completion()
+                    }
+                }
             } else {
                 completion()
             }
@@ -800,32 +810,62 @@ final class MediaPickerSelectedListNode: ASDisplayNode, ASScrollViewDelegate, AS
     
     func animateOut(transition: ContainedViewLayoutTransition, completion: @escaping () -> Void = {}) {
         if let wallpaperBackgroundNode = self.wallpaperBackgroundNode {
-            wallpaperBackgroundNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.25, removeOnCompletion: false, completion: { [weak self] _ in
-                completion()
-                
-                if let strongSelf = self {
-                    Queue.mainQueue().after(0.01) {
-                        for (_, backgroundNode) in strongSelf.backgroundNodes {
-                            backgroundNode.layer.removeAllAnimations()
+            if self.videoPlayer == nil {
+                wallpaperBackgroundNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.25, removeOnCompletion: false, completion: { [weak self] _ in
+                    completion()
+                    
+                    if let strongSelf = self {
+                        Queue.mainQueue().after(0.01) {
+                            for (_, backgroundNode) in strongSelf.backgroundNodes {
+                                backgroundNode.layer.removeAllAnimations()
+                            }
+                            
+                            for (_, itemNode) in strongSelf.itemNodes {
+                                itemNode.layer.removeAllAnimations()
+                            }
+                            
+                            for (_, priceNode) in strongSelf.priceNodes {
+                                priceNode.layer.removeAllAnimations()
+                            }
+                            
+                            strongSelf.messageNodes?.first?.layer.removeAllAnimations()
+                            strongSelf.messageNodes?.last?.layer.removeAllAnimations()
+                            
+                            strongSelf.wallpaperBackgroundNode?.layer.removeAllAnimations()
                         }
-                        
-                        for (_, itemNode) in strongSelf.itemNodes {
-                            itemNode.layer.removeAllAnimations()
-                        }
-                        
-                        for (_, priceNode) in strongSelf.priceNodes {
-                            priceNode.layer.removeAllAnimations()
-                        }
-                        
-                        strongSelf.messageNodes?.first?.layer.removeAllAnimations()
-                        strongSelf.messageNodes?.last?.layer.removeAllAnimations()
-                        
-                        strongSelf.wallpaperBackgroundNode?.layer.removeAllAnimations()
                     }
+                })
+                wallpaperBackgroundNode.layer.animateScale(from: 1.0, to: 1.2, duration: 0.33, timingFunction: kCAMediaTimingFunctionSpring)
+            } else {
+                if let videoPlayerLayer = self.videoPlayerLayer {
+                    videoPlayerLayer.animateAlpha(from: 1.0, to: 0.0, duration: 0.25, removeOnCompletion: false, completion: { [weak self] _ in
+                        completion()
+                        
+                        if let strongSelf = self {
+                            Queue.mainQueue().after(0.01) {
+                                for (_, backgroundNode) in strongSelf.backgroundNodes {
+                                    backgroundNode.layer.removeAllAnimations()
+                                }
+                                
+                                for (_, itemNode) in strongSelf.itemNodes {
+                                    itemNode.layer.removeAllAnimations()
+                                }
+                                
+                                for (_, priceNode) in strongSelf.priceNodes {
+                                    priceNode.layer.removeAllAnimations()
+                                }
+                                
+                                strongSelf.messageNodes?.first?.layer.removeAllAnimations()
+                                strongSelf.messageNodes?.last?.layer.removeAllAnimations()
+                                
+                                strongSelf.wallpaperBackgroundNode?.layer.removeAllAnimations()
+                            }
+                        }
+                    })
+                } else {
+                    completion()
                 }
-            })
-            
-            wallpaperBackgroundNode.layer.animateScale(from: 1.0, to: 1.2, duration: 0.33, timingFunction: kCAMediaTimingFunctionSpring)
+            }
         } else {
             completion()
         }
