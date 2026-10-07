@@ -347,7 +347,7 @@ public func legacyEnqueueGifMessage(account: Account, data: Data, correlationId:
                         semaphore.signal()
                     }
                 }
-                if let signal = videoItem.thumbnailImageSignal?() {
+                if let signal = videoItem.thumbnailImageSignal() {
                     let _ = signal.start(next: { next in
                         extractedImage = next as? UIImage
                         signalBlock()
