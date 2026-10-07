@@ -337,18 +337,27 @@ public func legacyEnqueueGifMessage(account: Account, data: Data, correlationId:
             let tempPath = NSTemporaryDirectory() + "\(randomId).mp4"
             let tempUrl = URL(fileURLWithPath: tempPath)
             let _ = try? FileManager.default.removeItem(atPath: tempPath)
-            if (try? data.write(to: tempUrl, options: [.atomic])) != nil {
-                let videoItem = TGCameraCapturedVideo(url: tempUrl, isAnimation: true)
+            if (try? data.write(to: tempUrl, options: [.atomic])) != nil, let videoItem = TGCameraCapturedVideo(url: tempUrl, isAnimation: true) {
                 var extractedImage: UIImage?
                 let semaphore = DispatchSemaphore(value: 0)
-                let _ = videoItem.thumbnailImageSignal().start(next: { next in
-                    extractedImage = next as? UIImage
-                }, error: { _ in
-                    semaphore.signal()
-                }, completed: {
-                    semaphore.signal()
-                })
-                let _ = semaphore.wait(timeout: .now() + 2.0)
+                var didSignal = false
+                let signalBlock: () -> Void = {
+                    if !didSignal {
+                        didSignal = true
+                        semaphore.signal()
+                    }
+                }
+                if let signal = videoItem.thumbnailImageSignal?() {
+                    let _ = signal.start(next: { next in
+                        extractedImage = next as? UIImage
+                        signalBlock()
+                    }, error: { _ in
+                        signalBlock()
+                    }, completed: {
+                        signalBlock()
+                    })
+                    let _ = semaphore.wait(timeout: .now() + 2.0)
+                }
                 previewImage = extractedImage
                 tempVideoFilePath = tempPath
                 let dims = videoItem.dimensions
