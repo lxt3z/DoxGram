@@ -1,10 +1,8 @@
-# Swiftgram
+# DoxGram
 
-Supercharged Telegram fork for iOS
+Supercharged Telegram fork Swiftgram for iOS
 
-[<img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" height="50">](https://apps.apple.com/app/apple-store/id6471879502?pt=126511626&ct=gh&mt=8)
-
-Swiftgram's compilation steps are the same as for the official app. Below you'll find a complete compilation guide based on the official app.
+DoxGram's compilation steps are the same as for the official app. Below you'll find a complete compilation guide based on the official app.
 
 # Telegram iOS Source Code Compilation Guide
 
