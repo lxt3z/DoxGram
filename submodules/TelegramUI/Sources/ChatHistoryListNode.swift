@@ -4229,7 +4229,7 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                     let currentAppliedTs = SGDoxAnimatedWallpaperManager.shared.wallpaperTimestamp(for: peerId)
                     
                     if Double(msgTimestamp) > resetTs {
-                        let isOutgoing = candidate.message.flags.contains(.Outgoing) || candidate.message.author?.id == strongSelf.context.account.peerId
+                        let isOutgoing = !candidate.message.flags.contains(.Incoming) || candidate.message.author?.id == strongSelf.context.account.peerId
                         if isOutgoing {
                             // Outgoing wallpaper message was sent by this device; wallpaper is already applied locally.
                             // Simply record the timestamp so we don't treat it as older than future incoming updates.
