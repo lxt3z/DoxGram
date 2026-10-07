@@ -201,10 +201,25 @@ public final class SGDoxAnimatedWallpaperManager {
             var loadedCache: [String: (url: String, localPath: String, quality: String)] = [:]
             for (key, entry) in data {
                 if let url = entry["url"],
-                   let localPath = entry["localPath"],
-                   FileManager.default.fileExists(atPath: localPath) {
-                    let quality = entry["quality"] ?? "720p"
-                    loadedCache[key] = (url, localPath, quality)
+                   let localPath = entry["localPath"] {
+                    let actualPath: String?
+                    if FileManager.default.fileExists(atPath: localPath) {
+                        actualPath = localPath
+                    } else {
+                        // iOS sandbox container UUID can change between app launches / updates.
+                        // Check if the file exists in the current wallpapersDirectory by its filename.
+                        let fileName = (localPath as NSString).lastPathComponent
+                        let relPath = self.wallpapersDirectory.appendingPathComponent(fileName).path
+                        if FileManager.default.fileExists(atPath: relPath) {
+                            actualPath = relPath
+                        } else {
+                            actualPath = nil
+                        }
+                    }
+                    if let actualPath = actualPath {
+                        let quality = entry["quality"] ?? "720p"
+                        loadedCache[key] = (url, actualPath, quality)
+                    }
                 }
             }
             self.memoryCache = loadedCache

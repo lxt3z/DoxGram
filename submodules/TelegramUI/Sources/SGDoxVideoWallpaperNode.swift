@@ -71,6 +71,10 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         self.isHidden = false
         self.alpha = 1.0
         if self.currentUrl == fileUrl, self.player != nil {
+            if self.playerLayer?.isReadyForDisplay == true {
+                self.backgroundColor = .black
+                self.onReady?()
+            }
             self.play()
             return
         }
@@ -189,6 +193,13 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
         }
     }
     
+    public override func layout() {
+        super.layout()
+        if let playerLayer = self.playerLayer {
+            playerLayer.frame = self.bounds
+        }
+    }
+
     public func updateLayout(size: CGSize, transition: ContainedViewLayoutTransition) {
         let frame = CGRect(origin: .zero, size: size)
         transition.updateFrame(node: self, frame: frame)

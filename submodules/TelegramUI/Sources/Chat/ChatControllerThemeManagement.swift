@@ -461,8 +461,10 @@ extension ChatControllerImpl {
         alert.addAction(UIAlertAction(title: isRu ? "Установить для обоих (DoxGram)" : "Set for Both (DoxGram)", style: .default, handler: { [weak self] _ in
             guard let strongSelf = self else { return }
             
-            // 1. Set locally immediately
-            SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: rawPeerId) { [weak self] success, _ in
+            // 1. Set locally immediately with current timestamp
+            let nowTs = Int32(Date().timeIntervalSince1970)
+            SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(nowTs, for: rawPeerId)
+            SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: selectedUrl, for: rawPeerId, customKey: "local_\(nowTs)") { [weak self] success, _ in
                 if success {
                     self?.chatDisplayNode.updateDoxVideoWallpaper()
                 }

@@ -322,8 +322,46 @@ public func legacyAssetPickerItemGenerator() -> ((Any?, NSAttributedString?, Str
 
 public func legacyEnqueueGifMessage(account: Account, data: Data, correlationId: Int64? = nil) -> Signal<EnqueueMessage, Void> {
     return Signal { subscriber in
-        if let previewImage = UIImage(data: data) {
-            let dimensions = previewImage.size
+        let tempVideoFilePath: String?
+        let previewImage: UIImage?
+        let videoDimensions: CGSize?
+        
+        if let image = UIImage(data: data) {
+            previewImage = image
+            tempVideoFilePath = nil
+            videoDimensions = nil
+        } else {
+            // Data may be a video (MP4/MOV). Write to temporary file to extract frame via TGCameraCapturedVideo
+            var randomId: Int64 = 0
+            arc4random_buf(&randomId, 8)
+            let tempPath = NSTemporaryDirectory() + "\(randomId).mp4"
+            let tempUrl = URL(fileURLWithPath: tempPath)
+            let _ = try? FileManager.default.removeItem(atPath: tempPath)
+            if (try? data.write(to: tempUrl, options: [.atomic])) != nil {
+                let videoItem = TGCameraCapturedVideo(url: tempUrl, isAnimation: true)
+                var extractedImage: UIImage?
+                let semaphore = DispatchSemaphore(value: 0)
+                let _ = videoItem.thumbnailImageSignal().start(next: { next in
+                    extractedImage = next as? UIImage
+                }, error: { _ in
+                    semaphore.signal()
+                }, completed: {
+                    semaphore.signal()
+                })
+                let _ = semaphore.wait(timeout: .now() + 2.0)
+                previewImage = extractedImage
+                tempVideoFilePath = tempPath
+                let dims = videoItem.dimensions
+                videoDimensions = (dims.width > 0 && dims.height > 0) ? dims : nil
+            } else {
+                previewImage = nil
+                tempVideoFilePath = nil
+                videoDimensions = nil
+            }
+        }
+        
+        if let previewImage = previewImage {
+            let dimensions = videoDimensions ?? previewImage.size
             var previewRepresentations: [TelegramMediaImageRepresentation] = []
             
             let thumbnailSize = dimensions.aspectFitted(CGSize(width: 320.0, height: 320.0))
@@ -334,14 +372,19 @@ public func legacyEnqueueGifMessage(account: Account, data: Data, correlationId:
                 previewRepresentations.append(TelegramMediaImageRepresentation(dimensions: PixelDimensions(thumbnailSize), resource: resource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: false))
             }
             
-            var randomId: Int64 = 0
-            arc4random_buf(&randomId, 8)
-            let tempFilePath = NSTemporaryDirectory() + "\(randomId).gif"
-            
-            let _ = try? FileManager.default.removeItem(atPath: tempFilePath)
-            let _ = try? data.write(to: URL(fileURLWithPath: tempFilePath), options: [.atomic])
+            let finalVideoPath: String
+            if let tempVideoFilePath = tempVideoFilePath {
+                finalVideoPath = tempVideoFilePath
+            } else {
+                var randomId: Int64 = 0
+                arc4random_buf(&randomId, 8)
+                let tempFilePath = NSTemporaryDirectory() + "\(randomId).gif"
+                let _ = try? FileManager.default.removeItem(atPath: tempFilePath)
+                let _ = try? data.write(to: URL(fileURLWithPath: tempFilePath), options: [.atomic])
+                finalVideoPath = tempFilePath
+            }
         
-            let resource = LocalFileGifMediaResource(randomId: Int64.random(in: Int64.min ... Int64.max), path: tempFilePath)
+            let resource = LocalFileGifMediaResource(randomId: Int64.random(in: Int64.min ... Int64.max), path: finalVideoPath)
             let fileName: String = "video.mp4"
             
             let finalDimensions = TGMediaVideoConverter.dimensions(for: dimensions, adjustments: nil, preset: TGMediaVideoConversionPresetAnimation)
@@ -355,6 +398,9 @@ public func legacyEnqueueGifMessage(account: Account, data: Data, correlationId:
             subscriber.putNext(.message(text: "", attributes: [], inlineStickers: [:], mediaReference: .standalone(media: media), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: correlationId, bubbleUpEmojiOrStickersets: []))
             subscriber.putCompletion()
         } else {
+            if let tempVideoFilePath = tempVideoFilePath {
+                let _ = try? FileManager.default.removeItem(atPath: tempVideoFilePath)
+            }
             subscriber.putError(Void())
         }
         

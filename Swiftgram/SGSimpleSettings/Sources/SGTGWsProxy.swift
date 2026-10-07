@@ -254,13 +254,15 @@ private final class SGTGWsSession {
     private var pendingClientData: [Data] = []
     private var hasReceivedWsData: Bool = false
 
-    // Pipelining and backpressure controls
+    // Strict send serialization and backpressure controls
     private var isReadingClient: Bool = false
     private var isReadingWebSocket: Bool = false
     private var pendingSocketSends: Int = 0
     private let maxPendingSocketSends: Int = 16
-    private var pendingWsSends: Int = 0
-    private let maxPendingWsSends: Int = 8
+    private var outgoingWsQueue: [Data] = []
+    private var isSendingWs: Bool = false
+    private let maxOutgoingWsQueueSize: Int = 16
+    private let maxFrameSize: Int = 16384
 
     init(id: Int, connection: NWConnection, urlSession: URLSession, queue: DispatchQueue, onClose: @escaping (Int) -> Void) {
         self.id = id
@@ -550,13 +552,16 @@ private final class SGTGWsSession {
             self.webSocketTask = task
             task.resume()
 
-            for chunk in self.pendingClientData {
-                task.send(.data(chunk)) { _ in }
-            }
-
             self.startPingTimer()
             self.startConnectWatchdogTimer()
             self.readFromWebSocket()
+
+            // If we have buffered handshake or initial data, enqueue and pump it
+            if !self.pendingClientData.isEmpty {
+                for chunk in self.pendingClientData {
+                    self.enqueueDataForWebSocket(chunk)
+                }
+            }
         } else {
             self.close()
         }
@@ -605,12 +610,52 @@ private final class SGTGWsSession {
         self.pingTimer = nil
     }
 
+    private func enqueueDataForWebSocket(_ data: Data) {
+        var offset = 0
+        let total = data.count
+        while offset < total {
+            let chunkSize = min(self.maxFrameSize, total - offset)
+            let chunk = data.subdata(in: offset..<(offset + chunkSize))
+            self.outgoingWsQueue.append(chunk)
+            offset += chunkSize
+        }
+        self.pumpOutgoingWsQueue()
+    }
+
+    private func pumpOutgoingWsQueue() {
+        guard #available(iOS 13.0, *), let task = self.webSocketTask else { return }
+        guard !self.isClosed, !self.isSendingWs, !self.outgoingWsQueue.isEmpty else { return }
+
+        self.isSendingWs = true
+        let nextChunk = self.outgoingWsQueue.removeFirst()
+
+        task.send(.data(nextChunk)) { [weak self] sendError in
+            guard let self = self else { return }
+            self.queue.async {
+                self.isSendingWs = false
+                guard !self.isClosed else { return }
+
+                if let sendError = sendError {
+                    SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS send error: \(sendError)")
+                    self.close()
+                    return
+                }
+
+                self.pumpOutgoingWsQueue()
+
+                if !self.isReadingClient && self.outgoingWsQueue.count < self.maxOutgoingWsQueueSize {
+                    self.readFromClient()
+                }
+            }
+        }
+    }
+
     private func readFromClient() {
         guard !self.isClosed, !self.isReadingClient else { return }
-        guard self.pendingWsSends < self.maxPendingWsSends else { return }
+        guard self.outgoingWsQueue.count < self.maxOutgoingWsQueueSize else { return }
         self.isReadingClient = true
 
-        self.connection.receive(minimumIncompleteLength: 1, maximumLength: 131072) { [weak self] data, _, isComplete, error in
+        self.connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self = self else { return }
             self.queue.async {
                 self.isReadingClient = false
@@ -632,34 +677,10 @@ private final class SGTGWsSession {
                     }
                 }
 
-                if #available(iOS 13.0, *) {
-                    guard let task = self.webSocketTask else {
-                        self.close()
-                        return
-                    }
-                    self.pendingWsSends += 1
-                    task.send(.data(data)) { [weak self] sendError in
-                        guard let self = self else { return }
-                        self.queue.async {
-                            guard !self.isClosed else { return }
-                            if let sendError = sendError {
-                                SGLogger.shared.log("SGTGWsProxy", "Session \(self.id): WS send error: \(sendError)")
-                                self.close()
-                                return
-                            }
-                            self.pendingWsSends = max(0, self.pendingWsSends - 1)
-                            if !self.isReadingClient && self.pendingWsSends < self.maxPendingWsSends {
-                                self.readFromClient()
-                            }
-                        }
-                    }
+                self.enqueueDataForWebSocket(data)
 
-                    // Pipelining: read next socket chunk immediately if below backpressure limit!
-                    if self.pendingWsSends < self.maxPendingWsSends {
-                        self.readFromClient()
-                    }
-                } else {
-                    self.close()
+                if self.outgoingWsQueue.count < self.maxOutgoingWsQueueSize {
+                    self.readFromClient()
                 }
             }
         }
@@ -741,6 +762,8 @@ private final class SGTGWsSession {
             self.stopConnectWatchdogTimer()
             self.webSocketTask?.cancel(with: .goingAway, reason: nil)
             self.webSocketTask = nil
+            self.outgoingWsQueue.removeAll(keepingCapacity: false)
+            self.isSendingWs = false
             self.connectWebSocket()
         } else {
             self.close()

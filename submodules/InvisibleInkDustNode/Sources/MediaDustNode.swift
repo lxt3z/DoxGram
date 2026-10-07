@@ -78,7 +78,7 @@ public class MediaDustLayer: CALayer {
         
         let square = Float(size.width * size.height)
         Queue.mainQueue().async {
-            self.emitter?.birthRate = min(100000.0, square * 0.02)
+            self.emitter?.birthRate = min(2500.0, square * 0.006)
         }
     }
     
@@ -313,7 +313,7 @@ public class MediaDustNode: ASDisplayNode {
         let xInset1: CGFloat = self.frame.width * 0.2
         let yInset1: CGFloat = self.frame.height * 0.2
         var positionValues1: [CGPoint] = []
-        for _ in 0 ..< 35 {
+        for _ in 0 ..< 8 {
             positionValues1.append(CGPoint(x: CGFloat.random(in: xInset1 ..< self.frame.width - xInset1), y: CGFloat.random(in: yInset1 ..< self.frame.height - yInset1)))
         }
         positionAnimation1.values = positionValues1
@@ -344,7 +344,7 @@ public class MediaDustNode: ASDisplayNode {
         let xInset2: CGFloat = self.frame.width * 0.1
         let yInset2: CGFloat = self.frame.height * 0.1
         var positionValues2: [CGPoint] = []
-        for _ in 0 ..< 35 {
+        for _ in 0 ..< 8 {
             positionValues2.append(CGPoint(x: CGFloat.random(in: xInset2 ..< self.frame.width - xInset2), y: CGFloat.random(in: yInset2 ..< self.frame.height - yInset2)))
         }
         positionAnimation2.values = positionValues2
@@ -367,7 +367,7 @@ public class MediaDustNode: ASDisplayNode {
             
             let square = Float(size.width * size.height)
             Queue.mainQueue().async {
-                self.emitter?.birthRate = min(100000.0, square * 0.02)
+                self.emitter?.birthRate = min(2500.0, square * 0.006)
             }
         } else {
             if let staticParams = self.staticParams, staticParams == size && self.staticNode?.image != nil {
