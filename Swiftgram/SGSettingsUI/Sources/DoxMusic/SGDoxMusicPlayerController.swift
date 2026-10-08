@@ -126,6 +126,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var stateToken: UUID?
     private var timeToken: UUID?
     private var validLayout: ContainerViewLayout?
+    private var lastDisplayedSecond: Int = -1
+    private var lyricsHeightCache: [Int: CGFloat] = [:]
     
     public init(context: AccountContext) {
         self.context = context
@@ -186,20 +188,29 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         self.timeToken = SGDoxMusicManager.shared.addTimeListener { [weak self] current, duration in
-            DispatchQueue.main.async {
-                guard let self = self, !self.isDraggingSlider else { return }
-                let d = duration > 0 ? duration : 30.0
-                self.progressSlider.value = Float(current / d)
-                self.currentTimeLabel.text = self.formatTime(current)
-                self.remainingTimeLabel.text = "-\(self.formatTime(max(0, d - current)))"
-                
-                self.lyricsMiniSlider.value = Float(current / d)
-                self.lyricsMiniCurrentTime.text = self.formatTime(current)
-                self.lyricsMiniRemainingTime.text = "-\(self.formatTime(max(0, d - current)))"
-                
-                if self.currentMode == .lyrics {
-                    self.syncLyricsPosition(currentTime: current)
+            guard let self = self, !self.isDraggingSlider else { return }
+            let d = duration > 0 ? duration : 30.0
+            let currentSecond = Int(current)
+            let progress = Float(current / d)
+            
+            switch self.currentMode {
+            case .nowPlaying:
+                self.progressSlider.value = progress
+                if currentSecond != self.lastDisplayedSecond {
+                    self.lastDisplayedSecond = currentSecond
+                    self.currentTimeLabel.text = self.formatTime(current)
+                    self.remainingTimeLabel.text = "-\(self.formatTime(max(0, d - current)))"
                 }
+            case .lyrics:
+                self.lyricsMiniSlider.value = progress
+                if currentSecond != self.lastDisplayedSecond {
+                    self.lastDisplayedSecond = currentSecond
+                    self.lyricsMiniCurrentTime.text = self.formatTime(current)
+                    self.lyricsMiniRemainingTime.text = "-\(self.formatTime(max(0, d - current)))"
+                }
+                self.syncLyricsPosition(currentTime: current)
+            case .queue:
+                break
             }
         }
         
@@ -834,12 +845,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.artworkContainerView.transform = .identity
         self.artworkContainerView.frame = CGRect(x: artX, y: artY, width: artSide, height: artSide)
         self.artworkImageView.frame = self.artworkContainerView.bounds
+        self.artworkContainerView.layer.shadowPath = UIBezierPath(roundedRect: self.artworkContainerView.bounds, cornerRadius: 24.0).cgPath
         
         let glowSize: CGFloat = artSide * 1.10
         let glowX = artX + (artSide - glowSize) * 0.5
         let glowY = artY + (artSide - glowSize) * 0.5 + 8.0
         self.artworkAmbientGlowView.frame = CGRect(x: glowX, y: glowY, width: glowSize, height: glowSize)
         self.artworkAmbientGlowView.layer.cornerRadius = glowSize * 0.5
+        self.artworkAmbientGlowView.layer.shadowPath = UIBezierPath(ovalIn: self.artworkAmbientGlowView.bounds).cgPath
         self.artworkGlowGradientLayer.frame = self.artworkAmbientGlowView.bounds
         self.artworkGlowGradientLayer.cornerRadius = glowSize * 0.5
         
@@ -1175,6 +1188,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 self.artworkAmbientGlowView.layer.shadowRadius = 32.0
                 self.artworkAmbientGlowView.layer.shadowOpacity = 0.65
                 self.artworkAmbientGlowView.layer.shadowOffset = CGSize(width: 0, height: 6)
+                if self.artworkAmbientGlowView.bounds.width > 0 {
+                    self.artworkAmbientGlowView.layer.shadowPath = UIBezierPath(ovalIn: self.artworkAmbientGlowView.bounds).cgPath
+                }
+                if self.artworkContainerView.bounds.width > 0 {
+                    self.artworkContainerView.layer.shadowPath = UIBezierPath(roundedRect: self.artworkContainerView.bounds, cornerRadius: 24.0).cgPath
+                }
                 self.startGlowAnimation()
             }
         }
@@ -1183,7 +1202,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func startGlowAnimation() {
         self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowPulse")
         self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowAlpha")
-        self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowRadius")
         self.artworkGlowGradientLayer.removeAnimation(forKey: "glowCenterShift")
         
         let pulseAnim = CABasicAnimation(keyPath: "transform.scale")
@@ -1203,15 +1221,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         alphaAnim.repeatCount = .infinity
         alphaAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         self.artworkAmbientGlowView.layer.add(alphaAnim, forKey: "glowAlpha")
-        
-        let radiusAnim = CABasicAnimation(keyPath: "shadowRadius")
-        radiusAnim.fromValue = 26.0
-        radiusAnim.toValue = 42.0
-        radiusAnim.duration = 4.8
-        radiusAnim.autoreverses = true
-        radiusAnim.repeatCount = .infinity
-        radiusAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        self.artworkAmbientGlowView.layer.add(radiusAnim, forKey: "glowRadius")
         
         let shiftAnim = CABasicAnimation(keyPath: "startPoint")
         shiftAnim.fromValue = CGPoint(x: 0.47, y: 0.47)
@@ -1365,6 +1374,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     private func updateLyricsDisplay(_ lyrics: SGDoxLyrics) {
         self.lyricsStatusLabel.isHidden = true
+        self.lyricsHeightCache.removeAll(keepingCapacity: true)
         if !lyrics.lines.isEmpty {
             self.lyricsTableView.isHidden = false
             self.lyricsPlainTextView.isHidden = true
@@ -1608,7 +1618,22 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         if tableView == self.lyricsTableView {
-            return UITableView.automaticDimension
+            if let cached = self.lyricsHeightCache[indexPath.row] {
+                return cached
+            }
+            guard let lyrics = self.currentLyrics, indexPath.row < lyrics.lines.count else { return 52.0 }
+            let text = lyrics.lines[indexPath.row].text
+            let width = max(100.0, self.lyricsTableView.bounds.width - 64.0)
+            let font = UIFont.systemFont(ofSize: 22, weight: .bold)
+            let rect = (text as NSString).boundingRect(
+                with: CGSize(width: width, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: [.font: font],
+                context: nil
+            )
+            let h = max(48.0, ceil(rect.height) + 26.0)
+            self.lyricsHeightCache[indexPath.row] = h
+            return h
         }
         return 60.0
     }
@@ -1783,15 +1808,7 @@ private final class SGDoxLyricsCell: UITableViewCell {
         self.lineLabel.numberOfLines = 0
         self.lineLabel.textAlignment = .left
         self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.4)
-        self.lineLabel.translatesAutoresizingMaskIntoConstraints = false
         self.contentView.addSubview(self.lineLabel)
-        
-        NSLayoutConstraint.activate([
-            self.lineLabel.leadingAnchor.constraint(equalTo: self.contentView.leadingAnchor, constant: 32),
-            self.lineLabel.trailingAnchor.constraint(equalTo: self.contentView.trailingAnchor, constant: -32),
-            self.lineLabel.topAnchor.constraint(equalTo: self.contentView.topAnchor, constant: 14),
-            self.lineLabel.bottomAnchor.constraint(equalTo: self.contentView.bottomAnchor, constant: -14)
-        ])
     }
     
     required init?(coder: NSCoder) {
@@ -1801,14 +1818,15 @@ private final class SGDoxLyricsCell: UITableViewCell {
     func configure(text: String, isActive: Bool) {
         self.lineLabel.text = text
         self.setIsActive(isActive, animated: false)
+        self.setNeedsLayout()
     }
     
     func setIsActive(_ isActive: Bool, animated: Bool) {
         let targetColor = isActive ? UIColor.white : UIColor.white.withAlphaComponent(0.4)
-        let targetScale: CGFloat = isActive ? 1.05 : 1.0
+        let targetScale: CGFloat = isActive ? 1.04 : 1.0
         
         if animated {
-            UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
+            UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
                 self.lineLabel.textColor = targetColor
                 self.lineLabel.transform = isActive ? CGAffineTransform(scaleX: targetScale, y: targetScale) : .identity
             })
@@ -1816,6 +1834,15 @@ private final class SGDoxLyricsCell: UITableViewCell {
             self.lineLabel.textColor = targetColor
             self.lineLabel.transform = isActive ? CGAffineTransform(scaleX: targetScale, y: targetScale) : .identity
         }
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let hInset: CGFloat = 32.0
+        let vInset: CGFloat = 13.0
+        let w = max(0, self.contentView.bounds.width - hInset * 2.0)
+        let textH = self.lineLabel.sizeThatFits(CGSize(width: w, height: .greatestFiniteMagnitude)).height
+        self.lineLabel.frame = CGRect(x: hInset, y: vInset, width: w, height: textH)
     }
     
     override func prepareForReuse() {

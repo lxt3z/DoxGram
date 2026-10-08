@@ -1976,7 +1976,7 @@ ios_application(
             ":NotificationContentExtension",
             ":NotificationServiceExtension" + notificationServiceExtensionVersion,
             ":IntentsExtension",
-            ":WidgetExtension",
+            # ":WidgetExtension",
             ":BroadcastUploadExtension",
         ],
     }),

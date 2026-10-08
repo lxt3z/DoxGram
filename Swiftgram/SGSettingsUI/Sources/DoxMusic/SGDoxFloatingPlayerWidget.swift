@@ -235,9 +235,8 @@ public final class SGDoxFloatingPlayerWidget: UIView {
             func findTabBar(in view: UIView) -> UIView? {
                 for sub in view.subviews {
                     if sub !== self && !sub.isHidden && sub.alpha > 0.05 {
-                        let name = String(reflecting: type(of: sub))
-                        let simpleName = String(describing: type(of: sub))
-                        if (name.contains("TabBar") || simpleName.contains("TabBar") || name.contains("tabBar") || simpleName.contains("tabBar") || name.contains("GlassBackground") || name.contains("GlassControlPanel")) && sub.frame.height > 20.0 {
+                        let name = NSStringFromClass(type(of: sub))
+                        if (name.contains("TabBar") || name.contains("tabBar") || name.contains("GlassBackground") || name.contains("GlassControlPanel")) && sub.frame.height > 20.0 {
                             let converted = view.convert(sub.frame, to: superview)
                             if converted.minY > size.height * 0.4 && converted.height < 140.0 {
                                 return sub
