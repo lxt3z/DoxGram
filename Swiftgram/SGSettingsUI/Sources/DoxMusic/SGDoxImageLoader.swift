@@ -10,8 +10,16 @@ public final class SGDoxImageLoader: @unchecked Sendable {
     private let session: URLSession
     
     private init() {
-        self.memoryCache.countLimit = 500
-        self.memoryCache.totalCostLimit = 120 * 1024 * 1024 // 120 MB
+        self.memoryCache.countLimit = 50
+        self.memoryCache.totalCostLimit = 25 * 1024 * 1024 // 25 MB
+        
+        NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: nil) { [weak self] _ in
+            self?.memoryCache.removeAllObjects()
+            self?.placeholderCache = nil
+        }
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
+            self?.memoryCache.removeAllObjects()
+        }
         
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15.0

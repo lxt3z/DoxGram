@@ -176,24 +176,8 @@ minimum_watchos_version="7.0" # MARK: Swiftgram
 notificationServiceExtensionVersion = "v1"
 
 empty_languages = [
-    "ar",
-    "be",
-    "ca",
-    "de",
-    "es",
-    "fa",
-    "fr",
-    "id",
-    "it",
-    "ko",
-    "ms",
-    "nl",
-    "pl",
-    "pt",
     "ru",
-    "tr",
     "uk",
-    "uz",
 ]
 
 [
@@ -291,15 +275,21 @@ filegroup(
 filegroup(
     name = "AppIntentVocabularyResources",
     srcs = glob([
-        "Telegram-iOS/*.lproj/AppIntentVocabulary.plist",
-    ], exclude = ["Telegram-iOS/*.lproj/**/.*"]),
+        "Telegram-iOS/Base.lproj/AppIntentVocabulary.plist",
+        "Telegram-iOS/en.lproj/AppIntentVocabulary.plist",
+        "Telegram-iOS/ru.lproj/AppIntentVocabulary.plist",
+        "Telegram-iOS/uk.lproj/AppIntentVocabulary.plist",
+    ], allow_empty = True),
 )
 
 filegroup(
     name = "InfoPlistStringResources",
     srcs = glob([
-        "Telegram-iOS/*.lproj/InfoPlist.strings",
-    ], exclude = ["Telegram-iOS/*.lproj/**/.*"]),
+        "Telegram-iOS/Base.lproj/InfoPlist.strings",
+        "Telegram-iOS/en.lproj/InfoPlist.strings",
+        "Telegram-iOS/ru.lproj/InfoPlist.strings",
+        "Telegram-iOS/uk.lproj/InfoPlist.strings",
+    ], allow_empty = True),
 )
 
 filegroup(

@@ -20,7 +20,11 @@ swift_library(
 
 filegroup(
     name = "SGLocalizableStrings",
-    srcs = glob(["Strings/*.lproj/SGLocalizable.strings"]),
+    srcs = [
+        "Strings/en.lproj/SGLocalizable.strings",
+        "Strings/ru.lproj/SGLocalizable.strings",
+        "Strings/uk.lproj/SGLocalizable.strings",
+    ],
     visibility = [
         "//visibility:public",
     ],

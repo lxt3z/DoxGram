@@ -281,6 +281,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private var hasSyncedAudioStart: Bool = false
     private var isTransitioningTrack: Bool = false
     private var activePlayGeneration: Int = 0
+    private var isInBackground: Bool = false
     
     private override init() {
         super.init()
@@ -288,6 +289,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.loadFavorites()
         self.loadPersistedState()
         self.syncFavoritesWithServices()
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(self.appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
         
         AppleMusicService.shared.onTrackDidFinish = { [weak self] in
             DispatchQueue.main.async {
@@ -363,6 +367,20 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
     }
     
+    @objc private func appDidEnterBackground() {
+        self.isInBackground = true
+        if self.isPlaying && self.playbackTimer != nil {
+            self.startTimeTracking()
+        }
+    }
+    
+    @objc private func appWillEnterForeground() {
+        self.isInBackground = false
+        if self.isPlaying && self.playbackTimer != nil {
+            self.startTimeTracking()
+        }
+    }
+    
     private func startTimeTracking() {
         self.stopTimeTracking()
         self.playbackStartTimestamp = CACurrentMediaTime()
@@ -370,7 +388,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.hasSyncedAudioStart = false
         
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
-        timer.schedule(deadline: .now(), repeating: .milliseconds(250))
+        let intervalMs = self.isInBackground ? 1500 : 250
+        timer.schedule(deadline: .now(), repeating: .milliseconds(intervalMs))
         timer.setEventHandler { [weak self] in
             guard let self = self, self.isPlaying else { return }
             
