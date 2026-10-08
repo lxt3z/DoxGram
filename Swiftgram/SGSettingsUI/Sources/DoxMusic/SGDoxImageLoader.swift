@@ -13,14 +13,6 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         self.memoryCache.countLimit = 50
         self.memoryCache.totalCostLimit = 25 * 1024 * 1024 // 25 MB
         
-        NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: nil) { [weak self] _ in
-            self?.memoryCache.removeAllObjects()
-            self?.placeholderCache = nil
-        }
-        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
-            self?.memoryCache.removeAllObjects()
-        }
-        
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15.0
         config.timeoutIntervalForResource = 30.0
@@ -30,6 +22,14 @@ public final class SGDoxImageLoader: @unchecked Sendable {
             "Accept": "image/webp,image/png,image/jpeg,image/*;q=0.8"
         ]
         self.session = URLSession(configuration: config)
+        
+        NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: nil) { [weak self] _ in
+            self?.memoryCache.removeAllObjects()
+            self?.placeholderCache = nil
+        }
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
+            self?.memoryCache.removeAllObjects()
+        }
     }
     
     private func dispatchMain(image: UIImage?, completion: @escaping @MainActor (UIImage?) -> Void) {
