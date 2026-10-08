@@ -36,10 +36,31 @@ public struct SGAdDetector {
         "erid:",
         "erid=",
         "erid ",
-        "реклама.",
-        "реклама ",
-        "рекламодатель",
-        "инн ",
+        "#erid",
+        "реклама. ооо",
+        "реклама. ип",
+        "реклама. пао",
+        "реклама. ао",
+        "реклама. зао",
+        "реклама. тоо",
+        "реклама. чао",
+        "реклама: ооо",
+        "реклама: ип",
+        "реклама: пао",
+        "реклама: ао",
+        "реклама: зао",
+        "реклама. инн",
+        "реклама: инн",
+        "информация о рекламодателе",
+        "сведения о рекламодателе",
+        "рекламодатель:",
+        "рекламодатель ооо",
+        "рекламодатель ип",
+        "рекламодатель ао",
+        "рекламодатель пао",
+        "рекламодатель инн",
+        "инн: ",
+        " инн: ",
         "#промо",
         "#реклама",
         "#promo",
@@ -637,6 +658,13 @@ public struct SGAdDetector {
         // 1. Official ad token / ERID marker
         for token in officialAdTokens {
             if fullText.contains(token) || normalizedText.contains(token) {
+                return true
+            }
+        }
+        
+        for rawLine in fullText.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if line == "реклама" || line == "реклама." || line == "реклама:" || line == "#реклама" || line == "реклама от автора" {
                 return true
             }
         }

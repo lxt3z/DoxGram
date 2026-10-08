@@ -386,6 +386,15 @@ struct SessionBackupManagerView: View {
         .navigationBarTitle(Text("SessionBackup.Title".i18n(lang)), displayMode: .inline)
         .tgNavigationBackButton(wrapperController: wrapperController)
         .onAppear {
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithTransparentBackground()
+            appearance.backgroundColor = .clear
+            appearance.backgroundEffect = nil
+            appearance.shadowColor = UIColor.black.withAlphaComponent(0.12)
+            UINavigationBar.appearance().standardAppearance = appearance
+            UINavigationBar.appearance().scrollEdgeAppearance = appearance
+            UINavigationBar.appearance().compactAppearance = appearance
+            
             withAnimation {
                 sessions = getBackedSessions()
             }

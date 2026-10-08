@@ -26,7 +26,6 @@ func getAvailableAppBadges() -> [AppBadge] {
         .init(displayName: "Makima", assetName: "MakimaAppBadge"),
         .init(displayName: "1337", assetName: "LeetAppBadge"),
         .init(displayName: "Viperr", assetName: "ViperrAppBadge"),
-        .init(displayName: "Major", assetName: "MajorAppBadge"),
         .init(displayName: "1000-7", assetName: "GhoulAppBadge"),
         .init(displayName: "Durov", assetName: "DurovAppBadge"),
         .init(displayName: "Sky", assetName: "SkyAppBadge"),
@@ -136,6 +135,16 @@ struct AppBadgeSettingsView: View {
             .background(Color(colorScheme == .light ? .secondarySystemBackground : .systemBackground).ignoresSafeArea())
             .navigationBarTitle(Text("AppBadge.Title".i18n(lang)), displayMode: .inline)
             .tgNavigationBackButton(wrapperController: wrapperController)
+            .onAppear {
+                let appearance = UINavigationBarAppearance()
+                appearance.configureWithTransparentBackground()
+                appearance.backgroundColor = .clear
+                appearance.backgroundEffect = nil
+                appearance.shadowColor = UIColor.black.withAlphaComponent(0.12)
+                UINavigationBar.appearance().standardAppearance = appearance
+                UINavigationBar.appearance().scrollEdgeAppearance = appearance
+                UINavigationBar.appearance().compactAppearance = appearance
+            }
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }

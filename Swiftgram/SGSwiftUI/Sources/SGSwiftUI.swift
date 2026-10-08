@@ -3,6 +3,8 @@ import Foundation
 import LegacyUI
 import SwiftUI
 import TelegramPresentationData
+import UIKit
+import QuartzCore
 
 
 @available(iOS 13.0, *)
@@ -165,12 +167,48 @@ public extension View {
 
 
 @available(iOS 13.0, *)
+private final class SGTopShadowView: UIView {
+    private let gradientLayer = CAGradientLayer()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        self.isUserInteractionEnabled = false
+        self.gradientLayer.colors = [
+            UIColor.black.withAlphaComponent(0.25).cgColor,
+            UIColor.black.withAlphaComponent(0.08).cgColor,
+            UIColor.clear.cgColor
+        ]
+        self.gradientLayer.locations = [0.0, 0.45, 1.0]
+        self.layer.addSublayer(self.gradientLayer)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        self.gradientLayer.frame = self.bounds
+    }
+    
+    func update(isDark: Bool) {
+        let maxAlpha: CGFloat = isDark ? 0.35 : 0.15
+        self.gradientLayer.colors = [
+            UIColor.black.withAlphaComponent(maxAlpha).cgColor,
+            UIColor.black.withAlphaComponent(maxAlpha * 0.35).cgColor,
+            UIColor.clear.cgColor
+        ]
+    }
+}
+
+@available(iOS 13.0, *)
 public final class LegacySwiftUIController: LegacyController {
     public var navigationBarHeightModel: ObservedValue<CGFloat>
     public var containerViewLayoutModel: ObservedValue<ContainerViewLayout?>
     public var inputHeightModel: ObservedValue<CGFloat?>
     public let lang: String
     public let commonBackString: String?
+    private let topShadowView = SGTopShadowView()
 //    public var containerViewLayoutUpdateCountModel: ObservedValue<Int64>
 
     override public init(presentation: LegacyControllerPresentation, theme: PresentationTheme? = nil, strings: PresentationStrings? = nil, initialLayout: ContainerViewLayout? = nil) {
@@ -180,6 +218,55 @@ public final class LegacySwiftUIController: LegacyController {
         lang = strings?.baseLanguageCode ?? "en"
         commonBackString = strings?.Common_Back
         super.init(presentation: presentation, theme: theme, strings: strings, initialLayout: initialLayout)
+    }
+
+    private func updateNavigationBarAppearance() {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = .clear
+        appearance.backgroundEffect = nil
+        appearance.shadowColor = UIColor.black.withAlphaComponent(0.12)
+        
+        let isDark = self.statusBar.statusBarStyle == .White
+        let textColor = isDark ? UIColor.white : UIColor.black
+        appearance.titleTextAttributes = [
+            .foregroundColor: textColor
+        ]
+        appearance.largeTitleTextAttributes = [
+            .foregroundColor: textColor
+        ]
+        
+        self.applyAppearance(appearance, to: self.view)
+        self.topShadowView.update(isDark: isDark)
+    }
+
+    private func applyAppearance(_ appearance: UINavigationBarAppearance, to view: UIView) {
+        if let navBar = view as? UINavigationBar {
+            navBar.standardAppearance = appearance
+            navBar.scrollEdgeAppearance = appearance
+            navBar.compactAppearance = appearance
+        }
+        for subview in view.subviews {
+            applyAppearance(appearance, to: subview)
+        }
+    }
+
+    override public func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        self.updateNavigationBarAppearance()
+        if self.topShadowView.superview == nil {
+            self.view.addSubview(self.topShadowView)
+        }
+        self.view.bringSubviewToFront(self.topShadowView)
+    }
+
+    override public func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        self.updateNavigationBarAppearance()
+        if self.topShadowView.superview == nil {
+            self.view.addSubview(self.topShadowView)
+        }
+        self.view.bringSubviewToFront(self.topShadowView)
     }
 
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
@@ -199,6 +286,15 @@ public final class LegacySwiftUIController: LegacyController {
         if inputHeightModel.value != layout.inputHeight {
             inputHeightModel.value = layout.inputHeight
         }
+
+        let statusBarHeight = layout.statusBarHeight ?? 0.0
+        let shadowHeight: CGFloat = max(44.0, statusBarHeight + 20.0)
+        self.topShadowView.frame = CGRect(x: 0, y: 0, width: layout.size.width, height: shadowHeight)
+        if self.topShadowView.superview == nil {
+            self.view.addSubview(self.topShadowView)
+        }
+        self.view.bringSubviewToFront(self.topShadowView)
+        self.updateNavigationBarAppearance()
     }
 
     override public func bind(controller: UIViewController) {
