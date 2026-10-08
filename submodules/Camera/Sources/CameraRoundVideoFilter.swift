@@ -11,7 +11,7 @@ import RLottieBinding
 import GZip
 import AppBundle
 
-let videoMessageDimensions = PixelDimensions(width: 400, height: 400)
+let videoMessageDimensions = PixelDimensions(width: 480, height: 480)
 
 func allocateOutputBufferPool(with inputFormatDescription: CMFormatDescription, outputRetainedBufferCountHint: Int) -> (
     outputBufferPool: CVPixelBufferPool?,

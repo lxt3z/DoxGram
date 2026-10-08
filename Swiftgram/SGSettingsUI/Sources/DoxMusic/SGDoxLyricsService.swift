@@ -181,6 +181,30 @@ public final class SGDoxLyricsService: @unchecked Sendable {
         task.resume()
     }
     
+    private func titleMatches(candidateName: String, targetTitle: String) -> Bool {
+        let normalize: (String) -> String = { str in
+            str.lowercased()
+                .replacingOccurrences(of: "\\(.*?\\)", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "[^a-zа-я0-9]", with: " ", options: .regularExpression)
+                .components(separatedBy: .whitespacesAndNewlines)
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+        }
+        let cleanCandidate = normalize(candidateName)
+        let cleanTarget = normalize(targetTitle)
+        if cleanCandidate.isEmpty || cleanTarget.isEmpty { return false }
+        if cleanCandidate == cleanTarget { return true }
+        if cleanCandidate.contains(cleanTarget) || cleanTarget.contains(cleanCandidate) { return true }
+        
+        let cWords = cleanCandidate.split(separator: " ")
+        let tWords = cleanTarget.split(separator: " ")
+        if let firstC = cWords.first, let firstT = tWords.first, firstC == firstT && firstC.count >= 2 {
+            return true
+        }
+        return false
+    }
+    
     private func fallbackSearch(track: SGDoxMusicTrack, query: String, completion: @escaping @MainActor (SGDoxLyrics?) -> Void) {
         guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let searchUrl = URL(string: "https://lrclib.net/api/search?q=\(encoded)") else {
@@ -192,14 +216,20 @@ public final class SGDoxLyricsService: @unchecked Sendable {
             guard let self = self else { return }
             
             if let http = response as? HTTPURLResponse, http.statusCode == 200, let data = data,
-               let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-               let firstMatch = results.first(where: {
-                   let synced = $0["syncedLyrics"] as? String
-                   let plain = $0["plainLyrics"] as? String
-                   return (synced != nil && !synced!.isEmpty) || (plain != nil && !plain!.isEmpty)
-               }) ?? results.first {
+               let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
                 
-                if let lyrics = self.parseLyricsJson(firstMatch, trackId: track.id) {
+                let matches = results.filter { item in
+                    let name = (item["trackName"] as? String) ?? (item["name"] as? String) ?? ""
+                    return self.titleMatches(candidateName: name, targetTitle: track.title)
+                }
+                
+                let firstMatch = matches.first(where: {
+                    let synced = $0["syncedLyrics"] as? String
+                    let plain = $0["plainLyrics"] as? String
+                    return (synced != nil && !synced!.isEmpty) || (plain != nil && !plain!.isEmpty)
+                }) ?? matches.first
+                
+                if let match = firstMatch, let lyrics = self.parseLyricsJson(match, trackId: track.id) {
                     self.saveLyricsToDisk(lyrics)
                     self.dispatchMain(lyrics: lyrics, completion: completion)
                     return

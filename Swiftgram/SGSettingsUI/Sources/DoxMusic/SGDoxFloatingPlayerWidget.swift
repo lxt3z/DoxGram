@@ -273,6 +273,10 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         
         if transition.isAnimated {
             transition.updateFrame(view: self, frame: targetFrame)
+        } else if self.window != nil && self.frame.width > 0 && abs(self.frame.origin.y - targetFrame.origin.y) > 1.0 {
+            UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState]) {
+                self.frame = targetFrame
+            }
         } else {
             self.frame = targetFrame
         }

@@ -2818,7 +2818,7 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                     }
                 }
             }
-            if let insertionTimestamp = insertionTimestamp {
+            if let insertionTimestamp = insertionTimestamp, !SGSimpleSettings.shared.hideAds {
                 let initialMessage = self.pendingDynamicAdMessages.removeFirst()
                 let message = Message(
                     stableId: UInt32.max - 1 - UInt32(self.nextPendingDynamicMessageId),

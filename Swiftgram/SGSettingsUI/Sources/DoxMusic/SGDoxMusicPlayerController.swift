@@ -930,9 +930,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.lyricsTableView.frame = lyricsFrame
         self.lyricsPlainTextView.frame = CGRect(x: 24, y: tableY, width: bounds.width - 48, height: tableH)
         
-        // Vertical insets to allow first and last lines to center
-        let verticalInset = tableH * 0.35
-        self.lyricsTableView.contentInset = UIEdgeInsets(top: verticalInset, left: 0, bottom: verticalInset, right: 0)
+        // Vertical insets: small top inset to avoid big gap, comfortable bottom inset for scrolling
+        let bottomInset = tableH * 0.35
+        self.lyricsTableView.contentInset = UIEdgeInsets(top: 16.0, left: 0, bottom: bottomInset, right: 0)
         
         self.lyricsLoadingIndicator.center = CGPoint(x: bounds.width * 0.5, y: tableY + tableH * 0.4)
         self.lyricsStatusLabel.frame = CGRect(x: 32, y: tableY + tableH * 0.35, width: bounds.width - 64, height: 60)

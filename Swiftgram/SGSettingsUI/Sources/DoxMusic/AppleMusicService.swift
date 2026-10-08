@@ -56,6 +56,12 @@ public final class AppleMusicService: @unchecked Sendable {
             name: .MPMusicPlayerControllerPlaybackStateDidChange,
             object: self.player
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.playerNowPlayingItemDidChange),
+            name: .MPMusicPlayerControllerNowPlayingItemDidChange,
+            object: self.player
+        )
     }
 
     private func setupLibraryNotifications() {
@@ -76,8 +82,39 @@ public final class AppleMusicService: @unchecked Sendable {
         }
     }
 
+    @objc private func playerNowPlayingItemDidChange() {
+        guard self.isUsingSystemPlayer else { return }
+        if self.player.nowPlayingItem == nil && SGDoxMusicManager.shared.isPlaying {
+            DispatchQueue.main.async { [weak self] in
+                self?.onTrackDidFinish?()
+            }
+        }
+    }
+
     @objc private func playerStateDidChange() {
-        // Track state observation if needed, without false-positive fallbacks
+        guard self.isUsingSystemPlayer else { return }
+        let state = self.player.playbackState
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            switch state {
+            case .playing:
+                SGDoxMusicManager.shared.notifyExternalPlaybackResumed()
+            case .paused:
+                let current = self.player.currentPlaybackTime
+                let total = self.player.nowPlayingItem?.playbackDuration ?? 0
+                if total > 0 && current >= total - 1.5 {
+                    self.onTrackDidFinish?()
+                } else {
+                    SGDoxMusicManager.shared.notifyExternalPlaybackPaused()
+                }
+            case .stopped:
+                if SGDoxMusicManager.shared.isPlaying {
+                    self.onTrackDidFinish?()
+                }
+            default:
+                break
+            }
+        }
     }
     
     public var isAuthorized: Bool {
@@ -529,14 +566,25 @@ public final class AppleMusicService: @unchecked Sendable {
                         }
                     } catch {
                     }
+                    self.fetchLibrarySongsFallback(limit: limit, completion: completion)
                 }
+                return
             }
         }
         #endif
         
+        self.fetchLibrarySongsFallback(limit: limit, completion: completion)
+    }
+    
+    private func fetchLibrarySongsFallback(limit: Int, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             let query = MPMediaQuery.songs()
-            let items = query.items ?? []
+            var items = query.items ?? []
+            items.sort { item1, item2 in
+                let d1 = (item1.value(forProperty: MPMediaItemPropertyDateAdded) as? Date) ?? Date.distantPast
+                let d2 = (item2.value(forProperty: MPMediaItemPropertyDateAdded) as? Date) ?? Date.distantPast
+                return d1 > d2
+            }
             let tracks: [SGDoxMusicTrack] = Array(items.prefix(limit)).compactMap { item in
                 guard let title = item.title, let artist = item.artist else { return nil }
                 let album = item.albumTitle ?? ""
@@ -594,7 +642,12 @@ public final class AppleMusicService: @unchecked Sendable {
                     }
                 } catch {
                 }
+                
+                MPMediaLibrary.default().addItem(withProductID: appleId) { _, error in
+                    DispatchQueue.main.async { completion(error == nil) }
+                }
             }
+            return
         }
         #endif
         
@@ -884,8 +937,7 @@ public final class AppleMusicService: @unchecked Sendable {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             guard let finishedItem = notification.object as? AVPlayerItem,
-                  finishedItem === self.avPlayer?.currentItem,
-                  SGDoxMusicManager.shared.isPlaying else { return }
+                  finishedItem === self.avPlayer?.currentItem else { return }
             self.onTrackDidFinish?()
         }
     }

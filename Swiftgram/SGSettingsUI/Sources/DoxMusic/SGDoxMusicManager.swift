@@ -468,11 +468,11 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     // MARK: - Playback
     
     public func play(track: SGDoxMusicTrack, queue: [SGDoxMusicTrack] = []) {
-        self.activePlayGeneration += 1
-        let generation = self.activePlayGeneration
-        
         self.stopTimeTracking()
         self.stopCurrentAudio()
+        
+        self.activePlayGeneration += 1
+        let generation = self.activePlayGeneration
         
         if let current = self.currentTrack, current.id != track.id {
             self.history.append(current)
@@ -483,7 +483,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.playbackStartTimestamp = CACurrentMediaTime()
         self.playbackStartOffset = 0.0
         self.hasSyncedAudioStart = false
-        self.isPlaying = false
+        self.isPlaying = true
+        self.startTimeTracking()
         
         if !queue.isEmpty {
             var q = queue.filter { $0.id != track.id }
@@ -604,6 +605,22 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         SpotifyService.shared.pause()
         self.savePersistedState()
         self.notifyStateChanged()
+    }
+    
+    public func notifyExternalPlaybackResumed() {
+        if !self.isPlaying {
+            self.isPlaying = true
+            self.startTimeTracking()
+            self.notifyStateChanged()
+        }
+    }
+    
+    public func notifyExternalPlaybackPaused() {
+        if self.isPlaying {
+            self.isPlaying = false
+            self.stopTimeTracking()
+            self.notifyStateChanged()
+        }
     }
     
     public func stop() {
