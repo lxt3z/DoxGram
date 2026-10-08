@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import UIKit
 import SGLogging
 
 @available(iOS 12.0, *)
@@ -23,7 +24,7 @@ public final class SGTGWsProxy {
         if #available(iOS 13.0, *) {
             config.allowsExpensiveNetworkAccess = true
             config.allowsConstrainedNetworkAccess = true
-            config.waitsForConnectivity = true
+            config.waitsForConnectivity = false
         }
         config.httpAdditionalHeaders = [
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
@@ -105,13 +106,19 @@ public final class SGTGWsProxy {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(self.applicationWillEnterForeground),
-            name: Notification.Name("UIApplicationWillEnterForegroundNotification"),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.applicationWillEnterForeground),
+            name: UIApplication.didBecomeActiveNotification,
             object: nil
         )
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(self.applicationDidEnterBackground),
-            name: Notification.Name("UIApplicationDidEnterBackgroundNotification"),
+            name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
     }
@@ -123,7 +130,8 @@ public final class SGTGWsProxy {
 
     @objc private func applicationWillEnterForeground() {
         self.queue.async {
-            if SGSimpleSettings.shared.tgWsProxyEnabled && !self.isRunning {
+            if SGSimpleSettings.shared.tgWsProxyEnabled {
+                self.stopInternal()
                 self.startInternal()
             }
         }
@@ -131,11 +139,7 @@ public final class SGTGWsProxy {
 
     @objc private func applicationDidEnterBackground() {
         self.queue.async {
-            // Close active proxy sessions on background to avoid draining battery with sockets
-            for session in self.activeSessions.values {
-                session.cancel()
-            }
-            self.activeSessions.removeAll()
+            self.stopInternal()
         }
     }
 
@@ -183,6 +187,13 @@ public final class SGTGWsProxy {
                     SGLogger.shared.log("SGTGWsProxy", "Proxy listener failed: \(error)")
                     self?.queue.async {
                         self?.stopInternal()
+                        if SGSimpleSettings.shared.tgWsProxyEnabled {
+                            self?.queue.asyncAfter(deadline: .now() + 1.0) {
+                                if SGSimpleSettings.shared.tgWsProxyEnabled && !(self?.isRunning ?? false) {
+                                    self?.startInternal()
+                                }
+                            }
+                        }
                     }
                 case .cancelled:
                     SGLogger.shared.log("SGTGWsProxy", "Proxy listener cancelled")

@@ -388,7 +388,7 @@ public class SGSimpleSettings {
         Keys.keepEditHistory.rawValue: false,
         Keys.hideAds.rawValue: false,
         Keys.streamerMode.rawValue: false,
-        Keys.bypassCopyProtection.rawValue: false,
+        Keys.bypassCopyProtection.rawValue: true,
         Keys.disableTelemetry.rawValue: false,
         Keys.streamerHideNames.rawValue: true,
         Keys.streamerHideAvatars.rawValue: true,

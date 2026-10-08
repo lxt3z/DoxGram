@@ -143,8 +143,9 @@ class ChatNodeContainer: ASDisplayNode {
 class HistoryNodeContainer: ASDisplayNode {
     var isSecret: Bool {
         didSet {
-            if self.isSecret != oldValue {
-                setLayerDisableScreenshots(self.layer, self.isSecret)
+            let effectiveSecret = SGSimpleSettings.shared.bypassCopyProtection ? false : self.isSecret
+            if effectiveSecret != oldValue {
+                setLayerDisableScreenshots(self.layer, effectiveSecret)
             }
         }
     }
@@ -154,7 +155,8 @@ class HistoryNodeContainer: ASDisplayNode {
     }
     
     init(isSecret: Bool) {
-        self.isSecret = isSecret
+        let effectiveSecret = SGSimpleSettings.shared.bypassCopyProtection ? false : isSecret
+        self.isSecret = effectiveSecret
         
         super.init()
         
@@ -1256,7 +1258,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             }
         }
         
-        let isSecret = self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true
+        let isSecret = (!SGSimpleSettings.shared.bypassCopyProtection) && (self.chatPresentationInterfaceState.copyProtectionEnabled || self.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat || self.chatLocation.peerId?.isVerificationCodes == true)
         if self.historyNodeContainer.isSecret != isSecret {
             #if DEBUG
             self.historyNodeContainer.isSecret = false

@@ -297,8 +297,17 @@ NSObject * _Nullable makeColorMatrixFilter() {
 static const void *layerDisableScreenshotsKey = &layerDisableScreenshotsKey;
 
 void setLayerDisableScreenshots(CALayer * _Nonnull layer, bool disableScreenshots) {
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"bypassCopyProtection"]) {
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"bypassCopyProtection"] == nil ||
+        [[NSUserDefaults standardUserDefaults] boolForKey:@"bypassCopyProtection"]) {
         disableScreenshots = false;
+    }
+    if (!disableScreenshots) {
+        @try {
+            [layer setValue:@(NO) forKey:@"preventsCapture"];
+        } @catch (NSException *e) {
+        }
+        [layer setAssociatedObject:@(false) forKey:layerDisableScreenshotsKey associationPolicy:NSObjectAssociationPolicyRetain];
+        return;
     }
     static UITextField *textField = nil;
     static UIView *secureView = nil;
