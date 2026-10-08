@@ -266,23 +266,7 @@ final class TabBarControllerNode: ASDisplayNode {
                         }
                     )
                 },
-                search: (!SGSimpleSettings.shared.tabBarSearchEnabled) ? nil : self.currentController?.tabBarSearchState.flatMap { tabBarSearchState in
-                    return TabBarComponent.Search(
-                        isActive: tabBarSearchState.isActive,
-                        activate: { [weak self] in
-                            guard let self else {
-                                return
-                            }
-                            self.activateSearch()
-                        },
-                        deactivate: { [weak self] in
-                            guard let self else {
-                                return
-                            }
-                            self.deactivateSearch()
-                        }
-                    )
-                },
+                search: nil,
                 selectedId: selectedId,
                 outerInsets: UIEdgeInsets(top: 0.0, left: sideInset, bottom: tabBarBottomInset, right: sideInset)
             )),

@@ -49,6 +49,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     }
     
     deinit {
+        NotificationCenter.default.removeObserver(self)
         if let token = self.stateToken {
             SGDoxMusicManager.shared.removeStateListener(token)
         }
@@ -210,6 +211,37 @@ public final class SGDoxFloatingPlayerWidget: UIView {
                 self.progressView.setProgress(Float(current / d), animated: false)
             }
         }
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(self.keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+    
+    @objc private func keyboardWillShow(_ notification: Notification) {
+        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.28
+        let endFrame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue ?? .zero
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, let superview = self.superview else { return }
+            var insets = superview.safeAreaInsets
+            if endFrame.height > 0 {
+                insets.bottom = max(insets.bottom, endFrame.height)
+            }
+            self.updateLayout(size: superview.bounds.size, insets: insets, transition: .animated(duration: duration, curve: .easeInOut))
+        }
+    }
+    
+    @objc private func keyboardWillHide(_ notification: Notification) {
+        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.28
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, let superview = self.superview else { return }
+            self.updateLayout(size: superview.bounds.size, insets: superview.safeAreaInsets, transition: .animated(duration: duration, curve: .easeInOut))
+        }
+    }
+    
+    public override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if let superview = self.superview, self.window != nil {
+            self.updateLayout(size: superview.bounds.size, insets: superview.safeAreaInsets, transition: .immediate)
+        }
     }
     
     public func updateTheme(_ theme: PresentationTheme) {
@@ -229,29 +261,44 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         let widgetWidth = min(size.width - horizontalMargin * 2.0, 420.0)
         let x = floor((size.width - widgetWidth) * 0.5)
         
-        // Find actual tab bar in view hierarchy if possible
+        // Find actual TabBarComponent.View in view hierarchy (strictly at bottom of screen)
         var tabBarTop: CGFloat?
         if let superview = self.superview {
-            func findTabBar(in view: UIView) -> UIView? {
-                for sub in view.subviews {
-                    if sub !== self && !sub.isHidden && sub.alpha > 0.05 {
-                        let name = NSStringFromClass(type(of: sub))
-                        if (name.contains("TabBar") || name.contains("tabBar") || name.contains("GlassBackground") || name.contains("GlassControlPanel")) && sub.frame.height > 20.0 {
-                            let converted = view.convert(sub.frame, to: superview)
-                            if converted.minY > size.height * 0.4 && converted.height < 140.0 {
-                                return sub
-                            }
-                        }
-                        if let child = findTabBar(in: sub) {
-                            return child
-                        }
+            var foundTabBar: UIView?
+            // Check direct subviews first (where TabBarComponent is placed)
+            for sub in superview.subviews {
+                if sub !== self && !sub.isHidden && sub.alpha > 0.05 {
+                    let name = NSStringFromClass(type(of: sub))
+                    if (name.contains("TabBarComponent") || name.contains("LiquidLens")) && sub.frame.height > 20.0 {
+                        foundTabBar = sub
+                        break
                     }
                 }
-                return nil
             }
-            if let tb = findTabBar(in: superview) {
+            // Check shallow recursive hierarchy if not a direct child
+            if foundTabBar == nil {
+                func findTabBar(in view: UIView, depth: Int = 0) -> UIView? {
+                    if depth > 4 { return nil }
+                    for sub in view.subviews {
+                        if sub !== self && !sub.isHidden && sub.alpha > 0.05 {
+                            let name = NSStringFromClass(type(of: sub))
+                            if (name.contains("TabBarComponent") || name.contains("LiquidLens")) && sub.frame.height > 20.0 {
+                                return sub
+                            }
+                            if let child = findTabBar(in: sub, depth: depth + 1) {
+                                return child
+                            }
+                        }
+                    }
+                    return nil
+                }
+                foundTabBar = findTabBar(in: superview)
+            }
+            
+            if let tb = foundTabBar {
                 let converted = tb.superview?.convert(tb.frame, to: superview) ?? tb.frame
-                if converted.minY > size.height * 0.4 {
+                // Only consider valid if strictly located in the bottom bar area (not offscreen and not high up)
+                if converted.minY > size.height - 150.0 && converted.minY < size.height - 20.0 {
                     tabBarTop = converted.minY
                 }
             }
@@ -259,14 +306,13 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         
         let spacing: CGFloat = 10.0
         let y: CGFloat
-        if let tbTop = tabBarTop, tbTop > size.height * 0.4 {
+        if let tbTop = tabBarTop {
             y = tbTop - widgetHeight - spacing
         } else {
             let windowBottom = self.window?.safeAreaInsets.bottom ?? 0.0
             let bottomInset = max(insets.bottom, windowBottom)
             let actualBottom = bottomInset > 0.0 ? bottomInset : 34.0
-            let tabIslandHeight: CGFloat = 64.0
-            y = size.height - actualBottom - tabIslandHeight - widgetHeight - spacing
+            y = size.height - actualBottom - widgetHeight - spacing
         }
         
         let targetFrame = CGRect(x: x, y: y, width: widgetWidth, height: widgetHeight)

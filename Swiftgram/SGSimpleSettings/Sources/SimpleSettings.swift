@@ -375,7 +375,7 @@ public class SGSimpleSettings {
         Keys.canUseNY.rawValue: false,
         Keys.nyStyle.rawValue: NYStyle.default.rawValue,
         Keys.wideTabBar.rawValue: false,
-        Keys.tabBarSearchEnabled.rawValue: true,
+        Keys.tabBarSearchEnabled.rawValue: false,
         Keys.hideStories.rawValue: false,
         Keys.warnOnStoriesOpen.rawValue: false,
         Keys.showProfileId.rawValue: true,
