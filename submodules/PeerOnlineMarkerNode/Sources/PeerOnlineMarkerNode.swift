@@ -142,7 +142,14 @@ public final class PeerOnlineMarkerNode: ASDisplayNode {
         }
     }
     
-    public func asyncLayout() -> (Bool, Bool, Bool) -> (CGSize, (Bool) -> Void) {
+    public func asyncLayout() -> (Bool, Bool) -> (CGSize, (Bool) -> Void) {
+        let f = self.asyncLayout(withMusic: true)
+        return { online, isVoiceChat in
+            return f(online, isVoiceChat, false)
+        }
+    }
+    
+    public func asyncLayout(withMusic: Bool) -> (Bool, Bool, Bool) -> (CGSize, (Bool) -> Void) {
         return { [weak self] online, isVoiceChat, isMusic in
             let size: CGFloat = isVoiceChat ? 22.0 : (isMusic ? 16.0 : 14.0)
             return (CGSize(width: size, height: size), { animated in
@@ -186,13 +193,6 @@ public final class PeerOnlineMarkerNode: ASDisplayNode {
                     }
                 }
             })
-        }
-    }
-    
-    public func asyncLayout() -> (Bool, Bool) -> (CGSize, (Bool) -> Void) {
-        let f: (Bool, Bool, Bool) -> (CGSize, (Bool) -> Void) = self.asyncLayout()
-        return { online, isVoiceChat in
-            return f(online, isVoiceChat, false)
         }
     }
 }

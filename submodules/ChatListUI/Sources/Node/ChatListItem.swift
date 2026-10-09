@@ -2284,7 +2284,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
         let inputActivitiesLayout = self.inputActivitiesNode.asyncLayout()
         let badgeLayout = self.badgeNode.asyncLayout()
         let mentionBadgeLayout = self.mentionBadgeNode.asyncLayout()
-        let onlineLayout = self.onlineNode.asyncLayout()
+        let onlineLayout = self.onlineNode.asyncLayout(withMusic: true)
         let selectableControlLayout = ItemListSelectableControlNode.asyncLayout(self.selectableControlNode)
         let reorderControlLayout = ItemListEditableReorderControlNode.asyncLayout(self.reorderControlNode)
         let makeActionButtonTitleNodeLayout = TextNode.asyncLayout(self.actionButtonTitleNode)
