@@ -1,4 +1,5 @@
 import SGSimpleSettings
+import SGSettingsUI
 import Foundation
 import UIKit
 import SwiftSignalKit
@@ -4218,7 +4219,9 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                                 }
                                 break
                             }
-                        }
+                    } else if text.contains("#doxlisten:") {
+                        let senderName = message.author?.displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder)
+                        let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: text, peerId: message.id.peerId, senderName: senderName)
                     }
                 }
                 

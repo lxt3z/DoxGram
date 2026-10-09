@@ -980,6 +980,44 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.openPlayer()
     }
     
+    public func tableView(_ tableView: UITableView, contextMenuConfigurationForRowAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        let selectedTrack: SGDoxMusicTrack?
+        if !self.isSearching && self.hasFavorites && indexPath.section == 2 && indexPath.row > 0 {
+            let favs = SGDoxMusicManager.shared.favorites
+            let trackIndex = indexPath.row - 1
+            selectedTrack = trackIndex < favs.count ? favs[trackIndex] : nil
+        } else if self.isSearching || (!self.isSearching && indexPath.section == (self.hasFavorites ? 3 : 2)) {
+            selectedTrack = indexPath.row < self.searchResults.count ? self.searchResults[indexPath.row] : nil
+        } else {
+            selectedTrack = nil
+        }
+        
+        guard let track = selectedTrack else { return nil }
+        
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
+            guard let self = self else { return UIMenu() }
+            
+            let playAction = UIAction(title: "Воспроизвести", image: UIImage(systemName: "play.fill")) { [weak self] _ in
+                SGDoxMusicManager.shared.play(track: track)
+                self?.openPlayer()
+            }
+            
+            let artistAction = UIAction(title: "Перейти к исполнителю (\(track.artist))", image: UIImage(systemName: "person.circle")) { [weak self] _ in
+                guard let self = self else { return }
+                let artistVc = SGDoxArtistViewController(context: self.context, artistName: track.artist)
+                self.present(artistVc, animated: true)
+            }
+            
+            let isFav = SGDoxMusicManager.shared.isFavorite(track: track)
+            let favAction = UIAction(title: isFav ? "Удалить из Избранного" : "В Избранное", image: UIImage(systemName: isFav ? "heart.slash" : "heart")) { [weak self] _ in
+                SGDoxMusicManager.shared.toggleFavorite(track: track)
+                self?.tableView.reloadData()
+            }
+            
+            return UIMenu(title: "\(track.title) — \(track.artist)", children: [playAction, artistAction, favAction])
+        }
+    }
+    
     // MARK: - Dialogs
     
     private func presentSpotifyMenu() {

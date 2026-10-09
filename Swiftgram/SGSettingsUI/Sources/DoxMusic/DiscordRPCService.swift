@@ -36,6 +36,9 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     private var activeTrackId: String?
     private var activeStartTimestamp: Int64?
     private var isAudioSyncedForCurrentTrack = false
+    private var lastSentTrackId: String?
+    private var lastSentIsPlaying: Bool = false
+    private var lastSentStartTimestamp: Int64?
     private var externalAssetCache: [String: String] = [:]
     private var resolvingUrls: Set<String> = []
     private let doxgramIconUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Telegram/Telegram-iOS/SGDefault.alticon/SGDefault%403x.png"
@@ -283,16 +286,43 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     }
     
     private func sendPresenceUpdate(track: SGDoxMusicTrack?, isPlaying: Bool) {
-        var activities: [[String: Any]] = []
-        if isPlaying, let activity = self.buildActivity(track: track, isPlaying: isPlaying) {
-            activities.append(activity)
+        if !isPlaying {
+            if self.lastSentIsPlaying == false && self.lastSentTrackId == nil {
+                return
+            }
+            self.lastSentIsPlaying = false
+            self.lastSentTrackId = nil
+            self.lastSentStartTimestamp = nil
+            let payload: [String: Any] = [
+                "op": 3,
+                "d": [
+                    "since": NSNull(),
+                    "activities": [],
+                    "status": "online",
+                    "afk": false
+                ]
+            ]
+            self.sendJson(payload)
+            return
         }
+        
+        guard let activity = self.buildActivity(track: track, isPlaying: isPlaying) else { return }
+        
+        let startTs = (activity["timestamps"] as? [String: Any])?["start"] as? Int64
+        if self.lastSentIsPlaying == true, self.lastSentTrackId == track?.id, self.lastSentStartTimestamp == startTs {
+            // Already synced, skip redundant update to prevent Discord client timer jitter
+            return
+        }
+        
+        self.lastSentIsPlaying = true
+        self.lastSentTrackId = track?.id
+        self.lastSentStartTimestamp = startTs
         
         let payload: [String: Any] = [
             "op": 3,
             "d": [
                 "since": NSNull(),
-                "activities": activities,
+                "activities": [activity],
                 "status": "online",
                 "afk": false
             ]
@@ -330,18 +360,24 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         
         let now = Date().timeIntervalSince1970
         let startTimestamp: Int64
-        let expectedStart = now - self.currentPlaybackTime
-        if self.activeTrackId == track.id, let existingStart = self.activeStartTimestamp, self.isAudioSyncedForCurrentTrack, abs(Double(existingStart) / 1000.0 - expectedStart) < 0.75 {
-            // Keep the exact same established startTimestamp for this track so Discord client timer stays rock-steady and does not drift
-            startTimestamp = existingStart
+        let expectedStart = now - max(0.0, self.currentPlaybackTime)
+        
+        if self.activeTrackId == track.id, let existingStart = self.activeStartTimestamp {
+            let existingStartTimeSec = Double(existingStart) / 1000.0
+            let drift = abs(existingStartTimeSec - expectedStart)
+            // Only re-anchor if there is a deliberate user seek (drift > 3.0 seconds)
+            if drift > 3.0 {
+                let computed = Int64(max(0.0, expectedStart) * 1000)
+                startTimestamp = computed
+                self.activeStartTimestamp = computed
+            } else {
+                startTimestamp = existingStart
+            }
         } else {
             let computed = Int64(max(0.0, expectedStart) * 1000)
             startTimestamp = computed
             self.activeTrackId = track.id
             self.activeStartTimestamp = computed
-            if self.currentPlaybackTime >= 0.15 {
-                self.isAudioSyncedForCurrentTrack = true
-            }
         }
         
         var timestamps: [String: Any] = [

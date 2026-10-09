@@ -92,6 +92,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let pinToProfileButton = UIButton(type: .system)
     private let waveButton = UIButton(type: .system)
     private let autoplayButton = UIButton(type: .system)
+    private let listenTogetherButton = UIButton(type: .system)
     private let downloadButton = UIButton(type: .system)
     
     public var onDismiss: (() -> Void)?
@@ -404,6 +405,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.72)
         self.artistLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         self.artistLabel.lineBreakMode = .byTruncatingTail
+        self.artistLabel.isUserInteractionEnabled = true
+        self.artistLabel.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.artistLabelTapped)))
         self.infoContainerView.addSubview(self.artistLabel)
         
         let quoteConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
@@ -479,11 +482,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         self.nowPlayingContainerView.addSubview(self.controlsContainerView)
         
-        // Bottom Action Buttons: Profile | Wave | Autoplay | Download
+        // Bottom Action Buttons: Profile | Wave | Autoplay | Together | Download
         self.actionsStackView.axis = .horizontal
         self.actionsStackView.distribution = .fillEqually
         self.actionsStackView.alignment = .fill
-        self.actionsStackView.spacing = 8
+        self.actionsStackView.spacing = 6
         
         self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.circle")
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
@@ -496,6 +499,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.styleCapsuleButton(self.autoplayButton, title: "Авто", icon: "infinity")
         self.autoplayButton.addTarget(self, action: #selector(self.autoplayPressed), for: .touchUpInside)
         self.actionsStackView.addArrangedSubview(self.autoplayButton)
+
+        self.styleCapsuleButton(self.listenTogetherButton, title: "Вместе", icon: "person.2.fill")
+        self.listenTogetherButton.addTarget(self, action: #selector(self.listenTogetherPressed), for: .touchUpInside)
+        self.actionsStackView.addArrangedSubview(self.listenTogetherButton)
 
         self.styleCapsuleButton(self.downloadButton, title: "Скачать", icon: "arrow.down.circle")
         self.downloadButton.addTarget(self, action: #selector(self.downloadPressed), for: .touchUpInside)
@@ -1083,6 +1090,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         // Action states
         self.waveButton.backgroundColor = manager.isWaveEnabled ? UIColor(red: 0.95, green: 0.25, blue: 0.50, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
         self.autoplayButton.backgroundColor = manager.isAutoplayEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
+        let isTogether = SGDoxListenTogetherManager.shared.isInSession
+        self.listenTogetherButton.backgroundColor = isTogether ? UIColor(red: 0.20, green: 0.60, blue: 1.0, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
         
         let isDownloaded = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
         let downConfig = UIImage.SymbolConfiguration(pointSize: 11.5, weight: .semibold)
@@ -1591,6 +1600,66 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             )
             self.present(undoController, in: .current)
         }
+    }
+    
+    @objc private func artistLabelTapped() {
+        guard let track = SGDoxMusicManager.shared.currentTrack, !track.artist.isEmpty else { return }
+        let artistVc = SGDoxArtistViewController(context: self.context, artistName: track.artist)
+        self.present(artistVc, animated: true)
+    }
+    
+    @objc private func listenTogetherPressed() {
+        guard let track = SGDoxMusicManager.shared.currentTrack else { return }
+        let manager = SGDoxListenTogetherManager.shared
+        
+        let alert = UIAlertController(
+            title: "🎧 Прослушивание вместе",
+            message: manager.isInSession ? "Вы слушаете музыку совместно с партнером." : "Слушайте трек синхронно с друзьями в DoxGram. Скопируйте ссылку или отправьте приглашение в чат.",
+            preferredStyle: .actionSheet
+        )
+        
+        if manager.isInSession {
+            alert.addAction(UIAlertAction(title: "🔄 Синхронизировать сейчас", style: .default, handler: { _ in
+                SGDoxMusicManager.shared.seek(to: SGDoxMusicManager.shared.currentTime)
+            }))
+            alert.addAction(UIAlertAction(title: "Покинуть сессию", style: .destructive, handler: { [weak self] _ in
+                manager.leaveSession()
+                self?.updateContent()
+            }))
+        } else {
+            alert.addAction(UIAlertAction(title: "Отправить приглашение", style: .default, handler: { [weak self] _ in
+                guard let self = self else { return }
+                manager.startHostSession(peerId: nil)
+                let inviteText = manager.generateInviteText(for: track)
+                let shareVc = UIActivityViewController(activityItems: [inviteText], applicationActivities: nil)
+                self.present(shareVc, animated: true)
+                self.updateContent()
+            }))
+            alert.addAction(UIAlertAction(title: "Скопировать тег сессии", style: .default, handler: { [weak self] _ in
+                guard let self = self else { return }
+                manager.startHostSession(peerId: nil)
+                let inviteText = manager.generateInviteText(for: track)
+                UIPasteboard.general.string = inviteText
+                let undoController = UndoOverlayController(
+                    presentationData: self.presentationData,
+                    content: .universalImage(
+                        image: UIImage(systemName: "checkmark.circle.fill") ?? UIImage(),
+                        size: nil,
+                        title: nil,
+                        text: "Приглашение скопировано в буфер обмена",
+                        customUndoText: nil,
+                        timeout: 2.5
+                    ),
+                    elevatedLayout: true,
+                    action: { _ in return true }
+                )
+                self.present(undoController, in: .current)
+                self.updateContent()
+            }))
+        }
+        
+        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
+        self.present(alert, animated: true)
     }
     
     @objc private func queueShufflePressed() {

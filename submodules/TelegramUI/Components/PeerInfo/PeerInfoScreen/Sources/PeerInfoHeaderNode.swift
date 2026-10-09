@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SGSimpleSettings
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -1264,7 +1265,11 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                 let subtitleColor: UIColor
                 subtitleColor = .white
                 
-                subtitleStringText = presentationData.strings.Presence_online
+                if SGSimpleSettings.shared.isMusicPlaying && !SGSimpleSettings.shared.currentPlayingTrackTitle.isEmpty {
+                    subtitleStringText = "🎵 \(SGSimpleSettings.shared.currentPlayingTrackTitle)"
+                } else {
+                    subtitleStringText = presentationData.strings.Presence_online
+                }
                 subtitleAttributes = MultiScaleTextState.Attributes(font: Font.regular(17.0), color: subtitleColor)
                 smallSubtitleAttributes = MultiScaleTextState.Attributes(font: Font.regular(16.0), color: .white, shadowColor: titleShadowColor)
                 

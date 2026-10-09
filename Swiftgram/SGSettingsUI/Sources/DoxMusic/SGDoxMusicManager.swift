@@ -7,14 +7,28 @@ import Postbox
 import AccountContext
 import Display
 import UndoUI
+import SGSimpleSettings
 
 public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     public static let shared = SGDoxMusicManager()
     
-    public private(set) var currentTrack: SGDoxMusicTrack?
+    public private(set) var currentTrack: SGDoxMusicTrack? {
+        didSet {
+            SGSimpleSettings.shared.currentPlayingTrackTitle = self.currentTrack?.title ?? ""
+            SGSimpleSettings.shared.currentPlayingTrackArtist = self.currentTrack?.artist ?? ""
+            NotificationCenter.default.post(name: NSNotification.Name("SGDoxMusicPlaybackStateChanged"), object: nil)
+        }
+    }
     public private(set) var queue: [SGDoxMusicTrack] = []
     public private(set) var history: [SGDoxMusicTrack] = []
-    public private(set) var isPlaying: Bool = false
+    public private(set) var isPlaying: Bool = false {
+        didSet {
+            SGSimpleSettings.shared.isMusicPlaying = self.isPlaying
+            SGSimpleSettings.shared.currentPlayingTrackTitle = self.currentTrack?.title ?? ""
+            SGSimpleSettings.shared.currentPlayingTrackArtist = self.currentTrack?.artist ?? ""
+            NotificationCenter.default.post(name: NSNotification.Name("SGDoxMusicPlaybackStateChanged"), object: nil)
+        }
+    }
     public private(set) var currentTime: Double = 0.0
     public private(set) var duration: Double = 0.0
     
@@ -822,7 +836,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     private func checkWaveReplenishmentIfNeeded() {
-        guard self.isWaveEnabled && self.queue.count < 3 else { return }
+        guard (self.isWaveEnabled || self.isAutoplayEnabled) && self.queue.count < 3 else { return }
         self.replenishWaveQueue()
     }
     
@@ -911,7 +925,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             var latestAudioRef: FileMediaReference?
             var count = 0
             
-            transaction.withAllMessages(peerId: context.account.peerId, namespace: nil, reversed: true) { message in
+            let checkMessage: (Message) -> Bool = { message in
                 count += 1
                 for media in message.media {
                     if let file = media as? TelegramMediaFile {
@@ -946,20 +960,25 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                         }
                     }
                 }
-                return count < 300
+                return count < 500
             }
+            
+            transaction.withAllMessages(peerId: context.account.peerId, namespace: Namespaces.Message.Cloud, reversed: true) { message in
+                return checkMessage(message)
+            }
+            
             return (matchedRef, latestAudioRef)
         } |> deliverOnMainQueue).start(next: { (matchedRef, latestAudioRef) in
             if let targetRef = matchedRef {
-                let _ = (context.engine.peers.addSavedMusic(file: targetRef) |> deliverOnMainQueue).start(error: { _ in
-                    completion(false, "Не удалось закрепить трек в профиле")
+                let _ = (context.engine.peers.addSavedMusic(file: targetRef) |> deliverOnMainQueue).start(error: { error in
+                    completion(false, "Не удалось закрепить трек в профиле. Требуется Telegram Premium для закрепления музыки.")
                 }, completed: {
                     completion(true, nil)
                 })
                 return
             }
             
-            // 3. If not found in Saved Messages, search Telegram global messages
+            // 3. Search Telegram public audio messages
             let searchQuery = "\(track.artist) \(cleanTitle)"
             let searchLocation = SearchMessagesLocation.general(
                 scope: .everywhere,
@@ -974,7 +993,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 location: searchLocation,
                 query: searchQuery,
                 state: nil,
-                limit: 25
+                limit: 30
             )
             
             let _ = (searchSignal |> deliverOnMainQueue).start(next: { (result: (SearchMessagesResult, SearchMessagesState)) in
@@ -983,7 +1002,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                         if let file = media as? TelegramMediaFile, file.isMusic {
                             let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
                             let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(error: { _ in
-                                completion(false, "Не удалось закрепить трек в профиле")
+                                completion(false, "Не удалось закрепить трек в профиле. Требуется Telegram Premium.")
                             }, completed: {
                                 completion(true, nil)
                             })
@@ -997,7 +1016,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     location: searchLocation,
                     query: cleanTitle,
                     state: nil,
-                    limit: 25
+                    limit: 30
                 )
                 let _ = (titleSignal |> deliverOnMainQueue).start(next: { (tResult: (SearchMessagesResult, SearchMessagesState)) in
                     for message in tResult.0.messages {
@@ -1005,7 +1024,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                             if let file = media as? TelegramMediaFile, file.isMusic {
                                 let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
                                 let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(error: { _ in
-                                    completion(false, "Не удалось закрепить трек в профиле")
+                                    completion(false, "Не удалось закрепить трек в профиле. Требуется Telegram Premium.")
                                 }, completed: {
                                     completion(true, nil)
                                 })
@@ -1016,12 +1035,12 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     
                     if let fallback = latestAudioRef {
                         let _ = (context.engine.peers.addSavedMusic(file: fallback) |> deliverOnMainQueue).start(error: { _ in
-                            completion(false, "Не удалось закрепить трек в профиле")
+                            completion(false, "Не удалось закрепить трек в профиле. Требуется Telegram Premium.")
                         }, completed: {
                             completion(true, nil)
                         })
                     } else {
-                        completion(false, "Трек не найден в Telegram. Отправьте аудиозапись в «Избранное» для закрепления в профиле.")
+                        completion(false, "Трек не найден в Telegram. Перешлите аудиозапись в «Избранное» и повторите закрепление.")
                     }
                 })
             })

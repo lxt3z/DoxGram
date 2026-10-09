@@ -142,9 +142,9 @@ public final class PeerOnlineMarkerNode: ASDisplayNode {
         }
     }
     
-    public func asyncLayout() -> (Bool, Bool) -> (CGSize, (Bool) -> Void) {
-        return { [weak self] online, isVoiceChat in
-            let size: CGFloat = isVoiceChat ? 22.0 : 14.0
+    public func asyncLayout() -> (Bool, Bool, Bool) -> (CGSize, (Bool) -> Void) {
+        return { [weak self] online, isVoiceChat, isMusic in
+            let size: CGFloat = isVoiceChat ? 22.0 : (isMusic ? 16.0 : 14.0)
             return (CGSize(width: size, height: size), { animated in
                 if let strongSelf = self {
                     strongSelf.iconNode.frame = CGRect(x: 0.0, y: 0.0, width: size, height: size)
@@ -186,6 +186,13 @@ public final class PeerOnlineMarkerNode: ASDisplayNode {
                     }
                 }
             })
+        }
+    }
+    
+    public func asyncLayout() -> (Bool, Bool) -> (CGSize, (Bool) -> Void) {
+        let f: (Bool, Bool, Bool) -> (CGSize, (Bool) -> Void) = self.asyncLayout()
+        return { online, isVoiceChat in
+            return f(online, isVoiceChat, false)
         }
     }
 }

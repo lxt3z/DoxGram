@@ -1468,6 +1468,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
     private var customAnimationInProgress: Bool = false
     
     private var onlineIsVoiceChat: Bool = false
+    private var onlineIsMusic: Bool = false
     private var currentOnline: Bool?
     
     override public var canBeSelected: Bool {
@@ -2198,7 +2199,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             }
             
             if let item = self.item, case .chatList = item.index {
-                self.onlineNode.setImage(PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .highlighted, voiceChat: self.onlineIsVoiceChat), color: nil, transition: transition)
+                self.onlineNode.setImage(PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .highlighted, voiceChat: self.onlineIsVoiceChat, music: self.onlineIsMusic), color: nil, transition: transition)
                 self.starView?.setOutlineColor(item.presentationData.theme.chatList.itemHighlightedBackgroundColor, transition: transition)
             }
         } else {
@@ -2220,10 +2221,10 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 let onlineIcon: UIImage?
                 let effectiveBackgroundColor: UIColor
                 if item.isPinned {
-                    onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .pinned, voiceChat: self.onlineIsVoiceChat)
+                    onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .pinned, voiceChat: self.onlineIsVoiceChat, music: self.onlineIsMusic)
                     effectiveBackgroundColor = item.presentationData.theme.chatList.pinnedItemBackgroundColor
                 } else {
-                    onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .regular, voiceChat: self.onlineIsVoiceChat)
+                    onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .regular, voiceChat: self.onlineIsVoiceChat, music: self.onlineIsMusic)
                     effectiveBackgroundColor = item.presentationData.theme.chatList.itemBackgroundColor
                 }
                 self.onlineNode.setImage(onlineIcon, color: nil, transition: transition)
@@ -3899,6 +3900,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             var online = false
             var animateOnline = false
             var onlineIsVoiceChat = false
+            var onlineIsMusic = false
             
             var isPinned = false
             if case let .chatList(index) = item.index {
@@ -3940,6 +3942,13 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                             if group.flags.contains(.hasActiveVoiceChat) && item.interaction.searchTextHighightState == nil {
                                 online = true
                             }
+                            animateOnline = true
+                        }
+                    }
+                    if !online && SGSimpleSettings.shared.isMusicPlaying {
+                        if renderedPeer.peerId == item.context.account.peerId {
+                            online = true
+                            onlineIsMusic = true
                             animateOnline = true
                         }
                     }
@@ -4060,7 +4069,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             }
             //
             
-            let (onlineLayout, onlineApply) = onlineLayout(online, onlineIsVoiceChat)
+            let (onlineLayout, onlineApply) = onlineLayout(online, onlineIsVoiceChat, onlineIsMusic)
             var animateContent = false
             if let currentItem = currentItem, currentItem.content.chatLocation == item.content.chatLocation {
                 animateContent = true
@@ -4110,6 +4119,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     strongSelf.cachedChatListQuoteSearchResult = chatListQuoteSearchResult
                     strongSelf.cachedCustomTextEntities = customTextEntities
                     strongSelf.onlineIsVoiceChat = onlineIsVoiceChat
+                    strongSelf.onlineIsMusic = onlineIsMusic
                     
                     var animateOnline = animateOnline
                     if let currentOnline = strongSelf.currentOnline, currentOnline == online {
@@ -4487,13 +4497,13 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                     let onlineIcon: UIImage?
                     let effectiveBackgroundColor: UIColor
                     if strongSelf.reallyHighlighted {
-                        onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .highlighted, voiceChat: onlineIsVoiceChat)
+                        onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .highlighted, voiceChat: onlineIsVoiceChat, music: onlineIsMusic)
                         effectiveBackgroundColor = item.presentationData.theme.chatList.itemHighlightedBackgroundColor
                     } else if case let .chatList(index) = item.index, index.pinningIndex != nil {
-                        onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .pinned, voiceChat: onlineIsVoiceChat)
+                        onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .pinned, voiceChat: onlineIsVoiceChat, music: onlineIsMusic)
                         effectiveBackgroundColor = item.presentationData.theme.chatList.pinnedItemBackgroundColor
                     } else {
-                        onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .regular, voiceChat: onlineIsVoiceChat)
+                        onlineIcon = PresentationResourcesChatList.recentStatusOnlineIcon(item.presentationData.theme, state: .regular, voiceChat: onlineIsVoiceChat, music: onlineIsMusic)
                         effectiveBackgroundColor = item.presentationData.theme.chatList.itemBackgroundColor
                     }
                     strongSelf.onlineNode.setImage(onlineIcon, color: item.presentationData.theme.list.itemCheckColors.foregroundColor, transition: .immediate)

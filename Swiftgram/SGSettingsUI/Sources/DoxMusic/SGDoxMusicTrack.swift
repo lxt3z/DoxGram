@@ -97,3 +97,22 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         try container.encodeIfPresent(self.appleMusicId, forKey: .appleMusicId)
     }
 }
+
+public struct SGDoxAlbum: Identifiable, Equatable, Hashable, Codable, Sendable {
+    public let id: String
+    public let title: String
+    public let artist: String
+    public let artworkUrl: String?
+    public let releaseDate: String?
+    public let trackCount: Int
+    
+    public init(id: String, title: String, artist: String, artworkUrl: String? = nil, releaseDate: String? = nil, trackCount: Int = 0) {
+        self.id = id
+        self.title = title
+        self.artist = artist
+        self.artworkUrl = artworkUrl
+        self.releaseDate = releaseDate
+        self.trackCount = trackCount
+    }
+}
+

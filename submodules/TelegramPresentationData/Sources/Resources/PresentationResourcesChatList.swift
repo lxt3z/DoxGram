@@ -146,20 +146,33 @@ public struct PresentationResourcesChatList {
         })
     }
     
-    public static func recentStatusOnlineIcon(_ theme: PresentationTheme, state: RecentStatusOnlineIconState, voiceChat: Bool = false) -> UIImage? {
+    public static func recentStatusOnlineIcon(_ theme: PresentationTheme, state: RecentStatusOnlineIconState, voiceChat: Bool = false, music: Bool = false) -> UIImage? {
         let key: PresentationResourceKey
-        switch state {
-            case .regular:
-                key = voiceChat ? PresentationResourceKey.chatListRecentStatusVoiceChatIcon : PresentationResourceKey.chatListRecentStatusOnlineIcon
-            case .highlighted:
-                key = voiceChat ? PresentationResourceKey.chatListRecentStatusVoiceChatHighlightedIcon : PresentationResourceKey.chatListRecentStatusOnlineHighlightedIcon
-            case .pinned:
-                key = voiceChat ? PresentationResourceKey.chatListRecentStatusVoiceChatPinnedIcon : PresentationResourceKey.chatListRecentStatusOnlinePinnedIcon
-            case .panel:
-                key = voiceChat ? PresentationResourceKey.chatListRecentStatusVoiceChatPanelIcon : PresentationResourceKey.chatListRecentStatusOnlinePanelIcon
+        if music {
+            switch state {
+                case .regular:
+                    key = PresentationResourceKey.chatListRecentStatusMusicIcon
+                case .highlighted:
+                    key = PresentationResourceKey.chatListRecentStatusMusicHighlightedIcon
+                case .pinned:
+                    key = PresentationResourceKey.chatListRecentStatusMusicPinnedIcon
+                case .panel:
+                    key = PresentationResourceKey.chatListRecentStatusMusicPanelIcon
+            }
+        } else {
+            switch state {
+                case .regular:
+                    key = voiceChat ? PresentationResourceKey.chatListRecentStatusVoiceChatIcon : PresentationResourceKey.chatListRecentStatusOnlineIcon
+                case .highlighted:
+                    key = voiceChat ? PresentationResourceKey.chatListRecentStatusVoiceChatHighlightedIcon : PresentationResourceKey.chatListRecentStatusOnlineHighlightedIcon
+                case .pinned:
+                    key = voiceChat ? PresentationResourceKey.chatListRecentStatusVoiceChatPinnedIcon : PresentationResourceKey.chatListRecentStatusOnlinePinnedIcon
+                case .panel:
+                    key = voiceChat ? PresentationResourceKey.chatListRecentStatusVoiceChatPanelIcon : PresentationResourceKey.chatListRecentStatusOnlinePanelIcon
+            }
         }
         return theme.image(key.rawValue, { theme in
-            let size: CGFloat = voiceChat ? 22.0 : 14.0
+            let size: CGFloat = voiceChat ? 22.0 : (music ? 16.0 : 14.0)
             return generateImage(CGSize(width: size, height: size), rotatedContext: { size, context in
                 let bounds = CGRect(origin: CGPoint(), size: size)
                 context.clear(bounds)
@@ -175,8 +188,31 @@ public struct PresentationResourcesChatList {
                 }
                 
                 context.fillEllipse(in: bounds)
-                context.setFillColor(theme.chatList.onlineDotColor.cgColor)
-                context.fillEllipse(in: bounds.insetBy(dx: 2.0, dy: 2.0))
+                if music {
+                    context.setFillColor(theme.chatList.onlineDotColor.cgColor)
+                    context.fillEllipse(in: bounds.insetBy(dx: 1.5, dy: 1.5))
+                    
+                    let text = "♫"
+                    let font = UIFont.systemFont(ofSize: 9.0, weight: .bold)
+                    let attributes: [NSAttributedString.Key: Any] = [
+                        .font: font,
+                        .foregroundColor: UIColor.white
+                    ]
+                    let attrString = NSAttributedString(string: text, attributes: attributes)
+                    let textSize = attrString.size()
+                    let textRect = CGRect(
+                        x: (size.width - textSize.width) * 0.5,
+                        y: (size.height - textSize.height) * 0.5 - 0.5,
+                        width: textSize.width,
+                        height: textSize.height
+                    )
+                    UIGraphicsPushContext(context)
+                    attrString.draw(in: textRect)
+                    UIGraphicsPopContext()
+                } else {
+                    context.setFillColor(theme.chatList.onlineDotColor.cgColor)
+                    context.fillEllipse(in: bounds.insetBy(dx: 2.0, dy: 2.0))
+                }
             })
         })
     }

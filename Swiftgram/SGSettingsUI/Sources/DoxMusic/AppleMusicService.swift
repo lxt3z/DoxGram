@@ -523,15 +523,212 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
-        if let track = track, !track.artist.isEmpty {
-            self.search(query: track.artist) { tracks, _ in
-                completion(tracks.filter { $0.id != track.id })
-            }
-        } else {
+        let seedArtist = track?.artist.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if seedArtist.isEmpty {
             self.fetchUserPersonalMusic { personalTracks in
                 completion(personalTracks)
             }
+            return
         }
+        
+        // 1. Fetch tracks by the current seed artist
+        self.search(query: seedArtist) { [weak self] artistTracks, _ in
+            guard let self = self else {
+                completion(artistTracks)
+                return
+            }
+            
+            let filteredArtistTracks = artistTracks.filter { $0.id != track?.id }
+            let primaryArtistTracks = Array(filteredArtistTracks.prefix(4))
+            
+            // 2. Cross-reference favorites and library to discover favorite artists
+            var favoriteArtists: [String] = []
+            for fav in SGDoxMusicManager.shared.favorites {
+                let a = fav.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !a.isEmpty && a.caseInsensitiveCompare(seedArtist) != .orderedSame && !favoriteArtists.contains(a) {
+                    favoriteArtists.append(a)
+                }
+            }
+            
+            if let pickArtist = favoriteArtists.randomElement() {
+                self.search(query: pickArtist) { libTracks, _ in
+                    var waveList: [SGDoxMusicTrack] = []
+                    var artistIter = primaryArtistTracks.makeIterator()
+                    var libIter = libTracks.prefix(3).makeIterator()
+                    
+                    if let t1 = artistIter.next() { waveList.append(t1) }
+                    if let t2 = artistIter.next() { waveList.append(t2) }
+                    if let l1 = libIter.next() { waveList.append(l1) }
+                    while let a = artistIter.next() {
+                        waveList.append(a)
+                        if let l = libIter.next() { waveList.append(l) }
+                    }
+                    while let l = libIter.next() {
+                        waveList.append(l)
+                    }
+                    
+                    completion(waveList.isEmpty ? filteredArtistTracks : waveList)
+                }
+            } else {
+                // If favorites are empty, try Apple Music library artists
+                self.fetchLibrarySongs(limit: 25) { librarySongs in
+                    let libArtists = Array(Set(librarySongs.map { $0.artist })).filter { $0.caseInsensitiveCompare(seedArtist) != .orderedSame && !$0.isEmpty }
+                    if let pickLibArtist = libArtists.randomElement() {
+                        self.search(query: pickLibArtist) { libTracks, _ in
+                            var waveList: [SGDoxMusicTrack] = primaryArtistTracks
+                            waveList.append(contentsOf: Array(libTracks.prefix(3)))
+                            completion(waveList.isEmpty ? filteredArtistTracks : waveList)
+                        }
+                    } else {
+                        completion(filteredArtistTracks)
+                    }
+                }
+            }
+        }
+    }
+    
+    public func fetchArtistDetails(artistName: String, completion: @escaping @Sendable (_ topTracks: [SGDoxMusicTrack], _ albums: [SGDoxAlbum], _ artistImageUrl: String?) -> Void) {
+        let cleanName = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let encoded = cleanName.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed), !encoded.isEmpty else {
+            DispatchQueue.main.async { completion([], [], nil) }
+            return
+        }
+        
+        let artistSearchUrl = "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=musicArtist&limit=1&country=RU"
+        guard let url = URL(string: artistSearchUrl) else {
+            DispatchQueue.main.async { completion([], [], nil) }
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let self = self else { return }
+            var foundArtistId: Int64? = nil
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let results = json["results"] as? [[String: Any]],
+               let first = results.first {
+                foundArtistId = (first["artistId"] as? Int64) ?? (first["artistId"] as? Int).map(Int64.init)
+            }
+            
+            if let artistId = foundArtistId {
+                self.lookupArtistData(artistId: artistId, artistName: cleanName, completion: completion)
+            } else {
+                self.searchITunesPublic(query: cleanName) { tracks, _ in
+                    let albumsUrlString = "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=album&limit=25&country=RU"
+                    guard let aUrl = URL(string: albumsUrlString) else {
+                        DispatchQueue.main.async {
+                            completion(tracks, [], tracks.first?.artworkUrl)
+                        }
+                        return
+                    }
+                    URLSession.shared.dataTask(with: aUrl) { aData, _, _ in
+                        var parsedAlbums: [SGDoxAlbum] = []
+                        if let aData = aData,
+                           let aJson = try? JSONSerialization.jsonObject(with: aData) as? [String: Any],
+                           let aResults = aJson["results"] as? [[String: Any]] {
+                            for item in aResults {
+                                if let collectionName = item["collectionName"] as? String,
+                                   let colId = (item["collectionId"] as? Int64) ?? (item["collectionId"] as? Int).map(Int64.init) {
+                                    let artUrl = (item["artworkUrl100"] as? String)?.replacingOccurrences(of: "100x100bb", with: "600x600bb")
+                                    let relDate = item["releaseDate"] as? String
+                                    let trackCount = (item["trackCount"] as? Int) ?? 0
+                                    parsedAlbums.append(SGDoxAlbum(
+                                        id: "\(colId)",
+                                        title: collectionName,
+                                        artist: (item["artistName"] as? String) ?? cleanName,
+                                        artworkUrl: artUrl,
+                                        releaseDate: relDate,
+                                        trackCount: trackCount
+                                    ))
+                                }
+                            }
+                        }
+                        DispatchQueue.main.async {
+                            completion(tracks, parsedAlbums, tracks.first?.artworkUrl)
+                        }
+                    }.resume()
+                }
+            }
+        }.resume()
+    }
+    
+    private func lookupArtistData(artistId: Int64, artistName: String, completion: @escaping @Sendable ([SGDoxMusicTrack], [SGDoxAlbum], String?) -> Void) {
+        let songsUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=song&limit=50&country=RU")
+        let albumsUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=album&limit=25&country=RU")
+        
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var topTracks: [SGDoxMusicTrack] = []
+        var albums: [SGDoxAlbum] = []
+        
+        if let sUrl = songsUrl {
+            group.enter()
+            URLSession.shared.dataTask(with: sUrl) { [weak self] data, _, _ in
+                defer { group.leave() }
+                guard let self = self, let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let results = json["results"] as? [[String: Any]] else { return }
+                let tracksOnly = results.filter { ($0["wrapperType"] as? String) == "track" }
+                let parsed = self.parseITunesResults(tracksOnly)
+                lock.lock()
+                topTracks = parsed
+                lock.unlock()
+            }.resume()
+        }
+        
+        if let aUrl = albumsUrl {
+            group.enter()
+            URLSession.shared.dataTask(with: aUrl) { data, _, _ in
+                defer { group.leave() }
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let results = json["results"] as? [[String: Any]] else { return }
+                var parsedAlbums: [SGDoxAlbum] = []
+                for item in results where (item["wrapperType"] as? String) == "collection" {
+                    if let colName = item["collectionName"] as? String,
+                       let colId = (item["collectionId"] as? Int64) ?? (item["collectionId"] as? Int).map(Int64.init) {
+                        let artUrl = (item["artworkUrl100"] as? String)?.replacingOccurrences(of: "100x100bb", with: "600x600bb")
+                        let relDate = item["releaseDate"] as? String
+                        let trackCount = (item["trackCount"] as? Int) ?? 0
+                        parsedAlbums.append(SGDoxAlbum(
+                            id: "\(colId)",
+                            title: colName,
+                            artist: (item["artistName"] as? String) ?? artistName,
+                            artworkUrl: artUrl,
+                            releaseDate: relDate,
+                            trackCount: trackCount
+                        ))
+                    }
+                }
+                lock.lock()
+                albums = parsedAlbums
+                lock.unlock()
+            }.resume()
+        }
+        
+        group.notify(queue: .main) {
+            completion(topTracks, albums, topTracks.first?.artworkUrl ?? albums.first?.artworkUrl)
+        }
+    }
+    
+    public func fetchAlbumTracks(collectionId: String, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(collectionId)&entity=song&limit=50&country=RU") else {
+            DispatchQueue.main.async { completion([]) }
+            return
+        }
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let self = self else { return }
+            var tracks: [SGDoxMusicTrack] = []
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let results = json["results"] as? [[String: Any]] {
+                let tracksOnly = results.filter { ($0["wrapperType"] as? String) == "track" }
+                tracks = self.parseITunesResults(tracksOnly)
+            }
+            DispatchQueue.main.async {
+                completion(tracks)
+            }
+        }.resume()
     }
     
     public func fetchLibrarySongs(limit: Int = 100, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
