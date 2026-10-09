@@ -134,7 +134,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
-        self.navigationPresentation = .modal
+        self.navigationPresentation = .flatModal
+        self.flatReceivesModalTransition = true
         self.statusBar.statusBarStyle = .White
         self.ready.set(.single(true))
     }
@@ -144,12 +145,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     deinit {
-        if let token = self.stateToken {
-            SGDoxMusicManager.shared.removeStateListener(token)
-        }
-        if let token = self.timeToken {
-            SGDoxMusicManager.shared.removeTimeListener(token)
-        }
+        self.detachListeners()
     }
     
     public override func loadDisplayNode() {
@@ -181,6 +177,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
         }
         
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
+        panGesture.delegate = self
+        self.view.addGestureRecognizer(panGesture)
+    }
+    
+    private func attachListeners() {
+        guard self.stateToken == nil else { return }
         self.stateToken = SGDoxMusicManager.shared.addStateListener { [weak self] in
             DispatchQueue.main.async {
                 self?.updateContent()
@@ -214,10 +217,17 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 break
             }
         }
-        
-        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
-        panGesture.delegate = self
-        self.view.addGestureRecognizer(panGesture)
+    }
+    
+    private func detachListeners() {
+        if let token = self.stateToken {
+            SGDoxMusicManager.shared.removeStateListener(token)
+            self.stateToken = nil
+        }
+        if let token = self.timeToken {
+            SGDoxMusicManager.shared.removeTimeListener(token)
+            self.timeToken = nil
+        }
     }
     
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
@@ -291,14 +301,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         // 2. Header
         self.grabberView.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
         self.grabberView.layer.cornerRadius = 2.5
+        self.grabberView.isHidden = true
         self.view.addSubview(self.grabberView)
         
         // Dismiss Chevron Button (Liquid Glass Circular Pill)
         let chevronConfig = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
         self.dismissButton.setImage(UIImage(systemName: "chevron.down", withConfiguration: chevronConfig), for: .normal)
-        self.dismissButton.tintColor = UIColor(white: 1.0, alpha: 0.85)
-        self.dismissButton.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
-        self.dismissButton.layer.cornerRadius = 16
+        self.dismissButton.tintColor = .white
+        self.dismissButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.dismissButton.layer.cornerRadius = 19
         self.dismissButton.layer.cornerCurve = .continuous
         self.dismissButton.layer.borderWidth = 0.5
         self.dismissButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
@@ -306,50 +317,55 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.dismissButton.addTarget(self, action: #selector(self.dismissPressed), for: .touchUpInside)
         self.view.addSubview(self.dismissButton)
         
-        // Segmented Mode Switcher: [ Сейчас | Очередь ]
-        self.segmentContainerView.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
-        self.segmentContainerView.layer.cornerRadius = 16
+        // Segmented Mode Switcher: [ Сейчас | Текст | Очередь ]
+        self.segmentContainerView.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
+        self.segmentContainerView.layer.cornerRadius = 18
+        self.segmentContainerView.layer.cornerCurve = .continuous
         self.segmentContainerView.layer.borderWidth = 0.5
-        self.segmentContainerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
+        self.segmentContainerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
         self.segmentContainerView.clipsToBounds = true
         self.view.addSubview(self.segmentContainerView)
         
-        self.segmentIndicatorView.backgroundColor = UIColor(white: 1.0, alpha: 0.28)
-        self.segmentIndicatorView.layer.cornerRadius = 13
+        self.segmentIndicatorView.backgroundColor = UIColor(white: 1.0, alpha: 0.22)
+        self.segmentIndicatorView.layer.cornerRadius = 15
+        self.segmentIndicatorView.layer.cornerCurve = .continuous
+        self.segmentIndicatorView.layer.borderWidth = 0.5
+        self.segmentIndicatorView.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
         self.segmentContainerView.addSubview(self.segmentIndicatorView)
         
         self.nowPlayingSegmentButton.setTitle("Сейчас", for: .normal)
         self.nowPlayingSegmentButton.setTitleColor(.white, for: .normal)
-        self.nowPlayingSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        self.nowPlayingSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
         self.nowPlayingSegmentButton.addTarget(self, action: #selector(self.nowPlayingSegmentPressed), for: .touchUpInside)
         self.segmentContainerView.addSubview(self.nowPlayingSegmentButton)
         
         self.lyricsSegmentButton.setTitle("Текст", for: .normal)
-        self.lyricsSegmentButton.setTitleColor(.white, for: .normal)
-        self.lyricsSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        self.lyricsSegmentButton.setTitleColor(UIColor(white: 1.0, alpha: 0.65), for: .normal)
+        self.lyricsSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         self.lyricsSegmentButton.addTarget(self, action: #selector(self.lyricsSegmentPressed), for: .touchUpInside)
         self.segmentContainerView.addSubview(self.lyricsSegmentButton)
         
         self.queueSegmentButton.setTitle("Очередь", for: .normal)
-        self.queueSegmentButton.setTitleColor(.white, for: .normal)
-        self.queueSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        self.queueSegmentButton.setTitleColor(UIColor(white: 1.0, alpha: 0.65), for: .normal)
+        self.queueSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         self.queueSegmentButton.addTarget(self, action: #selector(self.queueSegmentPressed), for: .touchUpInside)
         self.segmentContainerView.addSubview(self.queueSegmentButton)
         
         // Source Badge Pill (Right)
         self.sourceBadgeContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
-        self.sourceBadgeContainer.layer.cornerRadius = 14
+        self.sourceBadgeContainer.layer.cornerRadius = 17
+        self.sourceBadgeContainer.layer.cornerCurve = .continuous
         self.sourceBadgeContainer.layer.borderWidth = 0.5
-        self.sourceBadgeContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.14).cgColor
+        self.sourceBadgeContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.15).cgColor
         self.sourceBadgeContainer.clipsToBounds = true
         self.view.addSubview(self.sourceBadgeContainer)
         
         self.sourceIconView.contentMode = .scaleAspectFit
-        self.sourceIconView.tintColor = UIColor(white: 1.0, alpha: 0.85)
+        self.sourceIconView.tintColor = .white
         self.sourceBadgeContainer.addSubview(self.sourceIconView)
         
-        self.sourceLabel.textColor = UIColor(white: 1.0, alpha: 0.85)
-        self.sourceLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .medium)
+        self.sourceLabel.textColor = .white
+        self.sourceLabel.font = UIFont.systemFont(ofSize: 12.5, weight: .medium)
         self.sourceBadgeContainer.addSubview(self.sourceLabel)
         
         // 3. Content Panes
@@ -368,7 +384,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func setupNowPlayingPane() {
-        // Animated Ambient Glow behind Artwork (Organic Radial Aura)
+        // Soft Ambient Glow behind Artwork (Static Radial Aura)
         self.artworkAmbientGlowView.clipsToBounds = false
         self.artworkGlowGradientLayer.type = .radial
         self.artworkGlowGradientLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
@@ -378,53 +394,55 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.nowPlayingContainerView.addSubview(self.artworkAmbientGlowView)
 
         // Artwork
-        self.artworkContainerView.layer.cornerRadius = 24
-        self.artworkContainerView.layer.shadowOffset = CGSize(width: 0, height: 16)
-        self.artworkContainerView.layer.shadowOpacity = 0.45
-        self.artworkContainerView.layer.shadowRadius = 24
+        self.artworkContainerView.layer.cornerRadius = 28
+        self.artworkContainerView.layer.cornerCurve = .continuous
+        self.artworkContainerView.layer.shadowOffset = CGSize(width: 0, height: 14)
+        self.artworkContainerView.layer.shadowOpacity = 0.35
+        self.artworkContainerView.layer.shadowRadius = 22
         self.artworkContainerView.layer.shadowColor = UIColor.black.cgColor
         self.nowPlayingContainerView.addSubview(self.artworkContainerView)
         
         self.artworkImageView.contentMode = .scaleAspectFill
         self.artworkImageView.clipsToBounds = true
-        self.artworkImageView.layer.cornerRadius = 24
+        self.artworkImageView.layer.cornerRadius = 28
+        self.artworkImageView.layer.cornerCurve = .continuous
         self.artworkImageView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
         self.artworkContainerView.addSubview(self.artworkImageView)
         let artTap = UITapGestureRecognizer(target: self, action: #selector(self.artworkTapped))
         self.artworkContainerView.isUserInteractionEnabled = true
         self.artworkContainerView.addGestureRecognizer(artTap)
         
-        // Info Area: Title, Artist, Favorite, Lyrics
+        // Info Area: Title, Artist, Lyrics & Favorite
         self.nowPlayingContainerView.addSubview(self.infoContainerView)
         
         self.titleLabel.textColor = .white
-        self.titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
+        self.titleLabel.font = UIFont.systemFont(ofSize: 23, weight: .bold)
         self.titleLabel.lineBreakMode = .byTruncatingTail
         self.infoContainerView.addSubview(self.titleLabel)
         
-        self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.72)
-        self.artistLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        self.artistLabel.textColor = UIColor(white: 1.0, alpha: 0.68)
+        self.artistLabel.font = UIFont.systemFont(ofSize: 16, weight: .regular)
         self.artistLabel.lineBreakMode = .byTruncatingTail
         self.artistLabel.isUserInteractionEnabled = true
         self.artistLabel.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.artistLabelTapped)))
         self.infoContainerView.addSubview(self.artistLabel)
         
-        let quoteConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
+        let quoteConfig = UIImage.SymbolConfiguration(pointSize: 21, weight: .semibold)
         self.lyricsButton.setImage(UIImage(systemName: "quote.bubble", withConfiguration: quoteConfig), for: .normal)
-        self.lyricsButton.tintColor = UIColor.white.withAlphaComponent(0.8)
+        self.lyricsButton.tintColor = UIColor(red: 0.98, green: 0.18, blue: 0.38, alpha: 1.0)
         self.lyricsButton.addTarget(self, action: #selector(self.lyricsSegmentPressed), for: .touchUpInside)
         self.infoContainerView.addSubview(self.lyricsButton)
         
         let heartConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
         self.favoriteButton.setImage(UIImage(systemName: "heart", withConfiguration: heartConfig), for: .normal)
-        self.favoriteButton.tintColor = UIColor.white.withAlphaComponent(0.8)
+        self.favoriteButton.tintColor = .white
         self.favoriteButton.addTarget(self, action: #selector(self.favoritePressed), for: .touchUpInside)
         self.infoContainerView.addSubview(self.favoriteButton)
         
         // Slider & Time
         self.progressSlider.minimumValue = 0.0
         self.progressSlider.maximumValue = 1.0
-        self.progressSlider.minimumTrackTintColor = .white
+        self.progressSlider.minimumTrackTintColor = UIColor(red: 0.98, green: 0.18, blue: 0.38, alpha: 1.0)
         self.progressSlider.maximumTrackTintColor = UIColor(white: 1.0, alpha: 0.22)
         self.progressSlider.setThumbImage(self.generateSliderThumb(), for: .normal)
         self.progressSlider.addTarget(self, action: #selector(self.sliderValueChanged), for: .valueChanged)
@@ -432,38 +450,42 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.nowPlayingContainerView.addSubview(self.progressSlider)
         
         self.currentTimeLabel.textColor = UIColor(white: 1.0, alpha: 0.55)
-        self.currentTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        self.currentTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)
         self.currentTimeLabel.text = "0:00"
         self.nowPlayingContainerView.addSubview(self.currentTimeLabel)
         
         self.remainingTimeLabel.textColor = UIColor(white: 1.0, alpha: 0.55)
-        self.remainingTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        self.remainingTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)
         self.remainingTimeLabel.text = "-0:00"
         self.remainingTimeLabel.textAlignment = .right
         self.nowPlayingContainerView.addSubview(self.remainingTimeLabel)
         
         // Controls Row: Shuffle | Prev | Play/Pause | Next | Repeat
-        let subConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        let subConfig = UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)
         self.shuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: subConfig), for: .normal)
-        self.shuffleButton.tintColor = UIColor.white.withAlphaComponent(0.6)
+        self.shuffleButton.tintColor = UIColor(white: 1.0, alpha: 0.65)
         self.shuffleButton.addTarget(self, action: #selector(self.shufflePressed), for: .touchUpInside)
         self.controlsContainerView.addSubview(self.shuffleButton)
         
-        let skipConfig = UIImage.SymbolConfiguration(pointSize: 26, weight: .bold)
+        let skipConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: .bold)
         self.previousButton.setImage(UIImage(systemName: "backward.fill", withConfiguration: skipConfig), for: .normal)
         self.previousButton.tintColor = .white
         self.previousButton.addTarget(self, action: #selector(self.previousPressed), for: .touchUpInside)
         self.controlsContainerView.addSubview(self.previousButton)
         
-        // Play/Pause Big Glass Circle
+        // Play/Pause Glowing Glass Circle
         self.playPauseContainer.layer.cornerRadius = 34
         self.playPauseContainer.layer.cornerCurve = .continuous
-        self.playPauseContainer.clipsToBounds = true
-        self.playPauseContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.22)
-        self.playPauseContainer.layer.borderWidth = 0.5
-        self.playPauseContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
+        self.playPauseContainer.clipsToBounds = false
+        self.playPauseContainer.backgroundColor = UIColor(white: 0.12, alpha: 0.55)
+        self.playPauseContainer.layer.borderWidth = 1.8
+        self.playPauseContainer.layer.borderColor = UIColor(red: 0.98, green: 0.18, blue: 0.38, alpha: 0.90).cgColor
+        self.playPauseContainer.layer.shadowColor = UIColor(red: 0.98, green: 0.18, blue: 0.38, alpha: 1.0).cgColor
+        self.playPauseContainer.layer.shadowOpacity = 0.55
+        self.playPauseContainer.layer.shadowRadius = 8.0
+        self.playPauseContainer.layer.shadowOffset = .zero
         
-        let playConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 26, weight: .bold)
         self.playPauseButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playConfig), for: .normal)
         self.playPauseButton.tintColor = .white
         self.playPauseButton.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
@@ -476,23 +498,23 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.controlsContainerView.addSubview(self.nextButton)
         
         self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: subConfig), for: .normal)
-        self.repeatButton.tintColor = UIColor.white.withAlphaComponent(0.6)
+        self.repeatButton.tintColor = UIColor(white: 1.0, alpha: 0.65)
         self.repeatButton.addTarget(self, action: #selector(self.repeatPressed), for: .touchUpInside)
         self.controlsContainerView.addSubview(self.repeatButton)
         
         self.nowPlayingContainerView.addSubview(self.controlsContainerView)
         
-        // Bottom Action Buttons: Profile | Wave | Autoplay | Together | Download
+        // Bottom Action Buttons: Profile | Wave | Autoplay | Download (and Together when active)
         self.actionsStackView.axis = .horizontal
         self.actionsStackView.distribution = .fillEqually
         self.actionsStackView.alignment = .fill
-        self.actionsStackView.spacing = 6
+        self.actionsStackView.spacing = 8
         
-        self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.circle")
+        self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.crop.circle")
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
         self.actionsStackView.addArrangedSubview(self.pinToProfileButton)
         
-        self.styleCapsuleButton(self.waveButton, title: "Волна", icon: "waveform")
+        self.styleCapsuleButton(self.waveButton, title: "Волна", icon: "waveform", isActiveGlow: true)
         self.waveButton.addTarget(self, action: #selector(self.wavePressed), for: .touchUpInside)
         self.actionsStackView.addArrangedSubview(self.waveButton)
         
@@ -502,6 +524,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
 
         self.styleCapsuleButton(self.listenTogetherButton, title: "Вместе", icon: "person.2.fill")
         self.listenTogetherButton.addTarget(self, action: #selector(self.listenTogetherPressed), for: .touchUpInside)
+        self.listenTogetherButton.isHidden = true
         self.actionsStackView.addArrangedSubview(self.listenTogetherButton)
 
         self.styleCapsuleButton(self.downloadButton, title: "Скачать", icon: "arrow.down.circle")
@@ -734,22 +757,33 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         return img ?? UIImage()
     }
     
-    private func styleCapsuleButton(_ button: UIButton, title: String, icon: String) {
-        let config = UIImage.SymbolConfiguration(pointSize: 11.5, weight: .semibold)
+    private func styleCapsuleButton(_ button: UIButton, title: String, icon: String, isActiveGlow: Bool = false) {
+        let config = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         button.setImage(UIImage(systemName: icon, withConfiguration: config), for: .normal)
         button.setTitle(" \(title)", for: .normal)
         button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 11.5, weight: .semibold)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
         button.titleLabel?.adjustsFontSizeToFitWidth = true
-        button.titleLabel?.minimumScaleFactor = 0.65
+        button.titleLabel?.minimumScaleFactor = 0.70
         button.titleLabel?.lineBreakMode = .byClipping
-        button.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
         button.tintColor = .white
-        button.layer.cornerRadius = 16
+        button.layer.cornerRadius = 18
         button.layer.cornerCurve = .continuous
-        button.layer.borderWidth = 0.5
-        button.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
-        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 4, bottom: 6, right: 4)
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 6, bottom: 8, right: 6)
+        
+        if isActiveGlow {
+            button.backgroundColor = UIColor(red: 0.98, green: 0.18, blue: 0.38, alpha: 0.92)
+            button.layer.borderWidth = 0.0
+            button.layer.shadowColor = UIColor(red: 0.98, green: 0.18, blue: 0.38, alpha: 1.0).cgColor
+            button.layer.shadowOpacity = 0.55
+            button.layer.shadowRadius = 8.0
+            button.layer.shadowOffset = .zero
+        } else {
+            button.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+            button.layer.borderWidth = 0.5
+            button.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
+            button.layer.shadowOpacity = 0.0
+        }
     }
     
     private func generateSliderThumb() -> UIImage {
@@ -774,6 +808,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
     }
     
+    public override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        self.attachListeners()
+        self.updateContent()
+        self.reloadQueueData()
+    }
+    
     public override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         self.triggerDismissBeginIfNeeded()
@@ -781,6 +822,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        self.detachListeners()
         self.triggerDismissBeginIfNeeded()
         self.onDismiss?()
     }
@@ -793,17 +835,18 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.backgroundBlurView.frame = bounds
         self.darkDimOverlay.frame = bounds
         
-        let topY = max(safeArea.top, 14.0)
-        self.grabberView.frame = CGRect(x: (bounds.width - 38) * 0.5, y: topY + 6, width: 38, height: 5)
+        let topY = max(safeArea.top, 48.0)
+        self.grabberView.frame = .zero
         
-        let headerY = topY + 20
-        self.dismissButton.frame = CGRect(x: 16, y: headerY + 2, width: 32, height: 32)
-        self.dismissButton.layer.cornerRadius = 16
+        let btnDiameter: CGFloat = 38.0
+        self.dismissButton.frame = CGRect(x: 16, y: topY + 2, width: btnDiameter, height: btnDiameter)
+        self.dismissButton.layer.cornerRadius = btnDiameter * 0.5
         
         // Mode Switcher (Centered)
-        let segW: CGFloat = 192.0
-        let segH: CGFloat = 32.0
-        self.segmentContainerView.frame = CGRect(x: (bounds.width - segW) * 0.5, y: headerY + 2, width: segW, height: segH)
+        let segW: CGFloat = 216.0
+        let segH: CGFloat = 36.0
+        self.segmentContainerView.frame = CGRect(x: (bounds.width - segW) * 0.5, y: topY + 3, width: segW, height: segH)
+        self.segmentContainerView.layer.cornerRadius = segH * 0.5
         let itemW = segW / 3.0
         self.nowPlayingSegmentButton.frame = CGRect(x: 0, y: 0, width: itemW, height: segH)
         self.lyricsSegmentButton.frame = CGRect(x: itemW, y: 0, width: itemW, height: segH)
@@ -812,23 +855,25 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let indicatorX: CGFloat
         switch self.currentMode {
         case .nowPlaying:
-            indicatorX = 2.0
+            indicatorX = 2.5
         case .lyrics:
-            indicatorX = itemW + 2.0
+            indicatorX = itemW + 2.5
         case .queue:
-            indicatorX = itemW * 2.0 + 2.0
+            indicatorX = itemW * 2.0 + 2.5
         }
-        self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2, width: itemW - 4, height: segH - 4)
+        self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2.5, width: itemW - 5.0, height: segH - 5.0)
+        self.segmentIndicatorView.layer.cornerRadius = (segH - 5.0) * 0.5
         
         // Source Badge (Right)
-        let sourceW: CGFloat = 68.0
-        let sourceH: CGFloat = 28.0
-        self.sourceBadgeContainer.frame = CGRect(x: bounds.width - sourceW - 14, y: headerY + 4, width: sourceW, height: sourceH)
-        self.sourceIconView.frame = CGRect(x: 7, y: 7, width: 14, height: 14)
-        self.sourceLabel.frame = CGRect(x: 24, y: 4, width: sourceW - 28, height: 20)
+        let sourceW: CGFloat = 78.0
+        let sourceH: CGFloat = 34.0
+        self.sourceBadgeContainer.frame = CGRect(x: bounds.width - sourceW - 16, y: topY + 4, width: sourceW, height: sourceH)
+        self.sourceBadgeContainer.layer.cornerRadius = sourceH * 0.5
+        self.sourceIconView.frame = CGRect(x: 8, y: 9, width: 16, height: 16)
+        self.sourceLabel.frame = CGRect(x: 28, y: 7, width: sourceW - 34, height: 20)
         
-        let contentY = headerY + 46.0
-        let contentH = bounds.height - contentY - max(safeArea.bottom, 16.0)
+        let contentY = topY + 48.0
+        let contentH = bounds.height - contentY - max(safeArea.bottom, 20.0)
         let contentFrame = CGRect(x: 0, y: contentY, width: bounds.width, height: contentH)
         
         self.nowPlayingContainerView.frame = contentFrame
@@ -845,60 +890,57 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         guard bounds.width > 0 && bounds.height > 0 else { return }
         
         // Artwork: large square with dynamic height
-        let maxArtSide = min(bounds.width - 64, bounds.height * 0.38)
-        let artSide = max(160, maxArtSide)
-        let artY: CGFloat = 20.0
+        let maxArtSide = min(bounds.width - 64, bounds.height * 0.40)
+        let artSide = max(180, maxArtSide)
+        let artY: CGFloat = 16.0
         let artX = floor((bounds.width - artSide) * 0.5)
         self.artworkContainerView.transform = .identity
         self.artworkContainerView.frame = CGRect(x: artX, y: artY, width: artSide, height: artSide)
         self.artworkImageView.frame = self.artworkContainerView.bounds
-        self.artworkContainerView.layer.shadowPath = UIBezierPath(roundedRect: self.artworkContainerView.bounds, cornerRadius: 24.0).cgPath
+        self.artworkContainerView.layer.shadowPath = UIBezierPath(roundedRect: self.artworkContainerView.bounds, cornerRadius: 28.0).cgPath
         
-        let glowSize: CGFloat = artSide * 1.10
-        let glowX = artX + (artSide - glowSize) * 0.5
-        let glowY = artY + (artSide - glowSize) * 0.5 + 8.0
-        self.artworkAmbientGlowView.frame = CGRect(x: glowX, y: glowY, width: glowSize, height: glowSize)
-        self.artworkAmbientGlowView.layer.cornerRadius = glowSize * 0.5
-        self.artworkAmbientGlowView.layer.shadowPath = UIBezierPath(ovalIn: self.artworkAmbientGlowView.bounds).cgPath
+        let glowPadding: CGFloat = 28.0
+        self.artworkAmbientGlowView.frame = CGRect(x: artX - glowPadding * 0.5, y: artY - glowPadding * 0.5 + 6.0, width: artSide + glowPadding, height: artSide + glowPadding)
+        self.artworkAmbientGlowView.layer.cornerRadius = (artSide + glowPadding) * 0.5
         self.artworkGlowGradientLayer.frame = self.artworkAmbientGlowView.bounds
-        self.artworkGlowGradientLayer.cornerRadius = glowSize * 0.5
+        self.artworkGlowGradientLayer.cornerRadius = (artSide + glowPadding) * 0.5
         
         // Info: Title, Artist, Lyrics & Favorite buttons
-        let infoY = artY + artSide + 20.0
-        let btnSize: CGFloat = 36.0
-        self.infoContainerView.frame = CGRect(x: 32, y: infoY, width: bounds.width - 64, height: 50)
-        let titleW = bounds.width - 64 - (btnSize * 2 + 10) - 12
+        let infoY = artY + artSide + 24.0
+        let btnSize: CGFloat = 38.0
+        self.infoContainerView.frame = CGRect(x: 24, y: infoY, width: bounds.width - 48, height: 52)
+        let titleW = bounds.width - 48 - (btnSize * 2 + 12) - 10
         self.titleLabel.frame = CGRect(x: 0, y: 0, width: titleW, height: 28)
-        self.artistLabel.frame = CGRect(x: 0, y: 28, width: titleW, height: 20)
-        self.lyricsButton.frame = CGRect(x: bounds.width - 64 - btnSize * 2 - 8, y: 7, width: btnSize, height: btnSize)
-        self.favoriteButton.frame = CGRect(x: bounds.width - 64 - btnSize, y: 7, width: btnSize, height: btnSize)
+        self.artistLabel.frame = CGRect(x: 0, y: 28, width: titleW, height: 22)
+        self.lyricsButton.frame = CGRect(x: bounds.width - 48 - btnSize * 2 - 10, y: 7, width: btnSize, height: btnSize)
+        self.favoriteButton.frame = CGRect(x: bounds.width - 48 - btnSize, y: 7, width: btnSize, height: btnSize)
         
         // Progress Slider
-        let sliderY = infoY + 56.0
-        self.progressSlider.frame = CGRect(x: 32, y: sliderY, width: bounds.width - 64, height: 26)
-        self.currentTimeLabel.frame = CGRect(x: 32, y: sliderY + 22, width: 60, height: 16)
-        self.remainingTimeLabel.frame = CGRect(x: bounds.width - 92, y: sliderY + 22, width: 60, height: 16)
+        let sliderY = infoY + 60.0
+        self.progressSlider.frame = CGRect(x: 24, y: sliderY, width: bounds.width - 48, height: 26)
+        self.currentTimeLabel.frame = CGRect(x: 24, y: sliderY + 22, width: 60, height: 16)
+        self.remainingTimeLabel.frame = CGRect(x: bounds.width - 84, y: sliderY + 22, width: 60, height: 16)
         
         // Controls Row: deterministic frame positioning (never collapses)
-        let controlsY = sliderY + 44.0
+        let controlsY = sliderY + 46.0
         let controlsW = bounds.width - 48.0
-        self.controlsContainerView.frame = CGRect(x: 24, y: controlsY, width: controlsW, height: 68)
+        self.controlsContainerView.frame = CGRect(x: 24, y: controlsY, width: controlsW, height: 72)
         
         let centerX = controlsW * 0.5
-        self.playPauseContainer.frame = CGRect(x: centerX - 34.0, y: 0, width: 68.0, height: 68.0)
+        self.playPauseContainer.frame = CGRect(x: centerX - 34.0, y: (72.0 - 68.0) * 0.5, width: 68.0, height: 68.0)
         self.playPauseButton.frame = self.playPauseContainer.bounds
         
-        let skipSize: CGFloat = 44.0
-        self.previousButton.frame = CGRect(x: centerX - 34.0 - 24.0 - skipSize, y: (68.0 - skipSize) * 0.5, width: skipSize, height: skipSize)
-        self.nextButton.frame = CGRect(x: centerX + 34.0 + 24.0, y: (68.0 - skipSize) * 0.5, width: skipSize, height: skipSize)
+        let skipSize: CGFloat = 46.0
+        self.previousButton.frame = CGRect(x: centerX - 34.0 - 26.0 - skipSize, y: (72.0 - skipSize) * 0.5, width: skipSize, height: skipSize)
+        self.nextButton.frame = CGRect(x: centerX + 34.0 + 26.0, y: (72.0 - skipSize) * 0.5, width: skipSize, height: skipSize)
         
         let subSize: CGFloat = 40.0
-        self.shuffleButton.frame = CGRect(x: 8.0, y: (68.0 - subSize) * 0.5, width: subSize, height: subSize)
-        self.repeatButton.frame = CGRect(x: controlsW - 8.0 - subSize, y: (68.0 - subSize) * 0.5, width: subSize, height: subSize)
+        self.shuffleButton.frame = CGRect(x: 6.0, y: (72.0 - subSize) * 0.5, width: subSize, height: subSize)
+        self.repeatButton.frame = CGRect(x: controlsW - 6.0 - subSize, y: (72.0 - subSize) * 0.5, width: subSize, height: subSize)
         
         // Bottom Action Buttons
-        let actionsY = controlsY + 76.0
-        self.actionsStackView.frame = CGRect(x: 20, y: actionsY, width: bounds.width - 40, height: 36)
+        let actionsY = controlsY + 78.0
+        self.actionsStackView.frame = CGRect(x: 20, y: actionsY, width: bounds.width - 40, height: 38)
     }
     
     private func layoutLyricsPane(contentH: CGFloat) {
@@ -1061,14 +1103,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let lyricsMiniCfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)
         self.lyricsMiniPlayPause.setImage(UIImage(systemName: playIconName, withConfiguration: lyricsMiniCfg), for: .normal)
         
-        self.lyricsButton.tintColor = (self.currentLyrics != nil) ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : UIColor.white.withAlphaComponent(0.8)
+        self.lyricsButton.tintColor = UIColor(red: 0.98, green: 0.18, blue: 0.38, alpha: 1.0)
         
         // Favorite
         let isFav = manager.isFavorite(track: track)
         let heartIcon = isFav ? "heart.fill" : "heart"
         let heartCfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
         self.favoriteButton.setImage(UIImage(systemName: heartIcon, withConfiguration: heartCfg), for: .normal)
-        self.favoriteButton.tintColor = isFav ? UIColor(red: 1.0, green: 0.22, blue: 0.38, alpha: 1.0) : UIColor.white.withAlphaComponent(0.8)
+        self.favoriteButton.tintColor = isFav ? UIColor(red: 0.98, green: 0.18, blue: 0.38, alpha: 1.0) : .white
         
         // Shuffle
         self.shuffleButton.tintColor = manager.isShuffleEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0) : UIColor.white.withAlphaComponent(0.6)
@@ -1088,21 +1130,21 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         // Action states
-        self.waveButton.backgroundColor = manager.isWaveEnabled ? UIColor(red: 0.95, green: 0.25, blue: 0.50, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
-        self.autoplayButton.backgroundColor = manager.isAutoplayEnabled ? UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
+        self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.crop.circle")
+        self.styleCapsuleButton(self.waveButton, title: "Волна", icon: "waveform", isActiveGlow: manager.isWaveEnabled)
+        self.styleCapsuleButton(self.autoplayButton, title: "Авто", icon: "infinity", isActiveGlow: manager.isAutoplayEnabled)
+        
         let isTogether = SGDoxListenTogetherManager.shared.isInSession
-        self.listenTogetherButton.backgroundColor = isTogether ? UIColor(red: 0.20, green: 0.60, blue: 1.0, alpha: 0.85) : UIColor(white: 1.0, alpha: 0.14)
+        self.listenTogetherButton.isHidden = !isTogether
+        if isTogether {
+            self.styleCapsuleButton(self.listenTogetherButton, title: "Вместе", icon: "person.2.fill", isActiveGlow: true)
+        }
         
         let isDownloaded = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
-        let downConfig = UIImage.SymbolConfiguration(pointSize: 11.5, weight: .semibold)
         if isDownloaded {
-            self.downloadButton.backgroundColor = UIColor(red: 0.18, green: 0.80, blue: 0.44, alpha: 0.85)
-            self.downloadButton.setTitle(" Скачано", for: .normal)
-            self.downloadButton.setImage(UIImage(systemName: "checkmark.circle.fill", withConfiguration: downConfig), for: .normal)
+            self.styleCapsuleButton(self.downloadButton, title: "Скачано", icon: "checkmark.circle.fill")
         } else {
-            self.downloadButton.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
-            self.downloadButton.setTitle(" Скачать", for: .normal)
-            self.downloadButton.setImage(UIImage(systemName: "arrow.down.circle", withConfiguration: downConfig), for: .normal)
+            self.styleCapsuleButton(self.downloadButton, title: "Скачать", icon: "arrow.down.circle")
         }
         
         self.updateArtworkScale(isPlaying: manager.isPlaying, animated: true)
@@ -1127,15 +1169,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func updateArtworkScale(isPlaying: Bool, animated: Bool) {
-        let opacity: Float = isPlaying ? 0.55 : 0.30
-        let radius: CGFloat = isPlaying ? 26.0 : 16.0
-        if animated {
-            let anim = CABasicAnimation(keyPath: "shadowOpacity")
-            anim.fromValue = self.artworkContainerView.layer.shadowOpacity
-            anim.toValue = opacity
-            anim.duration = 0.3
-            self.artworkContainerView.layer.add(anim, forKey: "shadowOpacity")
-        }
+        let opacity: Float = isPlaying ? 0.40 : 0.25
+        let radius: CGFloat = isPlaying ? 24.0 : 16.0
         self.artworkContainerView.layer.shadowOpacity = opacity
         self.artworkContainerView.layer.shadowRadius = radius
     }
@@ -1176,69 +1211,19 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             let newColors = [vibrantColor.cgColor, avgColor.cgColor, deepColor.cgColor]
             
             let glowColors = [
-                vibrantColor.withAlphaComponent(0.65).cgColor,
-                avgColor.withAlphaComponent(0.35).cgColor,
+                vibrantColor.withAlphaComponent(0.45).cgColor,
+                avgColor.withAlphaComponent(0.18).cgColor,
                 UIColor.clear.cgColor
             ]
             
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                let animation = CABasicAnimation(keyPath: "colors")
-                animation.fromValue = self.ambientGradientLayer.colors
-                animation.toValue = newColors
-                animation.duration = 0.7
-                self.ambientGradientLayer.add(animation, forKey: "colorsChange")
                 self.ambientGradientLayer.colors = newColors
-                
-                self.artworkContainerView.layer.shadowColor = vibrantColor.cgColor
-                
                 self.artworkGlowGradientLayer.colors = glowColors
-                self.artworkAmbientGlowView.layer.shadowColor = vibrantColor.cgColor
-                self.artworkAmbientGlowView.layer.shadowRadius = 32.0
-                self.artworkAmbientGlowView.layer.shadowOpacity = 0.65
-                self.artworkAmbientGlowView.layer.shadowOffset = CGSize(width: 0, height: 6)
-                if self.artworkAmbientGlowView.bounds.width > 0 {
-                    self.artworkAmbientGlowView.layer.shadowPath = UIBezierPath(ovalIn: self.artworkAmbientGlowView.bounds).cgPath
-                }
-                if self.artworkContainerView.bounds.width > 0 {
-                    self.artworkContainerView.layer.shadowPath = UIBezierPath(roundedRect: self.artworkContainerView.bounds, cornerRadius: 24.0).cgPath
-                }
-                self.startGlowAnimation()
+                self.artworkContainerView.layer.shadowColor = UIColor.black.cgColor
+                self.artworkAmbientGlowView.layer.shadowOpacity = 0.0
             }
         }
-    }
-    
-    private func startGlowAnimation() {
-        self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowPulse")
-        self.artworkAmbientGlowView.layer.removeAnimation(forKey: "glowAlpha")
-        self.artworkGlowGradientLayer.removeAnimation(forKey: "glowCenterShift")
-        
-        let pulseAnim = CABasicAnimation(keyPath: "transform.scale")
-        pulseAnim.fromValue = 0.98
-        pulseAnim.toValue = 1.05
-        pulseAnim.duration = 4.2
-        pulseAnim.autoreverses = true
-        pulseAnim.repeatCount = .infinity
-        pulseAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        self.artworkAmbientGlowView.layer.add(pulseAnim, forKey: "glowPulse")
-        
-        let alphaAnim = CABasicAnimation(keyPath: "opacity")
-        alphaAnim.fromValue = 0.70
-        alphaAnim.toValue = 0.95
-        alphaAnim.duration = 3.5
-        alphaAnim.autoreverses = true
-        alphaAnim.repeatCount = .infinity
-        alphaAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        self.artworkAmbientGlowView.layer.add(alphaAnim, forKey: "glowAlpha")
-        
-        let shiftAnim = CABasicAnimation(keyPath: "startPoint")
-        shiftAnim.fromValue = CGPoint(x: 0.47, y: 0.47)
-        shiftAnim.toValue = CGPoint(x: 0.53, y: 0.53)
-        shiftAnim.duration = 6.2
-        shiftAnim.autoreverses = true
-        shiftAnim.repeatCount = .infinity
-        shiftAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        self.artworkGlowGradientLayer.add(shiftAnim, forKey: "glowCenterShift")
     }
     
     private func formatTime(_ seconds: Double) -> String {

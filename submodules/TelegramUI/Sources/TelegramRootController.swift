@@ -288,7 +288,8 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             guard let self = self else { return }
             floatingWidget?.setHiddenForSubscreens(true)
             let playerController = SGDoxMusicPlayerController(context: self.context)
-            playerController.navigationPresentation = .modal
+            playerController.navigationPresentation = .flatModal
+            playerController.flatReceivesModalTransition = true
             playerController.onDismissBegin = { [weak self, weak floatingWidget] in
                 guard let self = self else { return }
                 floatingWidget?.setHiddenForSubscreens(self.viewControllers.count > 1)

@@ -41,8 +41,11 @@ public final class AppleMusicService: @unchecked Sendable {
 
     private func checkCatalogSubscription() {
         SKCloudServiceController().requestCapabilities { [weak self] capabilities, error in
-            let canPlay = (error == nil) && capabilities.contains(.musicCatalogPlayback)
-            self?.canPlayCatalogContent = canPlay
+            if error == nil && capabilities.contains(.musicCatalogPlayback) {
+                self?.canPlayCatalogContent = true
+            } else {
+                self?.canPlayCatalogContent = nil
+            }
         }
     }
 
@@ -948,10 +951,9 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
-        // 3. Attempt system player if valid store ID AND user has catalog streaming rights
+        // 3. Attempt system player if valid store ID
         if let appleMusicId = track.appleMusicId,
-           !appleMusicId.isEmpty && !appleMusicId.hasPrefix("local_") && !appleMusicId.hasPrefix("am_local_"),
-           self.canPlayCatalogContent != false {
+           !appleMusicId.isEmpty && !appleMusicId.hasPrefix("local_") && !appleMusicId.hasPrefix("am_local_") {
             
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
