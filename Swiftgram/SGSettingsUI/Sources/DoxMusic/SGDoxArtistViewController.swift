@@ -192,24 +192,26 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     
     private func loadArtistData() {
         AppleMusicService.shared.fetchArtistDetails(artistName: self.artistName) { [weak self] tracks, albums, artistImageUrl in
-            guard let self = self else { return }
-            self.activityIndicator.stopAnimating()
-            self.topTracks = tracks
-            self.albums = albums
-            self.artistImageUrl = artistImageUrl
-            
-            if let imgUrl = artistImageUrl {
-                SGDoxImageLoader.shared.loadImage(urlString: imgUrl) { [weak self] loadedImage in
-                    self?.avatarImageView.image = loadedImage
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.activityIndicator.stopAnimating()
+                self.topTracks = tracks
+                self.albums = albums
+                self.artistImageUrl = artistImageUrl
+                
+                if let imgUrl = artistImageUrl {
+                    SGDoxImageLoader.shared.loadImage(urlString: imgUrl) { [weak self] loadedImage in
+                        self?.avatarImageView.image = loadedImage
+                    }
+                } else {
+                    self.avatarImageView.image = UIImage(systemName: "music.mic")
+                    self.avatarImageView.tintColor = .white
                 }
-            } else {
-                self.avatarImageView.image = UIImage(systemName: "music.mic")
-                self.avatarImageView.tintColor = .white
+                
+                self.updateHeaderHeight()
+                self.albumsCollectionView.reloadData()
+                self.tableView.reloadData()
             }
-            
-            self.updateHeaderHeight()
-            self.albumsCollectionView.reloadData()
-            self.tableView.reloadData()
         }
     }
     
@@ -287,12 +289,14 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         let album = self.albums[indexPath.item]
         self.activityIndicator.startAnimating()
         AppleMusicService.shared.fetchAlbumTracks(collectionId: album.id) { [weak self] albumTracks in
-            guard let self = self else { return }
-            self.activityIndicator.stopAnimating()
-            guard !albumTracks.isEmpty else { return }
-            var list = albumTracks
-            let first = list.removeFirst()
-            SGDoxMusicManager.shared.play(track: first, queue: list)
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.activityIndicator.stopAnimating()
+                guard !albumTracks.isEmpty else { return }
+                var list = albumTracks
+                let first = list.removeFirst()
+                SGDoxMusicManager.shared.play(track: first, queue: list)
+            }
         }
     }
 }
