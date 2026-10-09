@@ -92,12 +92,13 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.loadArtistData()
     }
     
+    public override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        self.layoutHeader(width: self.view.bounds.width)
+    }
+    
     private func setupHeaderView() {
-        let screenW = self.view.bounds.width
-        
-        // Avatar circle
         let avatarSize: CGFloat = 100.0
-        self.avatarImageView.frame = CGRect(x: (screenW - avatarSize) * 0.5, y: 12, width: avatarSize, height: avatarSize)
         self.avatarImageView.layer.cornerRadius = avatarSize * 0.5
         self.avatarImageView.clipsToBounds = true
         self.avatarImageView.contentMode = .scaleAspectFill
@@ -106,28 +107,18 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.avatarImageView.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
         self.headerView.addSubview(self.avatarImageView)
         
-        // Name label
-        self.nameLabel.frame = CGRect(x: 20, y: self.avatarImageView.frame.maxY + 10, width: screenW - 40, height: 28)
         self.nameLabel.text = self.artistName
         self.nameLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
         self.nameLabel.textColor = .white
         self.nameLabel.textAlignment = .center
         self.headerView.addSubview(self.nameLabel)
         
-        // Subtitle label
-        self.subtitleLabel.frame = CGRect(x: 20, y: self.nameLabel.frame.maxY + 2, width: screenW - 40, height: 18)
         self.subtitleLabel.text = "Исполнитель"
         self.subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.6)
         self.subtitleLabel.textAlignment = .center
         self.headerView.addSubview(self.subtitleLabel)
         
-        // Action Buttons Row (Play All & Shuffle)
-        let btnW = (screenW - 48 - 12) * 0.5
-        let btnH: CGFloat = 38.0
-        let btnY = self.subtitleLabel.frame.maxY + 14
-        
-        self.playAllButton.frame = CGRect(x: 24, y: btnY, width: btnW, height: btnH)
         self.playAllButton.setTitle("▶  Слушать", for: .normal)
         self.playAllButton.setTitleColor(.white, for: .normal)
         self.playAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
@@ -136,7 +127,6 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.playAllButton.addTarget(self, action: #selector(self.playAllPressed), for: .touchUpInside)
         self.headerView.addSubview(self.playAllButton)
         
-        self.shuffleButton.frame = CGRect(x: self.playAllButton.frame.maxX + 12, y: btnY, width: btnW, height: btnH)
         self.shuffleButton.setTitle("🔀  Перемешать", for: .normal)
         self.shuffleButton.setTitleColor(.white, for: .normal)
         self.shuffleButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
@@ -145,22 +135,19 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.shuffleButton.addTarget(self, action: #selector(self.shufflePressed), for: .touchUpInside)
         self.headerView.addSubview(self.shuffleButton)
         
-        // Albums collection
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
         layout.itemSize = CGSize(width: 120, height: 165)
         layout.minimumLineSpacing = 12
         layout.sectionInset = UIEdgeInsets(top: 0, left: 20, bottom: 0, right: 20)
         
-        let collY = btnY + btnH + 18
-        self.albumsSectionLabel.frame = CGRect(x: 20, y: collY, width: screenW - 40, height: 22)
         self.albumsSectionLabel.text = "Альбомы и синглы"
         self.albumsSectionLabel.font = UIFont.systemFont(ofSize: 17, weight: .bold)
         self.albumsSectionLabel.textColor = .white
         self.albumsSectionLabel.isHidden = true
         self.headerView.addSubview(self.albumsSectionLabel)
         
-        self.albumsCollectionView = UICollectionView(frame: CGRect(x: 0, y: collY + 28, width: screenW, height: 175), collectionViewLayout: layout)
+        self.albumsCollectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         self.albumsCollectionView.backgroundColor = .clear
         self.albumsCollectionView.showsHorizontalScrollIndicator = false
         self.albumsCollectionView.dataSource = self
@@ -169,24 +156,39 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.albumsCollectionView.isHidden = true
         self.headerView.addSubview(self.albumsCollectionView)
         
-        self.headerView.frame = CGRect(x: 0, y: 0, width: screenW, height: collY)
-        self.tableView.tableHeaderView = self.headerView
+        self.layoutHeader(width: self.view.bounds.width)
     }
     
-    private func updateHeaderHeight() {
-        let screenW = self.view.bounds.width
+    private func layoutHeader(width: CGFloat) {
+        guard width > 0 else { return }
+        let screenW = width
+        
+        let avatarSize: CGFloat = 100.0
+        self.avatarImageView.frame = CGRect(x: (screenW - avatarSize) * 0.5, y: 12, width: avatarSize, height: avatarSize)
+        self.nameLabel.frame = CGRect(x: 20, y: self.avatarImageView.frame.maxY + 10, width: screenW - 40, height: 28)
+        self.subtitleLabel.frame = CGRect(x: 20, y: self.nameLabel.frame.maxY + 2, width: screenW - 40, height: 18)
+        
+        let btnW = (screenW - 48 - 12) * 0.5
+        let btnH: CGFloat = 38.0
+        let btnY = self.subtitleLabel.frame.maxY + 14
+        
+        self.playAllButton.frame = CGRect(x: 24, y: btnY, width: btnW, height: btnH)
+        self.shuffleButton.frame = CGRect(x: self.playAllButton.frame.maxX + 12, y: btnY, width: btnW, height: btnH)
+        
         let hasAlbums = !self.albums.isEmpty
         self.albumsSectionLabel.isHidden = !hasAlbums
         self.albumsCollectionView.isHidden = !hasAlbums
         
-        let collY = self.shuffleButton.frame.maxY + 18
+        let collY = btnY + btnH + 18
+        let totalH: CGFloat
         if hasAlbums {
             self.albumsSectionLabel.frame = CGRect(x: 20, y: collY, width: screenW - 40, height: 22)
             self.albumsCollectionView.frame = CGRect(x: 0, y: collY + 28, width: screenW, height: 175)
-            self.headerView.frame = CGRect(x: 0, y: 0, width: screenW, height: collY + 28 + 175 + 10)
+            totalH = collY + 28 + 175 + 10
         } else {
-            self.headerView.frame = CGRect(x: 0, y: 0, width: screenW, height: collY + 6)
+            totalH = collY + 6
         }
+        self.headerView.frame = CGRect(x: 0, y: 0, width: screenW, height: totalH)
         self.tableView.tableHeaderView = self.headerView
     }
     
@@ -196,7 +198,8 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                 guard let self = self else { return }
                 self.activityIndicator.stopAnimating()
                 self.topTracks = tracks
-                self.albums = albums
+                // Sort albums newest first
+                self.albums = albums.sorted { ($0.releaseDate ?? "") > ($1.releaseDate ?? "") }
                 self.artistImageUrl = artistImageUrl
                 
                 if let imgUrl = artistImageUrl {
@@ -208,7 +211,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                     self.avatarImageView.tintColor = .white
                 }
                 
-                self.updateHeaderHeight()
+                self.layoutHeader(width: self.view.bounds.width)
                 self.albumsCollectionView.reloadData()
                 self.tableView.reloadData()
             }
@@ -287,17 +290,8 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     
     public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let album = self.albums[indexPath.item]
-        self.activityIndicator.startAnimating()
-        AppleMusicService.shared.fetchAlbumTracks(collectionId: album.id) { [weak self] albumTracks in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.activityIndicator.stopAnimating()
-                guard !albumTracks.isEmpty else { return }
-                var list = albumTracks
-                let first = list.removeFirst()
-                SGDoxMusicManager.shared.play(track: first, queue: list)
-            }
-        }
+        let albumVc = SGDoxAlbumViewController(context: self.context, album: album)
+        self.present(albumVc, in: .window(.root))
     }
 }
 

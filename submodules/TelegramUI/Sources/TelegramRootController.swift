@@ -304,11 +304,12 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
                     floatingWidget?.updateLayout(size: layout.size, insets: layout.insets(options: []), transition: .immediate)
                 }
             }
-            let presentationArguments = ViewControllerPresentationArguments(presentationAnimation: .modalSheet)
-            if let topViewController = self.topViewController as? ViewController {
-                topViewController.present(playerController, in: .window(.root), with: presentationArguments)
-            } else if let rootTabController = self.rootTabController {
-                rootTabController.present(playerController, in: .window(.root), with: presentationArguments)
+            if let topNavigationController = self.topViewController as? NavigationController {
+                topNavigationController.push(playerController)
+            } else if let topViewController = self.topViewController as? ViewController, let nav = topViewController.navigationController as? NavigationController {
+                nav.push(playerController)
+            } else {
+                self.push(playerController)
             }
         }
         self.floatingMusicWidget = floatingWidget

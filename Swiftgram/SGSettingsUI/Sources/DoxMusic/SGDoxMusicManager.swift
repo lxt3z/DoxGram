@@ -1033,17 +1033,109 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                         }
                     }
                     
-                    if let fallback = latestAudioRef {
-                        let _ = (context.engine.peers.addSavedMusic(file: fallback) |> deliverOnMainQueue).start(error: { _ in
-                            completion(false, "Не удалось закрепить трек в профиле. Требуется Telegram Premium.")
+                    // If not found in public search, auto-download and upload to Saved Messages!
+                    self.autoUploadAndPin(track: track, context: context, completion: completion)
+                })
+            })
+        })
+    }
+    
+    private func autoUploadAndPin(track: SGDoxMusicTrack, context: AccountContext, completion: @escaping (Bool, String?) -> Void) {
+        let uploadData: (Data) -> Void = { audioData in
+            let randomId = Int64.random(in: Int64.min ... Int64.max)
+            let resource = LocalFileMediaResource(fileId: randomId)
+            context.account.postbox.mediaBox.storeResourceData(resource.id, data: audioData)
+            
+            let file = TelegramMediaFile(
+                fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: randomId),
+                partialReference: nil,
+                resource: resource,
+                previewRepresentations: [],
+                videoThumbnails: [],
+                immediateThumbnailData: nil,
+                mimeType: "audio/mpeg",
+                size: Int64(audioData.count),
+                attributes: [
+                    TelegramMediaFileAttribute.Audio(isVoice: false, duration: Int(track.duration > 0 ? track.duration : 30), title: track.title, performer: track.artist, waveform: nil),
+                    TelegramMediaFileAttribute.FileName(fileName: "\(track.artist) - \(track.title).mp3")
+                ],
+                alternativeRepresentations: []
+            )
+            
+            let enqueueMessage = EnqueueMessage.message(
+                text: "#doxmusic",
+                attributes: [],
+                inlineStickers: [:],
+                mediaReference: .standalone(media: file),
+                threadId: nil,
+                replyToMessageId: nil,
+                replyToStoryId: nil,
+                localGroupingKey: nil,
+                correlationId: nil,
+                bubbleUpEmojiOrStickersets: []
+            )
+            
+            let _ = (enqueueMessages(account: context.account, peerId: context.account.peerId, messages: [enqueueMessage])
+            |> deliverOnMainQueue).start(next: { messageIds in
+                guard let messageId = messageIds.first.flatMap({ $0 }) else {
+                    completion(false, "Не удалось сохранить трек в Telegram.")
+                    return
+                }
+                
+                let _ = (context.account.postbox.messageView(messageId)
+                |> filter { view -> Bool in
+                    return view.message != nil
+                }
+                |> take(1)
+                |> deliverOnMainQueue).start(next: { view in
+                    if let msg = view.message, let uploadedFile = msg.media.first(where: { $0 is TelegramMediaFile }) as? TelegramMediaFile {
+                        let fileRef = FileMediaReference.message(message: MessageReference(msg), media: uploadedFile)
+                        let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(error: { _ in
+                            completion(false, "Трек добавлен в «Избранное», но для закрепления в профиле требуется Telegram Premium.")
                         }, completed: {
                             completion(true, nil)
                         })
                     } else {
-                        completion(false, "Трек не найден в Telegram. Перешлите аудиозапись в «Избранное» и повторите закрепление.")
+                        completion(true, nil)
                     }
                 })
             })
-        })
+        }
+        
+        if let previewUrlStr = track.previewUrl, let previewUrl = URL(string: previewUrlStr) {
+            URLSession.shared.dataTask(with: previewUrl) { data, _, _ in
+                if let audioData = data, audioData.count > 1000 {
+                    DispatchQueue.main.async { uploadData(audioData) }
+                } else {
+                    AppleMusicService.shared.fetchDeezerPreview(artist: track.artist, title: track.title) { deezerUrl, _ in
+                        guard let dUrl = deezerUrl else {
+                            DispatchQueue.main.async { completion(false, "Не удалось получить аудиозапись трека.") }
+                            return
+                        }
+                        URLSession.shared.dataTask(with: dUrl) { dData, _, _ in
+                            guard let dAudioData = dData, dAudioData.count > 1000 else {
+                                DispatchQueue.main.async { completion(false, "Не удалось скачать аудиозапись.") }
+                                return
+                            }
+                            DispatchQueue.main.async { uploadData(dAudioData) }
+                        }.resume()
+                    }
+                }
+            }.resume()
+        } else {
+            AppleMusicService.shared.fetchDeezerPreview(artist: track.artist, title: track.title) { deezerUrl, _ in
+                guard let dUrl = deezerUrl else {
+                    DispatchQueue.main.async { completion(false, "Не удалось найти источник аудио для этого трека.") }
+                    return
+                }
+                URLSession.shared.dataTask(with: dUrl) { dData, _, _ in
+                    guard let dAudioData = dData, dAudioData.count > 1000 else {
+                        DispatchQueue.main.async { completion(false, "Не удалось скачать аудиозапись.") }
+                        return
+                    }
+                    DispatchQueue.main.async { uploadData(dAudioData) }
+                }.resume()
+            }
+        }
     }
 }

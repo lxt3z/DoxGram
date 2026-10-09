@@ -335,19 +335,19 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         self.nowPlayingSegmentButton.setTitle("Сейчас", for: .normal)
         self.nowPlayingSegmentButton.setTitleColor(.white, for: .normal)
-        self.nowPlayingSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        self.nowPlayingSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
         self.nowPlayingSegmentButton.addTarget(self, action: #selector(self.nowPlayingSegmentPressed), for: .touchUpInside)
         self.segmentContainerView.addSubview(self.nowPlayingSegmentButton)
         
         self.lyricsSegmentButton.setTitle("Текст", for: .normal)
         self.lyricsSegmentButton.setTitleColor(UIColor(white: 1.0, alpha: 0.65), for: .normal)
-        self.lyricsSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        self.lyricsSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .medium)
         self.lyricsSegmentButton.addTarget(self, action: #selector(self.lyricsSegmentPressed), for: .touchUpInside)
         self.segmentContainerView.addSubview(self.lyricsSegmentButton)
         
         self.queueSegmentButton.setTitle("Очередь", for: .normal)
         self.queueSegmentButton.setTitleColor(UIColor(white: 1.0, alpha: 0.65), for: .normal)
-        self.queueSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        self.queueSegmentButton.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .medium)
         self.queueSegmentButton.addTarget(self, action: #selector(self.queueSegmentPressed), for: .touchUpInside)
         self.segmentContainerView.addSubview(self.queueSegmentButton)
         
@@ -843,9 +843,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.dismissButton.layer.cornerRadius = btnDiameter * 0.5
         
         // Mode Switcher (Centered)
-        let segW: CGFloat = 216.0
-        let segH: CGFloat = 36.0
-        self.segmentContainerView.frame = CGRect(x: (bounds.width - segW) * 0.5, y: topY + 3, width: segW, height: segH)
+        let segW: CGFloat = 186.0
+        let segH: CGFloat = 34.0
+        self.segmentContainerView.frame = CGRect(x: (bounds.width - segW) * 0.5, y: topY + 4, width: segW, height: segH)
         self.segmentContainerView.layer.cornerRadius = segH * 0.5
         let itemW = segW / 3.0
         self.nowPlayingSegmentButton.frame = CGRect(x: 0, y: 0, width: itemW, height: segH)
@@ -855,22 +855,22 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let indicatorX: CGFloat
         switch self.currentMode {
         case .nowPlaying:
-            indicatorX = 2.5
+            indicatorX = 2.0
         case .lyrics:
-            indicatorX = itemW + 2.5
+            indicatorX = itemW + 2.0
         case .queue:
-            indicatorX = itemW * 2.0 + 2.5
+            indicatorX = itemW * 2.0 + 2.0
         }
-        self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2.5, width: itemW - 5.0, height: segH - 5.0)
-        self.segmentIndicatorView.layer.cornerRadius = (segH - 5.0) * 0.5
+        self.segmentIndicatorView.frame = CGRect(x: indicatorX, y: 2.0, width: itemW - 4.0, height: segH - 4.0)
+        self.segmentIndicatorView.layer.cornerRadius = (segH - 4.0) * 0.5
         
         // Source Badge (Right)
-        let sourceW: CGFloat = 78.0
+        let sourceW: CGFloat = 72.0
         let sourceH: CGFloat = 34.0
-        self.sourceBadgeContainer.frame = CGRect(x: bounds.width - sourceW - 16, y: topY + 4, width: sourceW, height: sourceH)
+        self.sourceBadgeContainer.frame = CGRect(x: bounds.width - sourceW - 14, y: topY + 4, width: sourceW, height: sourceH)
         self.sourceBadgeContainer.layer.cornerRadius = sourceH * 0.5
         self.sourceIconView.frame = CGRect(x: 8, y: 9, width: 16, height: 16)
-        self.sourceLabel.frame = CGRect(x: 28, y: 7, width: sourceW - 34, height: 20)
+        self.sourceLabel.frame = CGRect(x: 26, y: 7, width: sourceW - 30, height: 20)
         
         let contentY = topY + 48.0
         let contentH = bounds.height - contentY - max(safeArea.bottom, 20.0)
