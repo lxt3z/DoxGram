@@ -1320,7 +1320,11 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                     subtitleColor = UIColor.white
                 }
                 
-                subtitleStringText = statusData.text
+                if let peerId = peer?.id.toInt64(), let peerMusic = SGDoxPeerMusicManager.shared.getMusicStatus(peerId: peerId) {
+                    subtitleStringText = "🎵 Слушает: \(peerMusic.title) — \(peerMusic.artist)"
+                } else {
+                    subtitleStringText = statusData.text
+                }
                 subtitleAttributes = MultiScaleTextState.Attributes(font: Font.regular(17.0), color: subtitleColor)
                 smallSubtitleAttributes = MultiScaleTextState.Attributes(font: Font.regular(16.0), color: .white, shadowColor: titleShadowColor)
                 if statusData.hasHiddenCommunityPrefix {

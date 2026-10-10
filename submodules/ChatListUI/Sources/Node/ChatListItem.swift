@@ -3945,12 +3945,16 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                             animateOnline = true
                         }
                     }
-                    if !online && SGSimpleSettings.shared.isMusicPlaying {
-                        if renderedPeer.peerId == item.context.account.peerId {
+                    if renderedPeer.peerId == item.context.account.peerId {
+                        if SGSimpleSettings.shared.isMusicPlaying {
                             online = true
                             onlineIsMusic = true
                             animateOnline = true
                         }
+                    } else if let peerStatus = SGDoxPeerMusicManager.shared.getMusicStatus(peerId: renderedPeer.peerId.toInt64()), peerStatus.isPlaying {
+                        online = true
+                        onlineIsMusic = true
+                        animateOnline = true
                     }
                     
                     if let enabledContextActions = item.enabledContextActions {

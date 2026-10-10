@@ -924,3 +924,48 @@ public func sgUseShortAllChatsTitle(_ default: Bool) -> Bool {
             return `default`
     }
 }
+
+public final class SGDoxPeerMusicManager: @unchecked Sendable {
+    public static let shared = SGDoxPeerMusicManager()
+    
+    public struct PeerMusicStatus: Sendable {
+        public let title: String
+        public let artist: String
+        public let timestamp: Double
+        public let duration: Double
+        
+        public var isPlaying: Bool {
+            let elapsed = Date().timeIntervalSince1970 - self.timestamp
+            let validDuration = self.duration > 0 ? self.duration : 300.0
+            return elapsed >= 0 && elapsed < validDuration
+        }
+    }
+    
+    private var peerStatuses: [Int64: PeerMusicStatus] = [:]
+    private let lock = NSLock()
+    
+    public func updateMusicStatus(peerId: Int64, title: String, artist: String, duration: Double = 0) {
+        self.lock.lock()
+        self.peerStatuses[peerId] = PeerMusicStatus(title: title, artist: artist, timestamp: Date().timeIntervalSince1970, duration: duration)
+        self.lock.unlock()
+    }
+    
+    public func clearMusicStatus(peerId: Int64) {
+        self.lock.lock()
+        self.peerStatuses.removeValue(forKey: peerId)
+        self.lock.unlock()
+    }
+    
+    public func getMusicStatus(peerId: Int64) -> PeerMusicStatus? {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        guard let status = self.peerStatuses[peerId] else { return nil }
+        if status.isPlaying {
+            return status
+        } else {
+            self.peerStatuses.removeValue(forKey: peerId)
+            return nil
+        }
+    }
+}
+

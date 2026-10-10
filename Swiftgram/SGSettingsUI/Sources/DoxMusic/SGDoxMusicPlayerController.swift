@@ -134,8 +134,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
-        self.navigationPresentation = .flatModal
-        self.flatReceivesModalTransition = true
+        self.navigationPresentation = .modal
         self.statusBar.statusBarStyle = .White
         self.ready.set(.single(true))
     }
@@ -178,10 +177,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
         }
         
-        let screenH = max(UIScreen.main.bounds.height, 800.0)
-        self.view.transform = CGAffineTransform(translationX: 0, y: screenH)
-        self.darkDimOverlay.alpha = 0.0
-        self.backgroundBlurView.alpha = 0.0
+        self.darkDimOverlay.alpha = 1.0
+        self.backgroundBlurView.alpha = 1.0
         
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
         panGesture.delegate = self
@@ -834,11 +831,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         super.viewDidAppear(animated)
         if !self.hasAnimatedIn {
             self.hasAnimatedIn = true
-            UIView.animate(withDuration: 0.36, delay: 0.0, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.4, options: [.curveEaseOut], animations: {
-                self.view.transform = .identity
-                self.darkDimOverlay.alpha = 1.0
-                self.backgroundBlurView.alpha = 1.0
-            }, completion: nil)
+            if self.navigationController == nil {
+                self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
+                UIView.animate(withDuration: 0.32, delay: 0.0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0.2, options: [.curveEaseOut], animations: {
+                    self.view.transform = .identity
+                    self.darkDimOverlay.alpha = 1.0
+                    self.backgroundBlurView.alpha = 1.0
+                }, completion: nil)
+            }
         }
     }
     
@@ -1476,27 +1476,23 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
         self.triggerDismissBeginIfNeeded()
-        let doDismiss = { [weak self] in
-            guard let self = self else { return }
-            if let navigationController = self.navigationController as? NavigationController {
-                navigationController.filterController(self, animated: false)
-                completion?()
-            } else if let presenting = self.presentingViewController {
-                presenting.dismiss(animated: false, completion: completion)
+        if let navigationController = self.navigationController as? NavigationController {
+            navigationController.filterController(self, animated: flag)
+            completion?()
+        } else if let presenting = self.presentingViewController {
+            presenting.dismiss(animated: flag, completion: completion)
+        } else {
+            if flag {
+                UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseIn], animations: {
+                    self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
+                    self.darkDimOverlay.alpha = 0.0
+                    self.backgroundBlurView.alpha = 0.0
+                }) { _ in
+                    self.performSuperDismiss(completion: completion)
+                }
             } else {
                 self.performSuperDismiss(completion: completion)
             }
-        }
-        if flag {
-            UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseIn], animations: {
-                self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
-                self.darkDimOverlay.alpha = 0.0
-                self.backgroundBlurView.alpha = 0.0
-            }) { _ in
-                doDismiss()
-            }
-        } else {
-            doDismiss()
         }
     }
     

@@ -276,154 +276,164 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
-        // Prioritize Russian storefront (RU) as requested, with fallback to device region
-        let primaryCountry = "RU"
-        self.performITunesSearch(term: encoded, country: primaryCountry) { [weak self] primaryResults, error in
+        let deviceCountry: String
+        if #available(iOS 16, *) {
+            deviceCountry = Locale.current.region?.identifier ?? "RU"
+        } else {
+            deviceCountry = Locale.current.regionCode ?? "RU"
+        }
+        
+        // Try device region first, followed by KZ (full Russian & CIS catalog without geo-blocks) and US
+        var countriesToTry: [String] = []
+        if !deviceCountry.isEmpty && deviceCountry != "KZ" {
+            countriesToTry.append(deviceCountry)
+        }
+        countriesToTry.append("KZ")
+        if !countriesToTry.contains("RU") {
+            countriesToTry.append("RU")
+        }
+        if !countriesToTry.contains("US") {
+            countriesToTry.append("US")
+        }
+        
+        self.performMultiCountrySearch(term: encoded, cleanQuery: cleanQuery, countries: countriesToTry, index: 0, completion: completion)
+    }
+    
+    private func performMultiCountrySearch(term: String, cleanQuery: String, countries: [String], index: Int, completion: @escaping @Sendable ([SGDoxMusicTrack], String?) -> Void) {
+        guard index < countries.count else {
+            completion([], "Ничего не найдено")
+            return
+        }
+        let country = countries[index]
+        self.performITunesSearch(term: term, cleanQuery: cleanQuery, country: country) { [weak self] results, error in
             guard let self = self else { return }
-            if !primaryResults.isEmpty {
-                completion(AppleMusicService.deduplicateTracks(primaryResults), nil)
-                return
-            }
-            
-            // If primary RU search yielded no results, fallback to KZ (complete CIS catalog for Russian artists like PHARAOH)
-            self.performITunesSearch(term: encoded, country: "KZ") { [weak self] kzResults, _ in
-                guard let self = self else { return }
-                if !kzResults.isEmpty {
-                    completion(AppleMusicService.deduplicateTracks(kzResults), nil)
-                    return
-                }
-                
-                // Fallback to device locale / US
-                let deviceCountry: String
-                if #available(iOS 16, *) {
-                    deviceCountry = Locale.current.region?.identifier ?? "US"
-                } else {
-                    deviceCountry = Locale.current.regionCode ?? "US"
-                }
-                
-                if deviceCountry != primaryCountry && deviceCountry != "KZ" {
-                    self.performITunesSearch(term: encoded, country: deviceCountry) { fallbackResults, fallbackError in
-                        completion(AppleMusicService.deduplicateTracks(fallbackResults), fallbackError ?? error)
-                    }
-                } else {
-                    completion([], error)
-                }
+            if !results.isEmpty {
+                completion(results, nil)
+            } else {
+                self.performMultiCountrySearch(term: term, cleanQuery: cleanQuery, countries: countries, index: index + 1, completion: completion)
             }
         }
     }
     
-    private func performITunesSearch(term: String, country: String, completion: @escaping @Sendable ([SGDoxMusicTrack], String?) -> Void) {
+    private func performITunesSearch(term: String, cleanQuery: String, country: String, completion: @escaping @Sendable ([SGDoxMusicTrack], String?) -> Void) {
         let songUrlString = "https://itunes.apple.com/search?term=\(term)&media=music&entity=song&limit=40&country=\(country)"
         let artistUrlString = "https://itunes.apple.com/search?term=\(term)&media=music&entity=musicArtist&limit=1&country=\(country)"
-        let albumUrlString = "https://itunes.apple.com/search?term=\(term)&media=music&entity=album&limit=1&country=\(country)"
         
-        guard let songUrl = URL(string: songUrlString) else {
-            completion([], "Invalid URL")
-            return
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var songTracks: [SGDoxMusicTrack] = []
+        var artistTracks: [SGDoxMusicTrack] = []
+        
+        // 1. Direct song search
+        if let songUrl = URL(string: songUrlString) {
+            group.enter()
+            var req = URLRequest(url: songUrl)
+            req.timeoutInterval = 4.0
+            URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+                defer { group.leave() }
+                guard let self = self, let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let results = json["results"] as? [[String: Any]] else { return }
+                let parsed = self.parseITunesResults(results)
+                lock.lock()
+                songTracks = parsed
+                lock.unlock()
+            }.resume()
         }
         
-        var songRequest = URLRequest(url: songUrl)
-        songRequest.timeoutInterval = 10.0
+        // 2. Artist search & lookup (concurrently)
+        if let artistUrl = URL(string: artistUrlString) {
+            group.enter()
+            var req = URLRequest(url: artistUrl)
+            req.timeoutInterval = 4.0
+            URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+                guard let self = self, let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let results = json["results"] as? [[String: Any]],
+                      let firstArtist = results.first,
+                      let artistId = (firstArtist["artistId"] as? Int64) ?? (firstArtist["artistId"] as? Int).map(Int64.init),
+                      let lookupUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=song&limit=40&country=\(country)") else {
+                    group.leave()
+                    return
+                }
+                var lookupReq = URLRequest(url: lookupUrl)
+                lookupReq.timeoutInterval = 4.0
+                URLSession.shared.dataTask(with: lookupReq) { [weak self] lData, _, _ in
+                    defer { group.leave() }
+                    guard let self = self, let lData = lData,
+                          let lJson = try? JSONSerialization.jsonObject(with: lData) as? [String: Any],
+                          let lResults = lJson["results"] as? [[String: Any]] else { return }
+                    let tracksOnly = lResults.filter { ($0["wrapperType"] as? String) == "track" }
+                    let parsed = self.parseITunesResults(tracksOnly)
+                    lock.lock()
+                    artistTracks = parsed
+                    lock.unlock()
+                }.resume()
+            }.resume()
+        }
         
-        URLSession.shared.dataTask(with: songRequest) { [weak self] data, _, error in
-            guard let self = self else { return }
-            let initialSongTracks: [SGDoxMusicTrack]
-            if let data = data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let results = json["results"] as? [[String: Any]] {
-                initialSongTracks = self.parseITunesResults(results)
+        group.notify(queue: .main) {
+            var combined: [SGDoxMusicTrack] = []
+            
+            // Prioritize artistTracks if artist name closely matches search query
+            let queryLower = cleanQuery.lowercased()
+            let isArtistQuery = artistTracks.contains { t in
+                t.artist.lowercased().contains(queryLower) || queryLower.contains(t.artist.lowercased())
+            }
+            
+            if isArtistQuery {
+                combined.append(contentsOf: artistTracks)
+                for st in songTracks {
+                    if !combined.contains(where: { $0.id == st.id }) {
+                        combined.append(st)
+                    }
+                }
             } else {
-                initialSongTracks = []
-            }
-            let songTracks = initialSongTracks
-            
-            // Check album lookup if song results are sparse or album query was matched
-            let checkAlbum: (@escaping @Sendable ([SGDoxMusicTrack]) -> Void) -> Void = { next in
-                guard let albumUrl = URL(string: albumUrlString) else {
-                    next([])
-                    return
-                }
-                var albumRequest = URLRequest(url: albumUrl)
-                albumRequest.timeoutInterval = 6.0
-                URLSession.shared.dataTask(with: albumRequest) { albData, _, _ in
-                    if let albData = albData,
-                       let albJson = try? JSONSerialization.jsonObject(with: albData) as? [String: Any],
-                       let albResults = albJson["results"] as? [[String: Any]],
-                       let firstAlbum = albResults.first,
-                       let collectionId = (firstAlbum["collectionId"] as? Int64) ?? (firstAlbum["collectionId"] as? Int).map(Int64.init),
-                       let lookupUrl = URL(string: "https://itunes.apple.com/lookup?id=\(collectionId)&entity=song&limit=40&country=\(country)") {
-                        var lookupRequest = URLRequest(url: lookupUrl)
-                        lookupRequest.timeoutInterval = 6.0
-                        URLSession.shared.dataTask(with: lookupRequest) { lData, _, _ in
-                            var albumTracks: [SGDoxMusicTrack] = []
-                            if let lData = lData,
-                               let lJson = try? JSONSerialization.jsonObject(with: lData) as? [String: Any],
-                               let lResults = lJson["results"] as? [[String: Any]] {
-                                let tracksOnly = lResults.filter { ($0["wrapperType"] as? String) == "track" }
-                                albumTracks = self.parseITunesResults(tracksOnly)
-                            }
-                            next(albumTracks)
-                        }.resume()
-                        return
+                combined.append(contentsOf: songTracks)
+                for at in artistTracks {
+                    if !combined.contains(where: { $0.id == at.id }) {
+                        combined.append(at)
                     }
-                    next([])
-                }.resume()
+                }
             }
             
-            checkAlbum { [weak self] albumTracks in
-                guard let self = self else { return }
-                var merged = songTracks
-                for at in albumTracks {
-                    if !merged.contains(where: { $0.id == at.id }) {
-                        merged.append(at)
-                    }
+            // Smart ranking: Put exact/prefix artist matches and exact title matches at the top
+            var sorted = AppleMusicService.deduplicateTracks(combined)
+            sorted.sort { t1, t2 in
+                let a1 = t1.artist.lowercased()
+                let a2 = t2.artist.lowercased()
+                let a1Exact = a1 == queryLower
+                let a2Exact = a2 == queryLower
+                if a1Exact != a2Exact {
+                    return a1Exact
                 }
-                
-                guard let artistUrl = URL(string: artistUrlString) else {
-                    DispatchQueue.main.async { completion(merged, error?.localizedDescription) }
-                    return
+                let a1Prefix = a1.hasPrefix(queryLower)
+                let a2Prefix = a2.hasPrefix(queryLower)
+                if a1Prefix != a2Prefix {
+                    return a1Prefix
                 }
-                
-                var artistRequest = URLRequest(url: artistUrl)
-                artistRequest.timeoutInterval = 6.0
-                URLSession.shared.dataTask(with: artistRequest) { aData, _, _ in
-                    if let aData = aData,
-                       let aJson = try? JSONSerialization.jsonObject(with: aData) as? [String: Any],
-                       let aResults = aJson["results"] as? [[String: Any]],
-                       let firstArtist = aResults.first,
-                       let artistId = (firstArtist["artistId"] as? Int64) ?? (firstArtist["artistId"] as? Int).map(Int64.init),
-                       let lookupUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=song&limit=30&country=\(country)") {
-                        var lookupRequest = URLRequest(url: lookupUrl)
-                        lookupRequest.timeoutInterval = 6.0
-                        URLSession.shared.dataTask(with: lookupRequest) { lData, _, _ in
-                            var artistTracks: [SGDoxMusicTrack] = []
-                            if let lData = lData,
-                               let lJson = try? JSONSerialization.jsonObject(with: lData) as? [String: Any],
-                               let lResults = lJson["results"] as? [[String: Any]] {
-                                let tracksOnly = lResults.filter { ($0["wrapperType"] as? String) == "track" }
-                                artistTracks = self.parseITunesResults(tracksOnly)
-                            }
-                            
-                            var finalTracks = merged
-                            for t in artistTracks {
-                                if !finalTracks.contains(where: { $0.id == t.id }) {
-                                    finalTracks.append(t)
-                                }
-                            }
-                            
-                            DispatchQueue.main.async {
-                                completion(AppleMusicService.deduplicateTracks(finalTracks.isEmpty ? merged : finalTracks), nil)
-                            }
-                        }.resume()
-                        return
-                    }
-                    
-                    DispatchQueue.main.async {
-                        completion(AppleMusicService.deduplicateTracks(merged), nil)
-                    }
-                }.resume()
+                let a1Contains = a1.contains(queryLower)
+                let a2Contains = a2.contains(queryLower)
+                if a1Contains != a2Contains {
+                    return a1Contains
+                }
+                let tit1 = t1.title.lowercased()
+                let tit2 = t2.title.lowercased()
+                let t1Exact = tit1 == queryLower
+                let t2Exact = tit2 == queryLower
+                if t1Exact != t2Exact {
+                    return t1Exact
+                }
+                let t1Prefix = tit1.hasPrefix(queryLower)
+                let t2Prefix = tit2.hasPrefix(queryLower)
+                if t1Prefix != t2Prefix {
+                    return t1Prefix
+                }
+                return false
             }
-        }.resume()
+            
+            completion(sorted, nil)
+        }
     }
     
     private func parseITunesResults(_ results: [[String: Any]]) -> [SGDoxMusicTrack] {
@@ -597,13 +607,29 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
-        let artistSearchUrl = "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=musicArtist&limit=1&country=RU"
+        let countries = ["KZ", "RU", "US"]
+        self.fetchArtistDetailsRecursive(encodedName: encoded, cleanName: cleanName, countries: countries, index: 0, completion: completion)
+    }
+    
+    private func fetchArtistDetailsRecursive(encodedName: String, cleanName: String, countries: [String], index: Int, completion: @escaping @Sendable ([SGDoxMusicTrack], [SGDoxAlbum], String?) -> Void) {
+        guard index < countries.count else {
+            self.searchITunesPublic(query: cleanName) { tracks, _ in
+                DispatchQueue.main.async {
+                    completion(tracks, [], tracks.first?.artworkUrl)
+                }
+            }
+            return
+        }
+        let country = countries[index]
+        let artistSearchUrl = "https://itunes.apple.com/search?term=\(encodedName)&media=music&entity=musicArtist&limit=1&country=\(country)"
         guard let url = URL(string: artistSearchUrl) else {
-            DispatchQueue.main.async { completion([], [], nil) }
+            self.fetchArtistDetailsRecursive(encodedName: encodedName, cleanName: cleanName, countries: countries, index: index + 1, completion: completion)
             return
         }
         
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 4.0
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
             guard let self = self else { return }
             var foundArtistId: Int64? = nil
             if let data = data,
@@ -614,50 +640,22 @@ public final class AppleMusicService: @unchecked Sendable {
             }
             
             if let artistId = foundArtistId {
-                self.lookupArtistData(artistId: artistId, artistName: cleanName, completion: completion)
-            } else {
-                self.searchITunesPublic(query: cleanName) { tracks, _ in
-                    let albumsUrlString = "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=album&limit=25&country=RU"
-                    guard let aUrl = URL(string: albumsUrlString) else {
-                        DispatchQueue.main.async {
-                            completion(tracks, [], tracks.first?.artworkUrl)
-                        }
-                        return
+                self.lookupArtistData(artistId: artistId, artistName: cleanName, country: country) { topTracks, albums, img in
+                    if !topTracks.isEmpty || !albums.isEmpty {
+                        completion(topTracks, albums, img)
+                    } else {
+                        self.fetchArtistDetailsRecursive(encodedName: encodedName, cleanName: cleanName, countries: countries, index: index + 1, completion: completion)
                     }
-                    URLSession.shared.dataTask(with: aUrl) { aData, _, _ in
-                        var parsedAlbums: [SGDoxAlbum] = []
-                        if let aData = aData,
-                           let aJson = try? JSONSerialization.jsonObject(with: aData) as? [String: Any],
-                           let aResults = aJson["results"] as? [[String: Any]] {
-                            for item in aResults {
-                                if let collectionName = item["collectionName"] as? String,
-                                   let colId = (item["collectionId"] as? Int64) ?? (item["collectionId"] as? Int).map(Int64.init) {
-                                    let artUrl = (item["artworkUrl100"] as? String)?.replacingOccurrences(of: "100x100bb", with: "600x600bb")
-                                    let relDate = item["releaseDate"] as? String
-                                    let trackCount = (item["trackCount"] as? Int) ?? 0
-                                    parsedAlbums.append(SGDoxAlbum(
-                                        id: "\(colId)",
-                                        title: collectionName,
-                                        artist: (item["artistName"] as? String) ?? cleanName,
-                                        artworkUrl: artUrl,
-                                        releaseDate: relDate,
-                                        trackCount: trackCount
-                                    ))
-                                }
-                            }
-                        }
-                        DispatchQueue.main.async {
-                            completion(tracks, parsedAlbums, tracks.first?.artworkUrl)
-                        }
-                    }.resume()
                 }
+            } else {
+                self.fetchArtistDetailsRecursive(encodedName: encodedName, cleanName: cleanName, countries: countries, index: index + 1, completion: completion)
             }
         }.resume()
     }
     
-    private func lookupArtistData(artistId: Int64, artistName: String, completion: @escaping @Sendable ([SGDoxMusicTrack], [SGDoxAlbum], String?) -> Void) {
-        let songsUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=song&limit=50&country=RU")
-        let albumsUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=album&limit=25&country=RU")
+    private func lookupArtistData(artistId: Int64, artistName: String, country: String, completion: @escaping @Sendable ([SGDoxMusicTrack], [SGDoxAlbum], String?) -> Void) {
+        let songsUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=song&limit=50&country=\(country)")
+        let albumsUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=album&limit=25&country=\(country)")
         
         let group = DispatchGroup()
         let lock = NSLock()
@@ -669,7 +667,9 @@ public final class AppleMusicService: @unchecked Sendable {
         if let encoded = artistName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
            let dUrl = URL(string: "https://api.deezer.com/search/artist?q=\(encoded)&limit=1") {
             group.enter()
-            URLSession.shared.dataTask(with: dUrl) { dData, _, _ in
+            var dReq = URLRequest(url: dUrl)
+            dReq.timeoutInterval = 3.5
+            URLSession.shared.dataTask(with: dReq) { dData, _, _ in
                 defer { group.leave() }
                 guard let dData = dData,
                       let json = try? JSONSerialization.jsonObject(with: dData) as? [String: Any],
@@ -684,7 +684,9 @@ public final class AppleMusicService: @unchecked Sendable {
         
         if let sUrl = songsUrl {
             group.enter()
-            URLSession.shared.dataTask(with: sUrl) { [weak self] data, _, _ in
+            var sReq = URLRequest(url: sUrl)
+            sReq.timeoutInterval = 4.0
+            URLSession.shared.dataTask(with: sReq) { [weak self] data, _, _ in
                 defer { group.leave() }
                 guard let self = self, let data = data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -699,7 +701,9 @@ public final class AppleMusicService: @unchecked Sendable {
         
         if let aUrl = albumsUrl {
             group.enter()
-            URLSession.shared.dataTask(with: aUrl) { data, _, _ in
+            var aReq = URLRequest(url: aUrl)
+            aReq.timeoutInterval = 4.0
+            URLSession.shared.dataTask(with: aReq) { data, _, _ in
                 defer { group.leave() }
                 guard let data = data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -728,17 +732,29 @@ public final class AppleMusicService: @unchecked Sendable {
         }
         
         group.notify(queue: .main) {
-            let finalImage = deezerPhoto ?? (topTracks.first?.artworkUrl ?? albums.first?.artworkUrl)
+            let finalImage = deezerPhoto ?? (albums.first?.artworkUrl ?? topTracks.first?.artworkUrl)
             completion(topTracks, albums, finalImage)
         }
     }
     
     public func fetchAlbumTracks(collectionId: String, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
-        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(collectionId)&entity=song&limit=50&country=RU") else {
+        let countries = ["KZ", "RU", "US"]
+        self.fetchAlbumTracksRecursive(collectionId: collectionId, countries: countries, index: 0, completion: completion)
+    }
+    
+    private func fetchAlbumTracksRecursive(collectionId: String, countries: [String], index: Int, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
+        guard index < countries.count else {
             DispatchQueue.main.async { completion([]) }
             return
         }
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+        let country = countries[index]
+        guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(collectionId)&entity=song&limit=50&country=\(country)") else {
+            self.fetchAlbumTracksRecursive(collectionId: collectionId, countries: countries, index: index + 1, completion: completion)
+            return
+        }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 4.0
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
             guard let self = self else { return }
             var tracks: [SGDoxMusicTrack] = []
             if let data = data,
@@ -747,8 +763,10 @@ public final class AppleMusicService: @unchecked Sendable {
                 let tracksOnly = results.filter { ($0["wrapperType"] as? String) == "track" }
                 tracks = self.parseITunesResults(tracksOnly)
             }
-            DispatchQueue.main.async {
-                completion(tracks)
+            if !tracks.isEmpty {
+                DispatchQueue.main.async { completion(tracks) }
+            } else {
+                self.fetchAlbumTracksRecursive(collectionId: collectionId, countries: countries, index: index + 1, completion: completion)
             }
         }.resume()
     }

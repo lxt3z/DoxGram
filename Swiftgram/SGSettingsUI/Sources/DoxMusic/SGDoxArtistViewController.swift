@@ -15,6 +15,8 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     private var artistImageUrl: String?
     
     private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialDark))
+    private let grabber = UIView()
+    private let closeButton = UIButton(type: .system)
     private let tableView = UITableView(frame: .zero, style: .grouped)
     private let activityIndicator = UIActivityIndicatorView(style: .large)
     
@@ -49,6 +51,21 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         super.containerLayoutUpdated(layout, transition: transition)
         self.displayNode.frame = CGRect(origin: .zero, size: layout.size)
         self.view.frame = CGRect(origin: .zero, size: layout.size)
+        self.blurView.frame = CGRect(origin: .zero, size: layout.size)
+        
+        let inNav = self.navigationController != nil
+        self.grabber.isHidden = inNav
+        self.closeButton.isHidden = inNav
+        
+        let statusBarHeight = layout.statusBarHeight ?? layout.safeInsets.top
+        let topInset: CGFloat = inNav ? (statusBarHeight + 44.0) : max(44.0, statusBarHeight + 14.0)
+        
+        if !inNav {
+            self.grabber.frame = CGRect(x: (layout.size.width - 38) * 0.5, y: max(8, statusBarHeight - 22), width: 38, height: 5)
+            self.closeButton.frame = CGRect(x: layout.size.width - 44, y: max(6, statusBarHeight - 24), width: 32, height: 32)
+        }
+        
+        self.tableView.frame = CGRect(x: 0, y: topInset, width: layout.size.width, height: max(0, layout.size.height - topInset))
         self.layoutHeader(width: layout.size.width)
     }
     
@@ -61,23 +78,16 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.view.addSubview(self.blurView)
         
         // Grabber / Close button
-        let grabber = UIView(frame: CGRect(x: (self.view.bounds.width - 38) * 0.5, y: 10, width: 38, height: 5))
-        grabber.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
-        grabber.layer.cornerRadius = 2.5
-        grabber.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin]
-        self.view.addSubview(grabber)
+        self.grabber.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
+        self.grabber.layer.cornerRadius = 2.5
+        self.view.addSubview(self.grabber)
         
-        let closeButton = UIButton(type: .system)
-        closeButton.frame = CGRect(x: self.view.bounds.width - 44, y: 12, width: 32, height: 32)
-        closeButton.autoresizingMask = [.flexibleLeftMargin]
-        closeButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-        closeButton.tintColor = UIColor(white: 1.0, alpha: 0.5)
-        closeButton.addTarget(self, action: #selector(self.closePressed), for: .touchUpInside)
-        self.view.addSubview(closeButton)
+        self.closeButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        self.closeButton.tintColor = UIColor(white: 1.0, alpha: 0.5)
+        self.closeButton.addTarget(self, action: #selector(self.closePressed), for: .touchUpInside)
+        self.view.addSubview(self.closeButton)
         
         // Table View
-        self.tableView.frame = CGRect(x: 0, y: 44, width: self.view.bounds.width, height: self.view.bounds.height - 44)
-        self.tableView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         self.tableView.backgroundColor = .clear
         self.tableView.separatorColor = UIColor(white: 1.0, alpha: 0.08)
         self.tableView.dataSource = self
@@ -256,12 +266,17 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     }
     
     private func openPlayer() {
-        let playerController = SGDoxMusicPlayerController(context: self.context)
-        playerController.navigationPresentation = .flatModal
-        playerController.flatReceivesModalTransition = true
         if let navigationController = self.navigationController as? NavigationController {
+            if let _ = navigationController.viewControllers.first(where: { $0 is SGDoxMusicPlayerController }) {
+                navigationController.filterController(self, animated: true)
+                return
+            }
+            let playerController = SGDoxMusicPlayerController(context: self.context)
+            playerController.navigationPresentation = .modal
             navigationController.pushViewController(playerController)
         } else {
+            let playerController = SGDoxMusicPlayerController(context: self.context)
+            playerController.navigationPresentation = .modal
             self.present(playerController, in: .window(.root))
         }
     }

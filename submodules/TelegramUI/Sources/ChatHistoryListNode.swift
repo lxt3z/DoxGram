@@ -4243,6 +4243,14 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                                         let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: text, peerId: message.id.peerId, senderName: senderName)
                                     }
                                 }
+                            } else if text.contains("#doxstatus:") {
+                                if let range = text.range(of: "#doxstatus:") {
+                                    let payload = String(text[range.upperBound...])
+                                    let parts = payload.components(separatedBy: ":")
+                                    if parts.count >= 2 {
+                                        SGDoxPeerMusicManager.shared.updateMusicStatus(peerId: message.id.peerId.toInt64(), title: parts[0], artist: parts[1])
+                                    }
+                                }
                             }
                         }
                         
@@ -4262,28 +4270,42 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                                     let quality = candidate.quality ?? "720p"
                                     if (SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != tagUrl || msgTimestamp > currentAppliedTs),
                                        !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
-                                        SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
-                                        SGDoxAnimatedWallpaperManager.shared.setWallpaper(url: tagUrl, for: peerId, quality: quality)
+                                        SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: tagUrl, quality: quality) { success, _ in
+                                            if success {
+                                                SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
+                                            }
+                                        }
                                     }
                                 } else if let file = candidate.file {
                                     let syncKey = "tg_msg_\(file.fileId.id)"
                                     if (SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != syncKey || msgTimestamp > currentAppliedTs),
                                        !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
                                         SGDoxAnimatedWallpaperManager.shared.markDownloading(for: peerId, url: syncKey)
-                                        SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
                                         if let path = mediaBox.completedResourcePath(file.resource), FileManager.default.fileExists(atPath: path) {
                                             let fileUrl = URL(fileURLWithPath: path)
-                                            SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey)
+                                            SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey) { success, _ in
+                                                if success {
+                                                    SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
+                                                }
+                                                SGDoxAnimatedWallpaperManager.shared.clearDownloading(for: peerId)
+                                            }
                                         } else {
                                             DispatchQueue.main.async {
+                                                var fetchDisposable: Disposable? = nil
                                                 let _ = (mediaBox.resourceData(file.resource)
                                                 |> deliverOnMainQueue).startStrict(next: { data in
                                                     if data.complete, let path = mediaBox.completedResourcePath(file.resource) {
+                                                        fetchDisposable?.dispose()
                                                         let fileUrl = URL(fileURLWithPath: path)
-                                                        SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey)
+                                                        SGDoxAnimatedWallpaperManager.shared.setLocalWallpaper(from: fileUrl, for: peerId, customKey: syncKey) { success, _ in
+                                                            if success {
+                                                                SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
+                                                            }
+                                                            SGDoxAnimatedWallpaperManager.shared.clearDownloading(for: peerId)
+                                                        }
                                                     }
                                                 })
-                                                let _ = mediaBox.fetchedResource(file.resource, parameters: nil).startStrict()
+                                                fetchDisposable = mediaBox.fetchedResource(file.resource, parameters: nil).startStrict()
                                             }
                                         }
                                     }

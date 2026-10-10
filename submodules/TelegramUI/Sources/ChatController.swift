@@ -3278,6 +3278,15 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             let progress = urlData.progress
             let forceExternal = urlData.external ?? false
             
+            if url.contains("doxlisten:") {
+                let tag = url.hasPrefix("#") ? url : "#\(url)"
+                if let peerId = strongSelf.chatLocation.peerId {
+                    let senderName = message?.author?.debugDisplayTitle
+                    let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: tag, peerId: peerId, senderName: senderName, forceJoin: true)
+                    return
+                }
+            }
+            
             var skipConcealedAlert = false
             if let author = message?.author, author.isVerified {
                 skipConcealedAlert = true
@@ -3494,6 +3503,13 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         }, openHashtag: { [weak self] peerName, hashtag in
             guard let strongSelf = self else {
                 return
+            }
+            if hashtag.contains("doxlisten:") || hashtag.hasPrefix("doxlisten:") {
+                let tag = hashtag.hasPrefix("#") ? hashtag : "#\(hashtag)"
+                if let peerId = strongSelf.chatLocation.peerId {
+                    let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: tag, peerId: peerId, senderName: nil, forceJoin: true)
+                    return
+                }
             }
             strongSelf.openHashtag(hashtag, peerName: peerName)
         }, updateInputState: { [weak self] f in
