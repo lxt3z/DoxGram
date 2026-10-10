@@ -305,11 +305,11 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
                 }
             }
             if let topNavigationController = self.topViewController as? NavigationController {
-                topNavigationController.push(playerController)
-            } else if let topViewController = self.topViewController as? ViewController, let nav = topViewController.navigationController as? NavigationController {
-                nav.push(playerController)
+                topNavigationController.pushViewController(playerController)
+            } else if let topViewController = self.topViewController as? ViewController {
+                topViewController.push(playerController)
             } else {
-                self.push(playerController)
+                self.pushViewController(playerController)
             }
         }
         self.floatingMusicWidget = floatingWidget

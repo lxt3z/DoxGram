@@ -1184,7 +1184,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         playerController.navigationPresentation = .flatModal
         playerController.flatReceivesModalTransition = true
         if let navigationController = self.navigationController as? NavigationController {
-            navigationController.push(playerController)
+            navigationController.pushViewController(playerController)
         } else {
             self.push(playerController)
         }
