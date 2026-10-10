@@ -21,6 +21,7 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
     }
     
     private let lock = NSLock()
+    private var lastProcessedTag: String?
     
     public func startHostSession(peerId: EnginePeer.Id?, partnerName: String? = nil) {
         self.lock.lock()
@@ -45,6 +46,7 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         self.activeRole = .none
         self.currentSessionPeerId = nil
         self.partnerName = nil
+        self.lastProcessedTag = nil
         self.lock.unlock()
         NotificationCenter.default.post(name: NSNotification.Name("SGDoxListenTogetherSessionChanged"), object: nil)
     }
@@ -60,8 +62,17 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
     public func handleIncomingSync(text: String, peerId: EnginePeer.Id, senderName: String? = nil) -> Bool {
         guard let range = text.range(of: "#doxlisten:") else { return false }
         let payload = String(text[range.upperBound...])
+        
+        self.lock.lock()
+        if self.lastProcessedTag == payload {
+            self.lock.unlock()
+            return false
+        }
         let components = payload.components(separatedBy: ":")
-        guard components.count >= 4 else { return false }
+        guard components.count >= 4 else {
+            self.lock.unlock()
+            return false
+        }
         
         let trackId = components[0]
         let timestamp = Int64(components[1]) ?? Int64(Date().timeIntervalSince1970)
@@ -69,6 +80,13 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         let artist = components[3]
         
         let elapsed = max(0.0, Double(Int64(Date().timeIntervalSince1970) - timestamp))
+        if elapsed > 300.0 {
+            self.lock.unlock()
+            return false
+        }
+        
+        self.lastProcessedTag = payload
+        self.lock.unlock()
         
         self.joinSession(peerId: peerId, partnerName: senderName)
         

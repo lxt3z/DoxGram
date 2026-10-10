@@ -4221,8 +4221,11 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                             }
                         }
                     } else if text.contains("#doxlisten:") {
-                        let senderName = message.author?.debugDisplayTitle
-                        let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: text, peerId: message.id.peerId, senderName: senderName)
+                        let isIncoming = message.flags.contains(.Incoming) && message.author?.id != strongSelf.context.account.peerId
+                        if isIncoming {
+                            let senderName = message.author?.debugDisplayTitle
+                            let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: text, peerId: message.id.peerId, senderName: senderName)
+                        }
                     }
                 }
                 

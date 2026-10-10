@@ -217,6 +217,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 break
             }
         }
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(self.sessionChangedNotification), name: NSNotification.Name("SGDoxListenTogetherSessionChanged"), object: nil)
+    }
+    
+    @objc private func sessionChangedNotification() {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateContent()
+        }
     }
     
     private func detachListeners() {
@@ -228,6 +236,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             SGDoxMusicManager.shared.removeTimeListener(token)
             self.timeToken = nil
         }
+        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("SGDoxListenTogetherSessionChanged"), object: nil)
     }
     
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
@@ -504,11 +513,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         self.nowPlayingContainerView.addSubview(self.controlsContainerView)
         
-        // Bottom Action Buttons: Profile | Wave | Autoplay | Download (and Together when active)
+        // Bottom Action Buttons: Profile | Wave | Autoplay | Together | Download
         self.actionsStackView.axis = .horizontal
         self.actionsStackView.distribution = .fillEqually
         self.actionsStackView.alignment = .fill
-        self.actionsStackView.spacing = 8
+        self.actionsStackView.spacing = 6
         
         self.styleCapsuleButton(self.pinToProfileButton, title: "Профиль", icon: "person.crop.circle")
         self.pinToProfileButton.addTarget(self, action: #selector(self.pinToProfilePressed), for: .touchUpInside)
@@ -524,7 +533,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
 
         self.styleCapsuleButton(self.listenTogetherButton, title: "Вместе", icon: "person.2.fill")
         self.listenTogetherButton.addTarget(self, action: #selector(self.listenTogetherPressed), for: .touchUpInside)
-        self.listenTogetherButton.isHidden = true
+        self.listenTogetherButton.isHidden = false
         self.actionsStackView.addArrangedSubview(self.listenTogetherButton)
 
         self.styleCapsuleButton(self.downloadButton, title: "Скачать", icon: "arrow.down.circle")
@@ -940,7 +949,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Bottom Action Buttons
         let actionsY = controlsY + 78.0
-        self.actionsStackView.frame = CGRect(x: 20, y: actionsY, width: bounds.width - 40, height: 38)
+        self.actionsStackView.frame = CGRect(x: 16, y: actionsY, width: bounds.width - 32, height: 38)
     }
     
     private func layoutLyricsPane(contentH: CGFloat) {
@@ -1135,10 +1144,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.styleCapsuleButton(self.autoplayButton, title: "Авто", icon: "infinity", isActiveGlow: manager.isAutoplayEnabled)
         
         let isTogether = SGDoxListenTogetherManager.shared.isInSession
-        self.listenTogetherButton.isHidden = !isTogether
-        if isTogether {
-            self.styleCapsuleButton(self.listenTogetherButton, title: "Вместе", icon: "person.2.fill", isActiveGlow: true)
-        }
+        self.listenTogetherButton.isHidden = false
+        self.styleCapsuleButton(
+            self.listenTogetherButton,
+            title: isTogether ? "В эфире" : "Вместе",
+            icon: isTogether ? "dot.radiowaves.left.and.right" : "person.2.fill",
+            isActiveGlow: isTogether
+        )
         
         let isDownloaded = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
         if isDownloaded {
@@ -1644,6 +1656,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = self.listenTogetherButton
+            popover.sourceRect = self.listenTogetherButton.bounds
+        }
         self.present(alert, animated: true)
     }
     
