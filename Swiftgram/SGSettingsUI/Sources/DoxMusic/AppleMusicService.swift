@@ -663,6 +663,24 @@ public final class AppleMusicService: @unchecked Sendable {
         let lock = NSLock()
         var topTracks: [SGDoxMusicTrack] = []
         var albums: [SGDoxAlbum] = []
+        var deezerPhoto: String? = nil
+        
+        // Fetch real artist avatar from Deezer concurrently
+        if let encoded = artistName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+           let dUrl = URL(string: "https://api.deezer.com/search/artist?q=\(encoded)&limit=1") {
+            group.enter()
+            URLSession.shared.dataTask(with: dUrl) { dData, _, _ in
+                defer { group.leave() }
+                guard let dData = dData,
+                      let json = try? JSONSerialization.jsonObject(with: dData) as? [String: Any],
+                      let dataList = json["data"] as? [[String: Any]],
+                      let first = dataList.first else { return }
+                let pic = (first["picture_xl"] as? String) ?? (first["picture_big"] as? String) ?? (first["picture_medium"] as? String)
+                lock.lock()
+                deezerPhoto = pic
+                lock.unlock()
+            }.resume()
+        }
         
         if let sUrl = songsUrl {
             group.enter()
@@ -710,7 +728,8 @@ public final class AppleMusicService: @unchecked Sendable {
         }
         
         group.notify(queue: .main) {
-            completion(topTracks, albums, topTracks.first?.artworkUrl ?? albums.first?.artworkUrl)
+            let finalImage = deezerPhoto ?? (topTracks.first?.artworkUrl ?? albums.first?.artworkUrl)
+            completion(topTracks, albums, finalImage)
         }
     }
     

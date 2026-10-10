@@ -153,11 +153,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.displayNode.backgroundColor = UIColor(red: 0.05, green: 0.05, blue: 0.08, alpha: 1.0)
     }
     
+    private var hasAnimatedIn = false
+    
     public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
         self.validLayout = layout
         self.displayNode.frame = CGRect(origin: .zero, size: layout.size)
-        self.view.frame = CGRect(origin: .zero, size: layout.size)
         let bounds = CGRect(origin: .zero, size: layout.size)
         let safeArea = layout.safeInsets
         self.applyLayout(bounds: bounds, safeArea: safeArea)
@@ -176,6 +177,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         } else if self.view.bounds.width > 0 && self.view.bounds.height > 0 {
             self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
         }
+        
+        let screenH = max(UIScreen.main.bounds.height, 800.0)
+        self.view.transform = CGAffineTransform(translationX: 0, y: screenH)
+        self.darkDimOverlay.alpha = 0.0
+        self.backgroundBlurView.alpha = 0.0
         
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
         panGesture.delegate = self
@@ -824,6 +830,18 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.reloadQueueData()
     }
     
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if !self.hasAnimatedIn {
+            self.hasAnimatedIn = true
+            UIView.animate(withDuration: 0.36, delay: 0.0, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.4, options: [.curveEaseOut], animations: {
+                self.view.transform = .identity
+                self.darkDimOverlay.alpha = 1.0
+                self.backgroundBlurView.alpha = 1.0
+            }, completion: nil)
+        }
+    }
+    
     public override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         self.triggerDismissBeginIfNeeded()
@@ -1449,8 +1467,37 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     // MARK: - Actions
     
     @objc private func dismissPressed() {
+        self.dismiss(animated: true)
+    }
+    
+    public override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
         self.triggerDismissBeginIfNeeded()
-        self.dismiss()
+        let doDismiss = { [weak self] in
+            guard let self = self else { return }
+            if let navigationController = self.navigationController as? NavigationController {
+                navigationController.filterController(self, animated: false)
+                completion?()
+            } else if let presenting = self.presentingViewController {
+                presenting.dismiss(animated: false, completion: completion)
+            } else {
+                super.dismiss(animated: false, completion: completion)
+            }
+        }
+        if flag {
+            UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseIn], animations: {
+                self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
+                self.darkDimOverlay.alpha = 0.0
+                self.backgroundBlurView.alpha = 0.0
+            }) { _ in
+                doDismiss()
+            }
+        } else {
+            doDismiss()
+        }
+    }
+    
+    public override func dismiss(completion: (() -> Void)? = nil) {
+        self.dismiss(animated: true, completion: completion)
     }
     
     @objc private func favoritePressed() {
@@ -1602,7 +1649,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     @objc private func artistLabelTapped() {
         guard let track = SGDoxMusicManager.shared.currentTrack, !track.artist.isEmpty else { return }
         let artistVc = SGDoxArtistViewController(context: self.context, artistName: track.artist)
-        self.present(artistVc, animated: true)
+        if let nav = self.navigationController as? NavigationController {
+            nav.pushViewController(artistVc)
+        } else {
+            self.present(artistVc, in: .window(.root))
+        }
     }
     
     @objc private func listenTogetherPressed() {

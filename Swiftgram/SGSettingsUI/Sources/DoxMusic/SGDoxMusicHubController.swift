@@ -1005,7 +1005,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             let artistAction = UIAction(title: "Перейти к исполнителю (\(track.artist))", image: UIImage(systemName: "person.circle")) { [weak self] _ in
                 guard let self = self else { return }
                 let artistVc = SGDoxArtistViewController(context: self.context, artistName: track.artist)
-                self.present(artistVc, animated: true)
+                if let navigationController = self.navigationController as? NavigationController {
+                    navigationController.pushViewController(artistVc)
+                } else {
+                    self.present(artistVc, in: .window(.root))
+                }
             }
             
             let isFav = SGDoxMusicManager.shared.isFavorite(track: track)

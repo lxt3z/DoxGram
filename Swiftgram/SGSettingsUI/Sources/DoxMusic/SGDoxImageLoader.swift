@@ -159,6 +159,9 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         
         // Handle template URLs ({w}x{h} or {f}) from Apple Music / MusicKit
         var effectiveUrl = trimmed
+        if effectiveUrl.hasPrefix("http://") {
+            effectiveUrl = "https://" + effectiveUrl.dropFirst(7)
+        }
         if effectiveUrl.contains("{w}") || effectiveUrl.contains("{h}") {
             effectiveUrl = effectiveUrl.replacingOccurrences(of: "{w}", with: "600")
                 .replacingOccurrences(of: "{h}", with: "600")
@@ -176,24 +179,27 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         self.session.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self, let data = data, error == nil, let image = UIImage(data: data) else {
                 // If 600x600 failed, fallback to 100x100 if applicable
+                var fallbackStr: String? = nil
                 if effectiveUrl.contains("600x600") {
-                    let fallbackStr = effectiveUrl.replacingOccurrences(of: "600x600", with: "100x100")
-                    if let fallbackUrl = URL(string: fallbackStr) {
-                        self?.session.dataTask(with: URLRequest(url: fallbackUrl)) { [weak self] fbData, _, _ in
-                            guard let self = self else { return }
-                            if let fbData = fbData, let fbImg = UIImage(data: fbData) {
-                                self.memoryCache.setObject(fbImg, forKey: cacheKey, cost: fbData.count)
-                                if let dir = self.diskCacheDirectory {
-                                    let fileUrl = dir.appendingPathComponent(fileName)
-                                    try? fbData.write(to: fileUrl, options: .atomic)
-                                }
-                                self.dispatchMain(image: fbImg, completion: completion)
-                            } else {
-                                self.dispatchMain(image: nil, completion: completion)
+                    fallbackStr = effectiveUrl.replacingOccurrences(of: "600x600", with: "100x100")
+                } else if effectiveUrl.contains("500x500") {
+                    fallbackStr = effectiveUrl.replacingOccurrences(of: "500x500", with: "100x100")
+                }
+                if let fallbackStr = fallbackStr, let fallbackUrl = URL(string: fallbackStr) {
+                    self?.session.dataTask(with: URLRequest(url: fallbackUrl)) { [weak self] fbData, _, _ in
+                        guard let self = self else { return }
+                        if let fbData = fbData, let fbImg = UIImage(data: fbData) {
+                            self.memoryCache.setObject(fbImg, forKey: cacheKey, cost: fbData.count)
+                            if let dir = self.diskCacheDirectory {
+                                let fileUrl = dir.appendingPathComponent(fileName)
+                                try? fbData.write(to: fileUrl, options: .atomic)
                             }
-                        }.resume()
-                        return
-                    }
+                            self.dispatchMain(image: fbImg, completion: completion)
+                        } else {
+                            self.dispatchMain(image: nil, completion: completion)
+                        }
+                    }.resume()
+                    return
                 }
                 
                 self?.dispatchMain(image: nil, completion: completion)

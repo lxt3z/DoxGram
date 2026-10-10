@@ -30,6 +30,7 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
         super.init(navigationBarPresentationData: nil)
         self.navigationPresentation = .modal
         self.statusBar.statusBarStyle = .White
+        self.ready.set(.single(true))
     }
     
     required init(coder aDecoder: NSCoder) {
@@ -39,6 +40,13 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
     public override func loadDisplayNode() {
         super.loadDisplayNode()
         self.displayNode.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
+    }
+    
+    public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+        self.displayNode.frame = CGRect(origin: .zero, size: layout.size)
+        self.view.frame = CGRect(origin: .zero, size: layout.size)
+        self.layoutHeader(width: layout.size.width)
     }
     
     public override func viewDidLoad() {
@@ -133,7 +141,10 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
         self.subtitleLabel.text = subParts.joined(separator: " • ")
         self.headerView.addSubview(self.subtitleLabel)
         
-        self.playAllButton.setTitle("▶  Слушать", for: .normal)
+        let playCfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
+        self.playAllButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playCfg), for: .normal)
+        self.playAllButton.setTitle("  Слушать", for: .normal)
+        self.playAllButton.tintColor = .white
         self.playAllButton.setTitleColor(.white, for: .normal)
         self.playAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         self.playAllButton.backgroundColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 0.85)
@@ -141,7 +152,10 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
         self.playAllButton.addTarget(self, action: #selector(self.playAllPressed), for: .touchUpInside)
         self.headerView.addSubview(self.playAllButton)
         
-        self.shuffleButton.setTitle("🔀  Перемешать", for: .normal)
+        let shufCfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        self.shuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: shufCfg), for: .normal)
+        self.shuffleButton.setTitle("  Перемешать", for: .normal)
+        self.shuffleButton.tintColor = .white
         self.shuffleButton.setTitleColor(.white, for: .normal)
         self.shuffleButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         self.shuffleButton.backgroundColor = UIColor(white: 1.0, alpha: 0.16)
@@ -205,7 +219,11 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
     
     @objc private func artistPressed() {
         let artistVc = SGDoxArtistViewController(context: self.context, artistName: self.album.artist)
-        self.present(artistVc, in: .window(.root))
+        if let nav = self.navigationController as? NavigationController {
+            nav.pushViewController(artistVc)
+        } else {
+            self.present(artistVc, in: .window(.root))
+        }
     }
     
     @objc private func playAllPressed() {
@@ -213,6 +231,8 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
         var list = self.tracks
         let first = list.removeFirst()
         SGDoxMusicManager.shared.play(track: first, queue: list)
+        self.tableView.reloadData()
+        self.openPlayer()
     }
     
     @objc private func shufflePressed() {
@@ -221,6 +241,19 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
         list.shuffle()
         let first = list.removeFirst()
         SGDoxMusicManager.shared.play(track: first, queue: list)
+        self.tableView.reloadData()
+        self.openPlayer()
+    }
+    
+    private func openPlayer() {
+        let playerController = SGDoxMusicPlayerController(context: self.context)
+        playerController.navigationPresentation = .flatModal
+        playerController.flatReceivesModalTransition = true
+        if let navigationController = self.navigationController as? NavigationController {
+            navigationController.pushViewController(playerController)
+        } else {
+            self.present(playerController, in: .window(.root))
+        }
     }
     
     // MARK: - UITableViewDataSource & Delegate
@@ -249,10 +282,12 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
     
     public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        guard indexPath.row < self.tracks.count else { return }
         let track = self.tracks[indexPath.row]
         let upcoming = Array(self.tracks.dropFirst(indexPath.row + 1))
         SGDoxMusicManager.shared.play(track: track, queue: upcoming)
         tableView.reloadData()
+        self.openPlayer()
     }
 }
 
