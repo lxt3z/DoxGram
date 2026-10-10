@@ -150,6 +150,12 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
     }
     
     public func clear() {
+        guard self.player != nil || self.playerLayer != nil || self.currentUrl != nil else {
+            self.isHidden = true
+            self.alpha = 0.0
+            self.backgroundColor = .clear
+            return
+        }
         if let endObserver = self.endObserver {
             NotificationCenter.default.removeObserver(endObserver)
             self.endObserver = nil
@@ -172,7 +178,9 @@ public final class SGDoxVideoWallpaperNode: ASDisplayNode {
     
     public func play() {
         guard let player = self.player, !self.isPlaying else { return }
-        self.configureAudioSessionForSilentPlayback()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            self?.configureAudioSessionForSilentPlayback()
+        }
         self.isPlaying = true
         player.play()
     }

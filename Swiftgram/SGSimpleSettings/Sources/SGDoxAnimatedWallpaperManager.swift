@@ -68,61 +68,91 @@ public final class SGDoxAnimatedWallpaperManager {
     private let queue = DispatchQueue(label: "org.doxgram.wallpaper.queue", qos: .utility)
     private let cacheLock = NSLock()
     private var memoryCache: [String: (url: String, localPath: String, quality: String)] = [:]
+    private var resetTimestampsCache: [String: Double]?
+    private var wallpaperTimestampsCache: [String: Int32]?
     private var isCacheLoaded = false
     private var activeDownloads = Set<String>()
     
+    private lazy var groupDefaults: UserDefaults? = UserDefaults(suiteName: sgAppGroupIdentifier())
+    private lazy var cachedWallpapersDirectory: URL = {
+        let appGroupId = sgAppGroupIdentifier()
+        let baseUrl: URL
+        if let groupContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+            baseUrl = groupContainer
+        } else {
+            baseUrl = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        }
+        return baseUrl.appendingPathComponent("dox_wallpapers", isDirectory: true)
+    }()
+    
+    private var wallpapersDirectory: URL {
+        return self.cachedWallpapersDirectory
+    }
+    
     public func resetTimestamp(for peerId: Int64) -> Double {
+        self.cacheLock.lock()
+        if let cache = self.resetTimestampsCache {
+            let val = cache[String(peerId)] ?? 0.0
+            self.cacheLock.unlock()
+            return val
+        }
         let dict: [String: Double]
-        if let groupDefaults = UserDefaults(suiteName: sgAppGroupIdentifier()),
-           let d = groupDefaults.dictionary(forKey: self.resetDefaultsKey) as? [String: Double] {
+        if let d = self.groupDefaults?.dictionary(forKey: self.resetDefaultsKey) as? [String: Double] {
             dict = d
         } else {
             dict = (UserDefaults.standard.dictionary(forKey: self.resetDefaultsKey) as? [String: Double]) ?? [:]
         }
-        return dict[String(peerId)] ?? 0.0
+        self.resetTimestampsCache = dict
+        let val = dict[String(peerId)] ?? 0.0
+        self.cacheLock.unlock()
+        return val
     }
     
     public func setResetTimestamp(_ timestamp: Double, for peerId: Int64) {
-        var dict: [String: Double]
-        if let groupDefaults = UserDefaults(suiteName: sgAppGroupIdentifier()),
-           let d = groupDefaults.dictionary(forKey: self.resetDefaultsKey) as? [String: Double] {
-            dict = d
-        } else {
-            dict = (UserDefaults.standard.dictionary(forKey: self.resetDefaultsKey) as? [String: Double]) ?? [:]
-        }
+        self.cacheLock.lock()
+        var dict = self.resetTimestampsCache ?? (self.groupDefaults?.dictionary(forKey: self.resetDefaultsKey) as? [String: Double]) ?? (UserDefaults.standard.dictionary(forKey: self.resetDefaultsKey) as? [String: Double]) ?? [:]
         dict[String(peerId)] = timestamp
-        if let groupDefaults = UserDefaults(suiteName: sgAppGroupIdentifier()) {
-            groupDefaults.set(dict, forKey: self.resetDefaultsKey)
-            groupDefaults.synchronize()
+        self.resetTimestampsCache = dict
+        self.cacheLock.unlock()
+        
+        self.queue.async { [weak self] in
+            guard let self = self else { return }
+            self.groupDefaults?.set(dict, forKey: self.resetDefaultsKey)
+            UserDefaults.standard.set(dict, forKey: self.resetDefaultsKey)
         }
-        UserDefaults.standard.set(dict, forKey: self.resetDefaultsKey)
     }
     
     public func wallpaperTimestamp(for peerId: Int64) -> Int32 {
+        self.cacheLock.lock()
+        if let cache = self.wallpaperTimestampsCache {
+            let val = cache[String(peerId)] ?? 0
+            self.cacheLock.unlock()
+            return val
+        }
         let dict: [String: Int32]
-        if let groupDefaults = UserDefaults(suiteName: sgAppGroupIdentifier()),
-           let d = groupDefaults.dictionary(forKey: self.timestampDefaultsKey) as? [String: Int32] {
+        if let d = self.groupDefaults?.dictionary(forKey: self.timestampDefaultsKey) as? [String: Int32] {
             dict = d
         } else {
             dict = (UserDefaults.standard.dictionary(forKey: self.timestampDefaultsKey) as? [String: Int32]) ?? [:]
         }
-        return dict[String(peerId)] ?? 0
+        self.wallpaperTimestampsCache = dict
+        let val = dict[String(peerId)] ?? 0
+        self.cacheLock.unlock()
+        return val
     }
     
     public func setWallpaperTimestamp(_ timestamp: Int32, for peerId: Int64) {
-        var dict: [String: Int32]
-        if let groupDefaults = UserDefaults(suiteName: sgAppGroupIdentifier()),
-           let d = groupDefaults.dictionary(forKey: self.timestampDefaultsKey) as? [String: Int32] {
-            dict = d
-        } else {
-            dict = (UserDefaults.standard.dictionary(forKey: self.timestampDefaultsKey) as? [String: Int32]) ?? [:]
-        }
+        self.cacheLock.lock()
+        var dict = self.wallpaperTimestampsCache ?? (self.groupDefaults?.dictionary(forKey: self.timestampDefaultsKey) as? [String: Int32]) ?? (UserDefaults.standard.dictionary(forKey: self.timestampDefaultsKey) as? [String: Int32]) ?? [:]
         dict[String(peerId)] = timestamp
-        if let groupDefaults = UserDefaults(suiteName: sgAppGroupIdentifier()) {
-            groupDefaults.set(dict, forKey: self.timestampDefaultsKey)
-            groupDefaults.synchronize()
+        self.wallpaperTimestampsCache = dict
+        self.cacheLock.unlock()
+        
+        self.queue.async { [weak self] in
+            guard let self = self else { return }
+            self.groupDefaults?.set(dict, forKey: self.timestampDefaultsKey)
+            UserDefaults.standard.set(dict, forKey: self.timestampDefaultsKey)
         }
-        UserDefaults.standard.set(dict, forKey: self.timestampDefaultsKey)
     }
     
     public func isDownloading(for peerId: Int64) -> Bool {
@@ -144,18 +174,10 @@ public final class SGDoxAnimatedWallpaperManager {
     }
     
     private init() {
-        self.ensureDirectoryExists()
-    }
-    
-    private var wallpapersDirectory: URL {
-        let appGroupId = sgAppGroupIdentifier()
-        let baseUrl: URL
-        if let groupContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
-            baseUrl = groupContainer
-        } else {
-            baseUrl = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        self.queue.async {
+            self.ensureDirectoryExists()
+            let _ = self.getWallpaper(for: Self.globalWallpaperPeerId)
         }
-        return baseUrl.appendingPathComponent("dox_wallpapers", isDirectory: true)
     }
     
     private func ensureDirectoryExists() {
@@ -166,18 +188,14 @@ public final class SGDoxAnimatedWallpaperManager {
     }
     
     private func getStoredData() -> [String: [String: String]] {
-        if let groupDefaults = UserDefaults(suiteName: sgAppGroupIdentifier()),
-           let dict = groupDefaults.dictionary(forKey: self.userDefaultsKey) as? [String: [String: String]] {
+        if let dict = self.groupDefaults?.dictionary(forKey: self.userDefaultsKey) as? [String: [String: String]] {
             return dict
         }
         return (UserDefaults.standard.dictionary(forKey: self.userDefaultsKey) as? [String: [String: String]]) ?? [:]
     }
     
     private func saveStoredData(_ data: [String: [String: String]]) {
-        if let groupDefaults = UserDefaults(suiteName: sgAppGroupIdentifier()) {
-            groupDefaults.set(data, forKey: self.userDefaultsKey)
-            groupDefaults.synchronize()
-        }
+        self.groupDefaults?.set(data, forKey: self.userDefaultsKey)
         UserDefaults.standard.set(data, forKey: self.userDefaultsKey)
 
         self.cacheLock.lock()
@@ -518,6 +536,9 @@ public final class SGDoxAnimatedWallpaperManager {
     
     public func removeWallpaper(for peerId: Int64) {
         self.setResetTimestamp(Date().timeIntervalSince1970, for: peerId)
+        self.cacheLock.lock()
+        self.memoryCache.removeValue(forKey: String(peerId))
+        self.cacheLock.unlock()
         self.queue.async {
             var data = self.getStoredData()
             if let entry = data.removeValue(forKey: String(peerId)),

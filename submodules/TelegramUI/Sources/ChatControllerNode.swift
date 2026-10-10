@@ -1063,22 +1063,20 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         }
     }
     
-    var hasDoxVideoWallpaper: Bool {
-        guard let peerId = self.chatLocation.peerId else {
-            return false
-        }
-        return SGDoxAnimatedWallpaperManager.shared.localFileUrl(for: peerId.toInt64()) != nil
-    }
+    private(set) var hasDoxVideoWallpaper: Bool = false
     
     func updateDoxVideoWallpaper() {
         guard let peerId = self.chatLocation.peerId else {
+            self.hasDoxVideoWallpaper = false
             self.doxVideoWallpaperNode.clear()
             self.doxVideoWallpaperNode.isHidden = true
             self.doxVideoWallpaperNode.alpha = 0.0
             self.backgroundNode.alpha = 1.0
             return
         }
-        if self.hasDoxVideoWallpaper {
+        let hasWallpaper = SGDoxAnimatedWallpaperManager.shared.localFileUrl(for: peerId.toInt64()) != nil
+        self.hasDoxVideoWallpaper = hasWallpaper
+        if hasWallpaper {
             self.backgroundNode.alpha = 1.0
             self.doxVideoWallpaperNode.isHidden = false
             self.doxVideoWallpaperNode.alpha = 1.0
