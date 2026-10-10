@@ -1470,6 +1470,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.dismiss(animated: true)
     }
     
+    private func performSuperDismiss(completion: (() -> Void)? = nil) {
+        super.dismiss(animated: false, completion: completion)
+    }
+    
     public override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
         self.triggerDismissBeginIfNeeded()
         let doDismiss = { [weak self] in
@@ -1480,7 +1484,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             } else if let presenting = self.presentingViewController {
                 presenting.dismiss(animated: false, completion: completion)
             } else {
-                super.dismiss(animated: false, completion: completion)
+                self.performSuperDismiss(completion: completion)
             }
         }
         if flag {
