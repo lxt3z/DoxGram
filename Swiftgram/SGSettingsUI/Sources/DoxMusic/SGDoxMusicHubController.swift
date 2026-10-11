@@ -69,87 +69,201 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
     let containerCard = UIView()
     let blurView = UIVisualEffectView()
     let ambientGradient = CAGradientLayer()
-    let iconBadge = UIView()
-    let iconImageView = UIImageView()
+    let sheenGradient = CAGradientLayer()
+    let aiBadge = UIView()
+    let aiIcon = UIImageView()
+    let aiLabel = UILabel()
     let titleLabel = UILabel()
     let subtitleLabel = UILabel()
     let playCircle = UIView()
     let playIcon = UIImageView()
+    
+    var modeButtons: [UIButton] = []
+    var onSelectMode: ((SGDoxMusicManager.SGDoxWaveMode) -> Void)?
+    var onPlayPauseTapped: (() -> Void)?
+    
+    private var currentMode: SGDoxMusicManager.SGDoxWaveMode = .flow
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         self.backgroundColor = .clear
         self.selectionStyle = .none
         
-        self.containerCard.layer.cornerRadius = 18
-        self.containerCard.layer.borderWidth = 0.5
-        self.containerCard.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
+        self.containerCard.layer.cornerRadius = 24
+        self.containerCard.layer.cornerCurve = .continuous
+        self.containerCard.layer.borderWidth = 0.75
+        self.containerCard.layer.borderColor = UIColor(white: 1.0, alpha: 0.28).cgColor
         self.containerCard.clipsToBounds = true
         self.contentView.addSubview(self.containerCard)
         
         self.ambientGradient.colors = [
-            UIColor(red: 0.42, green: 0.12, blue: 0.82, alpha: 0.85).cgColor,
-            UIColor(red: 0.12, green: 0.42, blue: 0.95, alpha: 0.85).cgColor
+            UIColor(red: 0.40, green: 0.16, blue: 0.85, alpha: 0.95).cgColor,
+            UIColor(red: 0.12, green: 0.44, blue: 0.95, alpha: 0.95).cgColor
         ]
         self.ambientGradient.startPoint = CGPoint(x: 0.0, y: 0.0)
         self.ambientGradient.endPoint = CGPoint(x: 1.0, y: 1.0)
         self.containerCard.layer.insertSublayer(self.ambientGradient, at: 0)
         
-        self.blurView.effect = UIBlurEffect(style: .systemThinMaterialDark)
+        self.blurView.effect = UIBlurEffect(style: .systemUltraThinMaterialDark)
         self.containerCard.addSubview(self.blurView)
         
-        self.iconBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
-        self.iconBadge.layer.cornerRadius = 20
-        self.iconBadge.clipsToBounds = true
-        self.containerCard.addSubview(self.iconBadge)
+        self.sheenGradient.colors = [
+            UIColor(white: 1.0, alpha: 0.38).cgColor,
+            UIColor(white: 1.0, alpha: 0.08).cgColor,
+            UIColor.clear.cgColor
+        ]
+        self.sheenGradient.locations = [0.0, 0.40, 1.0]
+        self.sheenGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
+        self.sheenGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
+        self.containerCard.layer.addSublayer(self.sheenGradient)
         
-        self.iconImageView.image = UIImage(systemName: "waveform.path.ecg") ?? UIImage(systemName: "dot.radiowaves.left.and.right")
-        self.iconImageView.tintColor = .white
-        self.iconImageView.contentMode = .scaleAspectFit
-        self.iconBadge.addSubview(self.iconImageView)
+        // AI Badge
+        self.aiBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.16)
+        self.aiBadge.layer.cornerRadius = 10
+        self.aiBadge.layer.borderWidth = 0.5
+        self.aiBadge.layer.borderColor = UIColor(white: 1.0, alpha: 0.28).cgColor
+        self.aiBadge.clipsToBounds = true
+        self.containerCard.addSubview(self.aiBadge)
         
+        let sparkCfg = UIImage.SymbolConfiguration(pointSize: 10, weight: .bold)
+        self.aiIcon.image = UIImage(systemName: "sparkles", withConfiguration: sparkCfg)
+        self.aiIcon.tintColor = UIColor(red: 0.55, green: 0.85, blue: 1.0, alpha: 1.0)
+        self.aiIcon.contentMode = .scaleAspectFit
+        self.aiBadge.addSubview(self.aiIcon)
+        
+        self.aiLabel.text = "AI FLOW"
+        self.aiLabel.font = UIFont.systemFont(ofSize: 10.5, weight: .heavy)
+        self.aiLabel.textColor = .white
+        self.aiBadge.addSubview(self.aiLabel)
+        
+        // Title & Subtitle
         self.titleLabel.text = "Моя волна"
-        self.titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .bold)
+        self.titleLabel.font = UIFont.systemFont(ofSize: 20, weight: .bold)
         self.titleLabel.textColor = .white
         self.containerCard.addSubview(self.titleLabel)
         
-        self.subtitleLabel.text = "Умный бесконечный поток музыки"
+        self.subtitleLabel.text = "Умный персональный поток"
         self.subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-        self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.80)
         self.containerCard.addSubview(self.subtitleLabel)
         
+        // Play / Pause Circle
         self.playCircle.backgroundColor = UIColor(white: 1.0, alpha: 0.22)
-        self.playCircle.layer.cornerRadius = 19
+        self.playCircle.layer.cornerRadius = 22
+        self.playCircle.layer.borderWidth = 0.75
+        self.playCircle.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
         self.playCircle.clipsToBounds = true
+        let playTap = UITapGestureRecognizer(target: self, action: #selector(self.playCircleTapped))
+        self.playCircle.addGestureRecognizer(playTap)
         self.containerCard.addSubview(self.playCircle)
         
-        self.playIcon.image = UIImage(systemName: "play.fill")
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        self.playIcon.image = UIImage(systemName: "play.fill", withConfiguration: playConfig)
         self.playIcon.tintColor = .white
         self.playIcon.contentMode = .scaleAspectFit
         self.playCircle.addSubview(self.playIcon)
+        
+        // Setup 4 AI Mode Chips
+        let modes: [SGDoxMusicManager.SGDoxWaveMode] = [.flow, .energy, .chill, .discovery]
+        for mode in modes {
+            let btn = UIButton(type: .system)
+            btn.layer.cornerRadius = 14
+            btn.layer.cornerCurve = .continuous
+            btn.clipsToBounds = true
+            let iconCfg = UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+            btn.setImage(UIImage(systemName: mode.icon, withConfiguration: iconCfg), for: .normal)
+            btn.setTitle(" \(mode.title)", for: .normal)
+            btn.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+            btn.tag = modes.firstIndex(of: mode) ?? 0
+            btn.addTarget(self, action: #selector(self.modeButtonTapped(_:)), for: .touchUpInside)
+            self.modeButtons.append(btn)
+            self.containerCard.addSubview(btn)
+        }
+        self.updateModeChipsVisuals()
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
+    public func updateWaveState(isPlaying: Bool, mode: SGDoxMusicManager.SGDoxWaveMode) {
+        self.currentMode = mode
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        let iconName = isPlaying ? "pause.fill" : "play.fill"
+        self.playIcon.image = UIImage(systemName: iconName, withConfiguration: playConfig)
+        self.subtitleLabel.text = mode.subtitle
+        self.updateModeChipsVisuals()
+    }
+    
+    private func updateModeChipsVisuals() {
+        let modes: [SGDoxMusicManager.SGDoxWaveMode] = [.flow, .energy, .chill, .discovery]
+        for (i, btn) in self.modeButtons.enumerated() {
+            guard i < modes.count else { continue }
+            let isSelected = modes[i] == self.currentMode
+            if isSelected {
+                btn.backgroundColor = UIColor(white: 1.0, alpha: 0.32)
+                btn.layer.borderWidth = 0.75
+                btn.layer.borderColor = UIColor(white: 1.0, alpha: 0.55).cgColor
+                btn.setTitleColor(.white, for: .normal)
+                btn.tintColor = .white
+            } else {
+                btn.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+                btn.layer.borderWidth = 0.5
+                btn.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
+                btn.setTitleColor(UIColor(white: 1.0, alpha: 0.75), for: .normal)
+                btn.tintColor = UIColor(white: 1.0, alpha: 0.75)
+            }
+        }
+    }
+    
+    @objc private func modeButtonTapped(_ sender: UIButton) {
+        let modes: [SGDoxMusicManager.SGDoxWaveMode] = [.flow, .energy, .chill, .discovery]
+        guard sender.tag < modes.count else { return }
+        let selectedMode = modes[sender.tag]
+        self.currentMode = selectedMode
+        self.updateModeChipsVisuals()
+        self.subtitleLabel.text = selectedMode.subtitle
+        self.onSelectMode?(selectedMode)
+    }
+    
+    @objc private func playCircleTapped() {
+        self.onPlayPauseTapped?()
+    }
+    
     override func layoutSubviews() {
         super.layoutSubviews()
         let bounds = self.contentView.bounds
-        self.containerCard.frame = CGRect(x: 16, y: 4, width: bounds.width - 32, height: bounds.height - 8)
+        let cardWidth = bounds.width - 32.0
+        let cardHeight = bounds.height - 8.0
+        
+        self.containerCard.frame = CGRect(x: 16, y: 4, width: cardWidth, height: cardHeight)
         self.ambientGradient.frame = self.containerCard.bounds
         self.blurView.frame = self.containerCard.bounds
+        self.sheenGradient.frame = CGRect(x: 0, y: 0, width: cardWidth, height: 70.0)
         
-        self.iconBadge.frame = CGRect(x: 14, y: (self.containerCard.bounds.height - 40) * 0.5, width: 40, height: 40)
-        self.iconImageView.frame = CGRect(x: 8, y: 8, width: 24, height: 24)
+        // AI Badge
+        self.aiBadge.frame = CGRect(x: 16, y: 14, width: 78, height: 20)
+        self.aiIcon.frame = CGRect(x: 7, y: 4, width: 12, height: 12)
+        self.aiLabel.frame = CGRect(x: 23, y: 1, width: 50, height: 18)
         
-        let textWidth = self.containerCard.bounds.width - 64 - 54
-        self.titleLabel.frame = CGRect(x: 64, y: 15, width: textWidth, height: 22)
-        self.subtitleLabel.frame = CGRect(x: 64, y: 38, width: textWidth, height: 18)
+        // Title & Subtitle
+        let textWidth = max(0, cardWidth - 32 - 54)
+        self.titleLabel.frame = CGRect(x: 16, y: 38, width: textWidth, height: 24)
+        self.subtitleLabel.frame = CGRect(x: 16, y: 64, width: textWidth, height: 18)
         
-        let playY = (self.containerCard.bounds.height - 38) * 0.5
-        self.playCircle.frame = CGRect(x: self.containerCard.bounds.width - 50, y: playY, width: 38, height: 38)
-        self.playIcon.frame = CGRect(x: 12, y: 10, width: 16, height: 18)
+        // Play circle
+        self.playCircle.frame = CGRect(x: cardWidth - 56, y: 32, width: 44, height: 44)
+        self.playIcon.frame = CGRect(x: 14, y: 13, width: 18, height: 18)
+        
+        // 4 Chips
+        let chipsY: CGFloat = 94.0
+        let chipH: CGFloat = 32.0
+        let spacing: CGFloat = 6.0
+        let totalSpacing = spacing * 3.0
+        let chipW = floor((cardWidth - 32.0 - totalSpacing) / 4.0)
+        for (i, btn) in self.modeButtons.enumerated() {
+            btn.frame = CGRect(x: 16.0 + CGFloat(i) * (chipW + spacing), y: chipsY, width: chipW, height: chipH)
+        }
     }
 }
 
@@ -747,7 +861,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                 return 54.0
             }
             if indexPath.section == 1 {
-                return 82.0
+                return 144.0
             }
             if self.hasFavorites && indexPath.section == 2 && indexPath.row == 0 {
                 return 96.0
@@ -828,6 +942,22 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         
         if !self.isSearching && indexPath.section == 1 {
             let cell = tableView.dequeueReusableCell(withIdentifier: "WaveHeroCell", for: indexPath) as! SGDoxWaveHeroCell
+            let manager = SGDoxMusicManager.shared
+            cell.updateWaveState(isPlaying: manager.isPlaying && manager.isWaveEnabled, mode: manager.currentWaveMode)
+            cell.onSelectMode = { [weak self] mode in
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                SGDoxMusicManager.shared.setWaveMode(mode)
+                self?.tableView.reloadRows(at: [IndexPath(row: 0, section: 1)], with: .none)
+            }
+            cell.onPlayPauseTapped = { [weak self] in
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                if manager.isPlaying && manager.isWaveEnabled {
+                    manager.pause()
+                } else {
+                    manager.startWave(mode: manager.currentWaveMode)
+                }
+                self?.tableView.reloadRows(at: [IndexPath(row: 0, section: 1)], with: .none)
+            }
             return cell
         }
         

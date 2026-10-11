@@ -3287,7 +3287,14 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 let tag = url.hasPrefix("#") ? url : "#\(url)"
                 if let peerId = strongSelf.chatLocation.peerId {
                     let senderName = message?.author?.debugDisplayTitle
-                    handleIncomingListenTogetherSync(text: tag, peerId: peerId, senderName: senderName)
+                    strongSelf.presentDoxListenTogetherInvite(text: tag, peerId: peerId, senderName: senderName)
+                    return
+                }
+            }
+            if url.contains("doxwall:") {
+                let tag = url.hasPrefix("#") ? url : "#\(url)"
+                if let peerId = strongSelf.chatLocation.peerId {
+                    strongSelf.presentDoxWallpaperConfirmation(tag: tag, peerId: peerId)
                     return
                 }
             }
@@ -3512,7 +3519,14 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             if hashtag.contains("doxlisten:") || hashtag.hasPrefix("doxlisten:") {
                 let tag = hashtag.hasPrefix("#") ? hashtag : "#\(hashtag)"
                 if let peerId = strongSelf.chatLocation.peerId {
-                    handleIncomingListenTogetherSync(text: tag, peerId: peerId, senderName: nil)
+                    strongSelf.presentDoxListenTogetherInvite(text: tag, peerId: peerId, senderName: nil)
+                    return
+                }
+            }
+            if hashtag.contains("doxwall:") || hashtag.hasPrefix("doxwall:") {
+                let tag = hashtag.hasPrefix("#") ? hashtag : "#\(hashtag)"
+                if let peerId = strongSelf.chatLocation.peerId {
+                    strongSelf.presentDoxWallpaperConfirmation(tag: tag, peerId: peerId)
                     return
                 }
             }
@@ -9708,6 +9722,58 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 }
             }))
         })
+    func presentDoxListenTogetherInvite(text: String, peerId: EnginePeer.Id, senderName: String?) {
+        if let session = SGDoxListenTogetherManager.shared.parseSyncTag(text: text, peerId: peerId, senderName: senderName) {
+            let inviteController = SGDoxListenTogetherInviteController(context: self.context, session: session)
+            self.present(inviteController, in: .window(.root))
+        } else {
+            let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: text, peerId: peerId, senderName: senderName, forceJoin: true)
+        }
+    }
+    
+    func presentDoxWallpaperConfirmation(tag: String, peerId: EnginePeer.Id) {
+        guard let sync = SGDoxAnimatedWallpaperManager.shared.parseSyncTag(from: tag) else { return }
+        let rawPeerId = peerId.toInt64()
+        let isRu = self.presentationData.strings.baseLanguageCode.hasPrefix("ru")
+        
+        let alert = UIAlertController(
+            title: isRu ? "🎬 Анимированные видео-обои" : "Animated Video Wallpaper",
+            message: isRu ? "Собеседник предлагает установить живые видео-обои для этого чата. Выберите качество установки:" : "A video wallpaper was shared for this chat. Select quality to apply:",
+            preferredStyle: .actionSheet
+        )
+        
+        alert.addAction(UIAlertAction(title: isRu ? "✨ Высокое качество (1080p / 720p)" : "High Quality (1080p / 720p)", style: .default, handler: { [weak self] _ in
+            guard let self = self else { return }
+            self.applyDoxWallpaper(urlString: sync.url, quality: "720p", peerId: rawPeerId)
+        }))
+        
+        alert.addAction(UIAlertAction(title: isRu ? "⚡ Экономичное качество (480p)" : "Eco Quality (480p)", style: .default, handler: { [weak self] _ in
+            guard let self = self else { return }
+            self.applyDoxWallpaper(urlString: sync.url, quality: "480p", peerId: rawPeerId)
+        }))
+        
+        alert.addAction(UIAlertAction(title: isRu ? "Не применять" : "Cancel", style: .cancel, handler: nil))
+        
+        self.context.sharedContext.applicationBindings.presentNativeController(alert)
+    }
+    
+    private func applyDoxWallpaper(urlString: String, quality: String, peerId: Int64) {
+        let hud = OverlayStatusController(theme: self.presentationData.theme, type: .loading(cancelled: nil))
+        self.present(hud, in: .window(.root))
+        
+        let isRu = self.presentationData.strings.baseLanguageCode.hasPrefix("ru")
+        SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: urlString, quality: quality) { [weak self, weak hud] success, errorText in
+            hud?.dismiss()
+            guard let self = self else { return }
+            if success {
+                self.chatDisplayNode.updateDoxVideoWallpaper()
+                let overlay = UndoOverlayController(presentationData: self.presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Анимированные обои успешно установлены!" : "Animated wallpaper applied!", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
+                self.present(overlay, in: .window(.root))
+            } else {
+                let overlay = UndoOverlayController(presentationData: self.presentationData, content: .info(title: isRu ? "Ошибка" : "Error", text: errorText ?? (isRu ? "Не удалось загрузить видео" : "Failed to load video"), timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
+                self.present(overlay, in: .window(.root))
+            }
+        }
     }
     
     func shareAccountContact() {

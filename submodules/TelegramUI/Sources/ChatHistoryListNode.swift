@@ -4266,16 +4266,8 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                                     if msgTimestamp > currentAppliedTs {
                                         SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
                                     }
-                                } else if let tagUrl = candidate.tagUrl {
-                                    let quality = candidate.quality ?? "720p"
-                                    if (SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != tagUrl || msgTimestamp > currentAppliedTs),
-                                       !SGDoxAnimatedWallpaperManager.shared.isDownloading(for: peerId) {
-                                        SGDoxAnimatedWallpaperManager.shared.setWallpaper(for: peerId, urlString: tagUrl, quality: quality) { success, _ in
-                                            if success {
-                                                SGDoxAnimatedWallpaperManager.shared.setWallpaperTimestamp(msgTimestamp, for: peerId)
-                                            }
-                                        }
-                                    }
+                                } else if let _ = candidate.tagUrl {
+                                    // Do not auto-apply incoming wallpaper without user confirmation. User can tap the message in chat to select quality and apply.
                                 } else if let file = candidate.file {
                                     let syncKey = "tg_msg_\(file.fileId.id)"
                                     if (SGDoxAnimatedWallpaperManager.shared.wallpaperUrl(for: peerId) != syncKey || msgTimestamp > currentAppliedTs),

@@ -535,7 +535,7 @@ public final class AppleMusicService: @unchecked Sendable {
         }
     }
     
-    public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
+    public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, mode: SGDoxMusicManager.SGDoxWaveMode = .flow, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
         let seedArtist = track?.artist.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if seedArtist.isEmpty {
             self.fetchUserPersonalMusic { personalTracks in
@@ -544,14 +544,27 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
+        let queryForArtist: String
+        switch mode {
+        case .energy:
+            queryForArtist = "\(seedArtist) remix"
+        case .chill:
+            queryForArtist = "\(seedArtist) acoustic"
+        case .discovery:
+            queryForArtist = "\(seedArtist) ft"
+        case .flow:
+            queryForArtist = seedArtist
+        }
+        
         // 1. Fetch tracks by the current seed artist
-        self.search(query: seedArtist) { [weak self] artistTracks, _ in
+        self.search(query: queryForArtist) { [weak self] primaryTracks, _ in
             guard let self = self else {
-                completion(artistTracks)
+                completion(primaryTracks)
                 return
             }
             
-            let filteredArtistTracks = artistTracks.filter { $0.id != track?.id }
+            let sourceTracks = primaryTracks.isEmpty ? [] : primaryTracks
+            let filteredArtistTracks = sourceTracks.filter { $0.id != track?.id }
             let primaryArtistTracks = Array(filteredArtistTracks.prefix(4))
             
             // 2. Cross-reference favorites and library to discover favorite artists
@@ -675,10 +688,14 @@ public final class AppleMusicService: @unchecked Sendable {
                       let json = try? JSONSerialization.jsonObject(with: dData) as? [String: Any],
                       let dataList = json["data"] as? [[String: Any]],
                       let first = dataList.first else { return }
-                let pic = (first["picture_xl"] as? String) ?? (first["picture_big"] as? String) ?? (first["picture_medium"] as? String)
-                lock.lock()
-                deezerPhoto = pic
-                lock.unlock()
+                let dName = (first["name"] as? String)?.lowercased() ?? ""
+                let clean = artistName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                if dName == clean || dName.contains(clean) || clean.contains(dName) {
+                    let pic = (first["picture_xl"] as? String) ?? (first["picture_big"] as? String) ?? (first["picture_medium"] as? String)
+                    lock.lock()
+                    deezerPhoto = pic
+                    lock.unlock()
+                }
             }.resume()
         }
         
@@ -712,7 +729,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 for item in results where (item["wrapperType"] as? String) == "collection" {
                     if let colName = item["collectionName"] as? String,
                        let colId = (item["collectionId"] as? Int64) ?? (item["collectionId"] as? Int).map(Int64.init) {
-                        let artUrl = (item["artworkUrl100"] as? String)?.replacingOccurrences(of: "100x100bb", with: "600x600bb")
+                        let artUrl = (item["artworkUrl100"] as? String)?.replacingOccurrences(of: "100x100bb", with: "1200x1200bb")
                         let relDate = item["releaseDate"] as? String
                         let trackCount = (item["trackCount"] as? Int) ?? 0
                         parsedAlbums.append(SGDoxAlbum(

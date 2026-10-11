@@ -495,7 +495,7 @@ extension ChatControllerImpl {
             var updatedMessage = message
             if case let .message(_, attributes, inlineStickers, mediaReference, _, replyToMessageId, replyToStoryId, localGroupingKey, correlationId, bubbleUpEmojiOrStickersets) = message {
                 updatedMessage = .message(
-                    text: "🎬 Анимированные обои чата #doxwall",
+                    text: "🎬 Анимированные обои для этого чата ✨\nНажмите для выбора качества и установки #doxwall",
                     attributes: attributes,
                     inlineStickers: inlineStickers,
                     mediaReference: mediaReference,
@@ -569,7 +569,8 @@ extension ChatControllerImpl {
                 if success {
                     strongSelf.chatDisplayNode.updateDoxVideoWallpaper()
                     let syncTag = SGDoxAnimatedWallpaperManager.shared.formatSyncTag(url: urlString, quality: quality)
-                    strongSelf.controllerInteraction?.sendMessage(syncTag, nil)
+                    let inviteMsg = isRu ? "🎬 Анимированные обои для этого чата ✨\nНажмите для выбора качества и установки: \(syncTag)" : "🎬 Animated wallpaper for this chat ✨\nTap to select quality and apply: \(syncTag)"
+                    strongSelf.controllerInteraction?.sendMessage(inviteMsg, nil)
                     let overlay = UndoOverlayController(presentationData: strongSelf.presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Обои установлены и отправлены собеседнику" : "Wallpaper applied and sent to chat", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
                     strongSelf.present(overlay, in: .window(.root))
                 } else {

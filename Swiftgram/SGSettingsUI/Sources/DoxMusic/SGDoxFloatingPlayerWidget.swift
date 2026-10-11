@@ -15,6 +15,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     private let containerView = UIView()
     private let blurView = UIVisualEffectView()
     private let tintOverlayView = UIView()
+    private let glassSheenLayer = CAGradientLayer()
     
     private let artworkImageView = UIImageView()
     private let textContainerView = UIView()
@@ -70,6 +71,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         
         self.containerView.addSubview(self.blurView)
         self.containerView.addSubview(self.tintOverlayView)
+        self.containerView.layer.addSublayer(self.glassSheenLayer)
         
         // Tap gesture to open player
         let tap = UITapGestureRecognizer(target: self, action: #selector(self.widgetTapped))
@@ -148,51 +150,73 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.blurView.effect = UIBlurEffect(style: isDark ? .systemUltraThinMaterialDark : .systemUltraThinMaterialLight)
         
         if isDark {
-            self.tintOverlayView.backgroundColor = UIColor(white: 0.05, alpha: 0.20)
-            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.14).cgColor
-            self.containerView.layer.borderWidth = 0.5
+            self.tintOverlayView.backgroundColor = UIColor(white: 0.10, alpha: 0.22)
+            self.glassSheenLayer.colors = [
+                UIColor(white: 1.0, alpha: 0.45).cgColor,
+                UIColor(white: 1.0, alpha: 0.12).cgColor,
+                UIColor.clear.cgColor
+            ]
+            self.glassSheenLayer.locations = [0.0, 0.40, 1.0]
+            self.glassSheenLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+            self.glassSheenLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
+            
+            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.32).cgColor
+            self.containerView.layer.borderWidth = 0.75
             self.layer.shadowColor = UIColor.black.cgColor
-            self.layer.shadowOpacity = 0.25
+            self.layer.shadowOpacity = 0.38
+            self.layer.shadowRadius = 22
+            self.layer.shadowOffset = CGSize(width: 0, height: 8)
+            
+            self.titleLabel.textColor = .white
+            self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.70)
+            
+            self.playPauseContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.22)
+            self.playPauseContainer.layer.borderWidth = 0.5
+            self.playPauseContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
+            self.playPauseButton.tintColor = .white
+            self.nextButton.tintColor = UIColor.white.withAlphaComponent(0.90)
+            self.closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+            self.closeButton.tintColor = UIColor.white.withAlphaComponent(0.75)
+            
+            self.artworkImageView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
+            self.artworkImageView.layer.borderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
+            
+            self.progressView.trackTintColor = UIColor(white: 1.0, alpha: 0.10)
+            self.progressView.progressTintColor = UIColor(red: 0.98, green: 0.25, blue: 0.40, alpha: 0.95)
+        } else {
+            self.tintOverlayView.backgroundColor = UIColor(white: 1.0, alpha: 0.25)
+            self.glassSheenLayer.colors = [
+                UIColor(white: 1.0, alpha: 0.55).cgColor,
+                UIColor(white: 1.0, alpha: 0.15).cgColor,
+                UIColor.clear.cgColor
+            ]
+            self.glassSheenLayer.locations = [0.0, 0.40, 1.0]
+            self.glassSheenLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+            self.glassSheenLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
+            
+            self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
+            self.containerView.layer.borderWidth = 0.75
+            self.layer.shadowColor = UIColor.black.cgColor
+            self.layer.shadowOpacity = 0.15
             self.layer.shadowRadius = 18
             self.layer.shadowOffset = CGSize(width: 0, height: 6)
             
-            self.titleLabel.textColor = .white
-            self.artistLabel.textColor = UIColor.white.withAlphaComponent(0.65)
-            
-            self.playPauseContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
-            self.playPauseButton.tintColor = .white
-            self.nextButton.tintColor = UIColor.white.withAlphaComponent(0.85)
-            self.closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
-            self.closeButton.tintColor = UIColor.white.withAlphaComponent(0.65)
-            
-            self.artworkImageView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
-            self.artworkImageView.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
-            
-            self.progressView.trackTintColor = UIColor(white: 1.0, alpha: 0.08)
-            self.progressView.progressTintColor = UIColor.white.withAlphaComponent(0.85)
-        } else {
-            self.tintOverlayView.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
-            self.containerView.layer.borderColor = UIColor(white: 0.0, alpha: 0.08).cgColor
-            self.containerView.layer.borderWidth = 0.5
-            self.layer.shadowColor = UIColor.black.cgColor
-            self.layer.shadowOpacity = 0.10
-            self.layer.shadowRadius = 16
-            self.layer.shadowOffset = CGSize(width: 0, height: 4)
-            
             let darkText = UIColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 1.0)
             self.titleLabel.textColor = darkText
-            self.artistLabel.textColor = UIColor(red: 0.44, green: 0.46, blue: 0.50, alpha: 1.0)
+            self.artistLabel.textColor = UIColor(red: 0.40, green: 0.42, blue: 0.46, alpha: 1.0)
             
-            self.playPauseContainer.backgroundColor = UIColor(white: 0.0, alpha: 0.06)
+            self.playPauseContainer.backgroundColor = UIColor(white: 0.0, alpha: 0.08)
+            self.playPauseContainer.layer.borderWidth = 0.5
+            self.playPauseContainer.layer.borderColor = UIColor(white: 0.0, alpha: 0.10).cgColor
             self.playPauseButton.tintColor = darkText
-            self.nextButton.tintColor = UIColor(red: 0.30, green: 0.32, blue: 0.36, alpha: 1.0)
-            self.closeButton.backgroundColor = UIColor(white: 0.0, alpha: 0.05)
-            self.closeButton.tintColor = UIColor(red: 0.45, green: 0.47, blue: 0.52, alpha: 1.0)
+            self.nextButton.tintColor = UIColor(red: 0.25, green: 0.27, blue: 0.30, alpha: 1.0)
+            self.closeButton.backgroundColor = UIColor(white: 0.0, alpha: 0.06)
+            self.closeButton.tintColor = UIColor(red: 0.40, green: 0.42, blue: 0.46, alpha: 1.0)
             
             self.artworkImageView.backgroundColor = UIColor(white: 0.90, alpha: 1.0)
-            self.artworkImageView.layer.borderColor = UIColor(white: 0.0, alpha: 0.06).cgColor
+            self.artworkImageView.layer.borderColor = UIColor(white: 0.0, alpha: 0.08).cgColor
             
-            self.progressView.trackTintColor = UIColor(white: 0.0, alpha: 0.06)
+            self.progressView.trackTintColor = UIColor(white: 0.0, alpha: 0.08)
             self.progressView.progressTintColor = self.theme.list.itemAccentColor
         }
     }
@@ -331,6 +355,7 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.containerView.layer.cornerRadius = widgetHeight * 0.5
         self.blurView.frame = self.bounds
         self.tintOverlayView.frame = self.bounds
+        self.glassSheenLayer.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: self.bounds.height * 0.55)
         
         // Artwork
         let artSide: CGFloat = 38.0
@@ -432,8 +457,16 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     // MARK: - Actions
     
     @objc private func widgetTapped() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        self.openPlayer?()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        UIView.animate(withDuration: 0.10, animations: {
+            self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        }) { _ in
+            UIView.animate(withDuration: 0.18, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.4, options: [.allowUserInteraction], animations: {
+                self.transform = .identity
+            }) { _ in
+                self.openPlayer?()
+            }
+        }
     }
     
     @objc private func handleSwipeDown() {

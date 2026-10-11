@@ -4,6 +4,26 @@ import AccountContext
 import Display
 import SGSimpleSettings
 
+public struct SGDoxListenTogetherSessionInfo: Equatable, Sendable {
+    public let trackId: String
+    public let title: String
+    public let artist: String
+    public let timestamp: Int64
+    public let senderName: String?
+    public let peerId: EnginePeer.Id
+    public var artworkUrl: String?
+    
+    public init(trackId: String, title: String, artist: String, timestamp: Int64, senderName: String?, peerId: EnginePeer.Id, artworkUrl: String? = nil) {
+        self.trackId = trackId
+        self.title = title
+        self.artist = artist
+        self.timestamp = timestamp
+        self.senderName = senderName
+        self.peerId = peerId
+        self.artworkUrl = artworkUrl
+    }
+}
+
 public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
     public static let shared = SGDoxListenTogetherManager()
     
@@ -16,6 +36,7 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
     public private(set) var activeRole: Role = .none
     public private(set) var currentSessionPeerId: EnginePeer.Id?
     public private(set) var partnerName: String?
+    public private(set) var latestInvitesByPeer: [EnginePeer.Id: SGDoxListenTogetherSessionInfo] = [:]
     
     public var isInSession: Bool {
         return self.activeRole != .none
@@ -57,16 +78,16 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         let cleanTitle = track.title.replacingOccurrences(of: ":", with: " ")
         let cleanArtist = track.artist.replacingOccurrences(of: ":", with: " ")
         let tag = "#doxlisten:\(track.id):\(now):\(cleanTitle):\(cleanArtist)"
-        return "🎧 Приглашение в «Прослушивание вместе» DoxGram!\n🎵 \(track.title) — \(track.artist)\n\nСлушать вместе: \(tag)"
+        return "🎧 Совместное прослушивание DoxGram\n🎵 \(track.title) — \(track.artist)\n\nНажмите для синхронизации: \(tag)"
     }
     
-    public func handleIncomingSync(text: String, peerId: EnginePeer.Id, senderName: String? = nil, forceJoin: Bool = false) -> Bool {
-        guard let range = text.range(of: "#doxlisten:") else { return false }
+    public func parseSyncTag(text: String, peerId: EnginePeer.Id, senderName: String? = nil) -> SGDoxListenTogetherSessionInfo? {
+        guard let range = text.range(of: "#doxlisten:") else { return nil }
         let payload = String(text[range.upperBound...])
         
         let components = payload.components(separatedBy: ":")
         guard components.count >= 4 else {
-            return false
+            return nil
         }
         
         let trackId = components[0]
@@ -74,43 +95,48 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         let title = components[2]
         let artist = components[3]
         
-        // Record peer's music status in SGDoxPeerMusicManager so note icon displays on their avatar & profile
-        SGDoxPeerMusicManager.shared.updateMusicStatus(peerId: peerId.toInt64(), title: title, artist: artist)
+        let existingArtwork = self.latestInvitesByPeer[peerId]?.artworkUrl
+        var info = SGDoxListenTogetherSessionInfo(
+            trackId: trackId,
+            title: title,
+            artist: artist,
+            timestamp: timestamp,
+            senderName: senderName ?? self.latestInvitesByPeer[peerId]?.senderName,
+            peerId: peerId,
+            artworkUrl: existingArtwork
+        )
         
-        let elapsed = max(0.0, Double(Int64(Date().timeIntervalSince1970) - timestamp))
+        self.latestInvitesByPeer[peerId] = info
         
-        // Safeguard against auto-playing old messages when merely opening chat
-        if !forceJoin {
-            let isCurrentSession = self.isInSession && self.currentSessionPeerId == peerId
-            let isFreshInvite = elapsed < 15.0
-            if !isCurrentSession && !isFreshInvite {
-                return false
+        // Resolve artwork asynchronously if missing
+        if info.artworkUrl == nil || info.artworkUrl?.isEmpty == true {
+            AppleMusicService.shared.search(query: "\(title) \(artist)") { [weak self] tracks, _ in
+                if let first = tracks.first(where: { !$0.artworkUrl.isEmpty }) {
+                    DispatchQueue.main.async {
+                        guard let self = self else { return }
+                        if var current = self.latestInvitesByPeer[peerId], current.trackId == trackId {
+                            current.artworkUrl = first.artworkUrl
+                            self.latestInvitesByPeer[peerId] = current
+                            NotificationCenter.default.post(name: NSNotification.Name("SGDoxListenTogetherUpdated"), object: nil, userInfo: ["peerId": peerId])
+                        }
+                    }
+                }
             }
         }
         
-        self.lock.lock()
-        if self.lastProcessedTag == payload && !forceJoin {
-            self.lock.unlock()
-            return false
-        }
+        return info
+    }
+    
+    public func joinAndPlay(session: SGDoxListenTogetherSessionInfo) {
+        self.joinSession(peerId: session.peerId, partnerName: session.senderName)
+        let elapsed = max(0.0, Double(Int64(Date().timeIntervalSince1970) - session.timestamp))
         
-        if elapsed > 360.0 {
-            self.lock.unlock()
-            return false
-        }
-        
-        self.lastProcessedTag = payload
-        self.lock.unlock()
-        
-        self.joinSession(peerId: peerId, partnerName: senderName)
-        
-        // Search and play track synchronized with strict matching
-        AppleMusicService.shared.search(query: "\(title) \(artist)") { tracks, _ in
-            let cleanTargetTitle = title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            let cleanTargetArtist = artist.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        AppleMusicService.shared.search(query: "\(session.title) \(session.artist)") { tracks, _ in
+            let cleanTargetTitle = session.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanTargetArtist = session.artist.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
             
             // 1. Direct ID match
-            var match = tracks.first(where: { $0.id == trackId })
+            var match = tracks.first(where: { $0.id == session.trackId })
             
             // 2. Both title and artist match closely
             if match == nil {
@@ -131,12 +157,9 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
                 })
             }
             
-            // 4. Exact artist match with partial title
+            // 4. Fallback first track
             if match == nil {
-                match = tracks.first(where: { t in
-                    let tArtist = t.artist.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                    return tArtist == cleanTargetArtist
-                })
+                match = tracks.first
             }
             
             if let trackToPlay = match {
@@ -153,6 +176,43 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
                 }
             }
         }
+    }
+    
+    public func handleIncomingSync(text: String, peerId: EnginePeer.Id, senderName: String? = nil, forceJoin: Bool = false) -> Bool {
+        guard let info = self.parseSyncTag(text: text, peerId: peerId, senderName: senderName) else {
+            return false
+        }
+        
+        // Record peer's music status in SGDoxPeerMusicManager so note icon displays on their avatar & profile
+        SGDoxPeerMusicManager.shared.updateMusicStatus(peerId: peerId.toInt64(), title: info.title, artist: info.artist)
+        
+        // Notify any active invite UI about track updates
+        NotificationCenter.default.post(name: NSNotification.Name("SGDoxListenTogetherUpdated"), object: nil, userInfo: ["peerId": peerId])
+        
+        let elapsed = max(0.0, Double(Int64(Date().timeIntervalSince1970) - info.timestamp))
+        let isCurrentSession = self.isInSession && self.currentSessionPeerId == peerId
+        
+        // NEVER auto-play on passive open; playback only starts if already in active session or explicitly tapped (forceJoin)
+        if !isCurrentSession && !forceJoin {
+            return false
+        }
+        
+        let payload = "\(info.trackId):\(info.timestamp):\(info.title):\(info.artist)"
+        self.lock.lock()
+        if self.lastProcessedTag == payload && !forceJoin {
+            self.lock.unlock()
+            return false
+        }
+        
+        if elapsed > 600.0 && !forceJoin {
+            self.lock.unlock()
+            return false
+        }
+        
+        self.lastProcessedTag = payload
+        self.lock.unlock()
+        
+        self.joinAndPlay(session: info)
         return true
     }
 }

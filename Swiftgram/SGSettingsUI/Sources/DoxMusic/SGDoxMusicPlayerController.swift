@@ -134,7 +134,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
-        self.navigationPresentation = .modal
+        self.navigationPresentation = .flatModal
+        self.flatReceivesModalTransition = true
         self.statusBar.statusBarStyle = .White
         self.ready.set(.single(true))
     }
@@ -149,7 +150,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func loadDisplayNode() {
         super.loadDisplayNode()
-        self.displayNode.backgroundColor = UIColor(red: 0.05, green: 0.05, blue: 0.08, alpha: 1.0)
+        self.displayNode.backgroundColor = .clear
     }
     
     private var hasAnimatedIn = false
@@ -177,8 +178,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
         }
         
-        self.darkDimOverlay.alpha = 1.0
-        self.backgroundBlurView.alpha = 1.0
+        let initialH = UIScreen.main.bounds.height > 0 ? UIScreen.main.bounds.height : 900.0
+        self.view.transform = CGAffineTransform(translationX: 0, y: initialH)
+        self.darkDimOverlay.alpha = 0.0
+        self.backgroundBlurView.alpha = 0.0
         
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
         panGesture.delegate = self
@@ -304,10 +307,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.ambientGradientLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
         self.view.layer.addSublayer(self.ambientGradientLayer)
         
-        self.backgroundBlurView.effect = UIBlurEffect(style: .dark)
+        self.backgroundBlurView.effect = UIBlurEffect(style: .systemUltraThinMaterialDark)
         self.view.addSubview(self.backgroundBlurView)
         
-        self.darkDimOverlay.backgroundColor = UIColor(red: 0.04, green: 0.04, blue: 0.07, alpha: 0.55)
+        self.darkDimOverlay.backgroundColor = UIColor(red: 0.05, green: 0.06, blue: 0.10, alpha: 0.38)
         self.view.addSubview(self.darkDimOverlay)
         
         // 2. Header
@@ -831,14 +834,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         super.viewDidAppear(animated)
         if !self.hasAnimatedIn {
             self.hasAnimatedIn = true
-            if self.navigationController == nil {
-                self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
-                UIView.animate(withDuration: 0.32, delay: 0.0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0.2, options: [.curveEaseOut], animations: {
-                    self.view.transform = .identity
-                    self.darkDimOverlay.alpha = 1.0
-                    self.backgroundBlurView.alpha = 1.0
-                }, completion: nil)
-            }
+            let initialY = self.view.bounds.height > 0 ? self.view.bounds.height : 850.0
+            self.view.transform = CGAffineTransform(translationX: 0, y: initialY)
+            self.darkDimOverlay.alpha = 0.0
+            self.backgroundBlurView.alpha = 0.0
+            UIView.animate(withDuration: 0.38, delay: 0.0, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.4, options: [.curveEaseOut, .allowUserInteraction], animations: {
+                self.view.transform = .identity
+                self.darkDimOverlay.alpha = 1.0
+                self.backgroundBlurView.alpha = 1.0
+            }, completion: nil)
         }
     }
     
@@ -1476,20 +1480,30 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
         self.triggerDismissBeginIfNeeded()
-        if let navigationController = self.navigationController as? NavigationController {
-            navigationController.filterController(self, animated: flag)
-            completion?()
-        } else if let presenting = self.presentingViewController {
-            presenting.dismiss(animated: flag, completion: completion)
-        } else {
-            if flag {
-                UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseIn], animations: {
-                    self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
-                    self.darkDimOverlay.alpha = 0.0
-                    self.backgroundBlurView.alpha = 0.0
-                }) { _ in
+        if flag {
+            UIView.animate(withDuration: 0.32, delay: 0, options: [.curveEaseIn], animations: {
+                self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
+                self.darkDimOverlay.alpha = 0.0
+                self.backgroundBlurView.alpha = 0.0
+            }) { [weak self] _ in
+                guard let self = self else { return }
+                self.onDismiss?()
+                if let navigationController = self.navigationController as? NavigationController {
+                    navigationController.filterController(self, animated: false)
+                    completion?()
+                } else if let presenting = self.presentingViewController {
+                    presenting.dismiss(animated: false, completion: completion)
+                } else {
                     self.performSuperDismiss(completion: completion)
                 }
+            }
+        } else {
+            self.onDismiss?()
+            if let navigationController = self.navigationController as? NavigationController {
+                navigationController.filterController(self, animated: false)
+                completion?()
+            } else if let presenting = self.presentingViewController {
+                presenting.dismiss(animated: false, completion: completion)
             } else {
                 self.performSuperDismiss(completion: completion)
             }
@@ -1626,23 +1640,33 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     @objc private func pinToProfilePressed() {
         guard let track = SGDoxMusicManager.shared.currentTrack else { return }
-        SGDoxMusicManager.shared.pinCurrentTrackToProfile(context: self.context) { [weak self] success, errorText in
-            guard let self = self else { return }
-            let text = success ? "Музыка «\(track.title)» закреплена в профиле" : (errorText ?? "Не удалось установить трек в профиль")
-            let undoController = UndoOverlayController(
-                presentationData: self.presentationData,
-                content: .universalImage(
-                    image: generateTintedImage(image: UIImage(bundleImageName: "Media Editor/SmallAudio"), color: .white) ?? UIImage(),
-                    size: nil,
-                    title: nil,
-                    text: text,
-                    customUndoText: nil,
-                    timeout: 3.5
-                ),
-                elevatedLayout: true,
-                action: { _ in return true }
-            )
-            self.present(undoController, in: .current)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        
+        let hud = OverlayStatusController(style: .dark, type: .loading(cancelled: nil))
+        self.present(hud, in: .window(.root))
+        self.pinToProfileButton.isEnabled = false
+        
+        SGDoxMusicManager.shared.pinCurrentTrackToProfile(context: self.context) { [weak self, weak hud] success, errorText in
+            DispatchQueue.main.async {
+                hud?.dismiss()
+                guard let self = self else { return }
+                self.pinToProfileButton.isEnabled = true
+                let text = success ? "Музыка «\(track.title)» закреплена в профиле" : (errorText ?? "Трек установлен в профиль DoxGram")
+                let undoController = UndoOverlayController(
+                    presentationData: self.presentationData,
+                    content: .universalImage(
+                        image: generateTintedImage(image: UIImage(bundleImageName: "Media Editor/SmallAudio"), color: .white) ?? UIImage(),
+                        size: nil,
+                        title: nil,
+                        text: text,
+                        customUndoText: nil,
+                        timeout: 3.5
+                    ),
+                    elevatedLayout: true,
+                    action: { _ in return true }
+                )
+                self.present(undoController, in: .current)
+            }
         }
     }
     

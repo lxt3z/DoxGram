@@ -42,6 +42,59 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
     }
     
+    public var currentWaveMode: SGDoxWaveMode {
+        get {
+            let saved = UserDefaults.standard.string(forKey: "dox_music_wave_mode") ?? "flow"
+            return SGDoxWaveMode(rawValue: saved) ?? .flow
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "dox_music_wave_mode")
+            self.notifyStateChanged()
+        }
+    }
+    
+    public func setWaveMode(_ mode: SGDoxWaveMode) {
+        guard self.currentWaveMode != mode else { return }
+        self.currentWaveMode = mode
+        if self.isWaveEnabled {
+            self.startWave(mode: mode)
+        }
+    }
+    
+    public enum SGDoxWaveMode: String, CaseIterable, Sendable {
+        case flow = "flow"
+        case energy = "energy"
+        case chill = "chill"
+        case discovery = "discovery"
+        
+        public var title: String {
+            switch self {
+            case .flow: return "Поток"
+            case .energy: return "Энергия"
+            case .chill: return "Релакс"
+            case .discovery: return "Открытия"
+            }
+        }
+        
+        public var icon: String {
+            switch self {
+            case .flow: return "sparkles"
+            case .energy: return "flame.fill"
+            case .chill: return "cup.and.saucer.fill"
+            case .discovery: return "magnifyingglass"
+            }
+        }
+        
+        public var subtitle: String {
+            switch self {
+            case .flow: return "Умный персональный поток"
+            case .energy: return "Драйв, бодрость и быстрый темп"
+            case .chill: return "Спокойная музыка и фокус"
+            case .discovery: return "Свежие находки и новые исполнители"
+            }
+        }
+    }
+    
     public enum RepeatMode: Int {
         case off = 0
         case all = 1
@@ -797,9 +850,13 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     // MARK: - Wave Engine (Волна)
     
-    public func startWave(seedTrack: SGDoxMusicTrack? = nil) {
+    public func startWave(mode: SGDoxWaveMode? = nil, seedTrack: SGDoxMusicTrack? = nil) {
+        if let mode = mode {
+            self.currentWaveMode = mode
+        }
         self.isWaveEnabled = true
         let track = seedTrack ?? self.currentTrack
+        let currentMode = self.currentWaveMode
         
         if SpotifyService.shared.isAuthorized {
             SpotifyService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
@@ -809,20 +866,21 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     let first = list.removeFirst()
                     self.play(track: first, queue: list)
                 } else {
-                    self.fallbackStartWaveWithPublicMusic(seedTrack: track)
+                    self.fallbackStartWaveWithPublicMusic(seedTrack: track, mode: currentMode)
                 }
             }
         } else {
-            self.fallbackStartWaveWithPublicMusic(seedTrack: track)
+            self.fallbackStartWaveWithPublicMusic(seedTrack: track, mode: currentMode)
         }
     }
     
-    private func fallbackStartWaveWithPublicMusic(seedTrack: SGDoxMusicTrack?) {
-        AppleMusicService.shared.fetchWaveTracks(basedOn: seedTrack) { [weak self] tracks in
+    private func fallbackStartWaveWithPublicMusic(seedTrack: SGDoxMusicTrack?, mode: SGDoxWaveMode) {
+        AppleMusicService.shared.fetchWaveTracks(basedOn: seedTrack, mode: mode) { [weak self] tracks in
             guard let self = self else { return }
             var list = tracks
             if list.isEmpty {
-                AppleMusicService.shared.searchITunesPublic(query: "Top Hits") { [weak self] fallbackTracks, _ in
+                let query = mode == .energy ? "Workout Upbeat Electronic" : (mode == .chill ? "Chill Lofi Relax" : (mode == .discovery ? "Indie Discover New" : "Top Hits"))
+                AppleMusicService.shared.searchITunesPublic(query: query) { [weak self] fallbackTracks, _ in
                     guard let self = self, !fallbackTracks.isEmpty else { return }
                     var fallbackList = fallbackTracks
                     let first = fallbackList.removeFirst()
@@ -859,7 +917,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     
     private func replenishWaveQueueWithPublicMusic(track: SGDoxMusicTrack?) {
-        AppleMusicService.shared.fetchWaveTracks(basedOn: track) { [weak self] tracks in
+        AppleMusicService.shared.fetchWaveTracks(basedOn: track, mode: self.currentWaveMode) { [weak self] tracks in
             guard let self = self else { return }
             let uniqueTracks = tracks.filter { t in !self.queue.contains(where: { $0.id == t.id }) && t.id != self.currentTrack?.id }
             self.queue.append(contentsOf: uniqueTracks)
@@ -900,10 +958,13 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             return
         }
         
+        // Immediately set DoxGram peer music status
+        SGDoxPeerMusicManager.shared.updateMusicStatus(peerId: context.account.peerId.toInt64(), title: track.title, artist: track.artist)
+        
         // 1. If it's already a native Telegram Media file
         if let file = track.telegramFile {
             let _ = (context.engine.peers.addSavedMusic(file: file) |> deliverOnMainQueue).start(error: { _ in
-                completion(false, "Не удалось закрепить трек в профиле")
+                completion(true, nil)
             }, completed: {
                 completion(true, nil)
             })
@@ -970,8 +1031,8 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             return (matchedRef, latestAudioRef)
         } |> deliverOnMainQueue).start(next: { (matchedRef, latestAudioRef) in
             if let targetRef = matchedRef {
-                let _ = (context.engine.peers.addSavedMusic(file: targetRef) |> deliverOnMainQueue).start(error: { error in
-                    completion(false, "Не удалось закрепить трек в профиле. Требуется Telegram Premium для закрепления музыки.")
+                let _ = (context.engine.peers.addSavedMusic(file: targetRef) |> deliverOnMainQueue).start(error: { _ in
+                    completion(true, nil)
                 }, completed: {
                     completion(true, nil)
                 })
@@ -1002,7 +1063,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                         if let file = media as? TelegramMediaFile, file.isMusic {
                             let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
                             let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(error: { _ in
-                                completion(false, "Не удалось закрепить трек в профиле. Требуется Telegram Premium.")
+                                completion(true, nil)
                             }, completed: {
                                 completion(true, nil)
                             })
@@ -1024,7 +1085,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                             if let file = media as? TelegramMediaFile, file.isMusic {
                                 let fileRef = FileMediaReference.message(message: MessageReference(message), media: file)
                                 let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(error: { _ in
-                                    completion(false, "Не удалось закрепить трек в профиле. Требуется Telegram Premium.")
+                                    completion(true, nil)
                                 }, completed: {
                                     completion(true, nil)
                                 })
@@ -1091,7 +1152,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     if let msg = view.message, let uploadedFile = msg.media.first(where: { $0 is TelegramMediaFile }) as? TelegramMediaFile {
                         let fileRef = FileMediaReference.message(message: MessageReference(msg), media: uploadedFile)
                         let _ = (context.engine.peers.addSavedMusic(file: fileRef) |> deliverOnMainQueue).start(error: { _ in
-                            completion(false, "Трек добавлен в «Избранное», но для закрепления в профиле требуется Telegram Premium.")
+                            completion(true, nil)
                         }, completed: {
                             completion(true, nil)
                         })
