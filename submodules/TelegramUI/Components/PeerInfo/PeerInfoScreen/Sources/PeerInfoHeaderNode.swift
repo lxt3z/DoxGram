@@ -1320,7 +1320,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                     subtitleColor = UIColor.white
                 }
                 
-                if let peerId = peer?.id.toInt64(), let peerMusic = SGDoxPeerMusicManager.shared.getMusicStatus(peerId: peerId) {
+                if let peerMusic = SGDoxPeerMusicManager.shared.getMusicStatus(peerId: peer.id.toInt64()) {
                     subtitleStringText = "🎵 Слушает: \(peerMusic.title) — \(peerMusic.artist)"
                 } else {
                     subtitleStringText = statusData.text
