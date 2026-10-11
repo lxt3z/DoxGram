@@ -333,10 +333,11 @@ public final class SGDoxListenTogetherInviteController: ViewController {
             id: self.currentSession.trackId,
             title: self.currentSession.title,
             artist: self.currentSession.artist,
-            duration: 0,
-            service: .appleMusic,
-            artworkUrl: self.currentSession.artworkUrl ?? "",
-            previewUrl: nil
+            album: "",
+            artworkUrl: self.currentSession.artworkUrl,
+            duration: 0.0,
+            previewUrl: nil,
+            source: .appleMusic
         )
         SGDoxImageLoader.shared.loadArtwork(for: dummyTrack, targetSize: CGSize(width: 280, height: 280)) { [weak self] image in
             guard let self = self, let image = image else { return }

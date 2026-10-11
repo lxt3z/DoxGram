@@ -4,7 +4,7 @@ import AccountContext
 import Display
 import SGSimpleSettings
 
-public struct SGDoxListenTogetherSessionInfo: Equatable, Sendable {
+public struct SGDoxListenTogetherSessionInfo: Equatable, @unchecked Sendable {
     public let trackId: String
     public let title: String
     public let artist: String
@@ -111,7 +111,7 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         // Resolve artwork asynchronously if missing
         if info.artworkUrl == nil || info.artworkUrl?.isEmpty == true {
             AppleMusicService.shared.search(query: "\(title) \(artist)") { [weak self] tracks, _ in
-                if let first = tracks.first(where: { !$0.artworkUrl.isEmpty }) {
+                if let first = tracks.first(where: { $0.artworkUrl?.isEmpty == false }) {
                     DispatchQueue.main.async {
                         guard let self = self else { return }
                         if var current = self.latestInvitesByPeer[peerId], current.trackId == trackId {

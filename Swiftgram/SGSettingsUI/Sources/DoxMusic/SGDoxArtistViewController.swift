@@ -369,6 +369,10 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.dismiss(animated: true, completion: nil)
     }
     
+    private func performSuperDismiss(completion: (() -> Void)? = nil) {
+        super.dismiss(animated: false, completion: completion)
+    }
+    
     public override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
         if flag {
             UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseIn], animations: {
@@ -380,7 +384,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                     navigationController.filterController(self, animated: false)
                     completion?()
                 } else {
-                    super.dismiss(animated: false, completion: completion)
+                    self.performSuperDismiss(completion: completion)
                 }
             }
         } else {
@@ -388,7 +392,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                 navigationController.filterController(self, animated: false)
                 completion?()
             } else {
-                super.dismiss(animated: false, completion: completion)
+                self.performSuperDismiss(completion: completion)
             }
         }
     }
