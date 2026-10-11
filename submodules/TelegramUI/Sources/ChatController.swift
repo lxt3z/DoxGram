@@ -3286,6 +3286,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             if url.contains("doxlisten:") {
                 let tag = url.hasPrefix("#") ? url : "#\(url)"
                 if let peerId = strongSelf.chatLocation.peerId {
+                    let senderName = message?.author?.debugDisplayTitle
                     handleIncomingListenTogetherSync(text: tag, peerId: peerId, senderName: senderName)
                     return
                 }
