@@ -1,4 +1,5 @@
 import SGSimpleSettings
+import SGSettingsUI
 import Foundation
 import UIKit
 import Postbox
@@ -147,6 +148,10 @@ import GlobalControlPanelsContext
 import ChatSearchNavigationContentNode
 import ChatAgeRestrictionAlertController
 import TextProcessingScreen
+
+private func handleIncomingListenTogetherSync(text: String, peerId: EnginePeer.Id, senderName: String?) {
+    let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: text, peerId: peerId, senderName: senderName, forceJoin: true)
+}
 
 public final class ChatControllerOverlayPresentationData {
     public let expandData: (ASDisplayNode?, () -> Void)
@@ -3281,8 +3286,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             if url.contains("doxlisten:") {
                 let tag = url.hasPrefix("#") ? url : "#\(url)"
                 if let peerId = strongSelf.chatLocation.peerId {
-                    let senderName = message?.author?.debugDisplayTitle
-                    let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: tag, peerId: peerId, senderName: senderName, forceJoin: true)
+                    handleIncomingListenTogetherSync(text: tag, peerId: peerId, senderName: senderName)
                     return
                 }
             }
@@ -3507,7 +3511,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             if hashtag.contains("doxlisten:") || hashtag.hasPrefix("doxlisten:") {
                 let tag = hashtag.hasPrefix("#") ? hashtag : "#\(hashtag)"
                 if let peerId = strongSelf.chatLocation.peerId {
-                    let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: tag, peerId: peerId, senderName: nil, forceJoin: true)
+                    handleIncomingListenTogetherSync(text: tag, peerId: peerId, senderName: nil)
                     return
                 }
             }
