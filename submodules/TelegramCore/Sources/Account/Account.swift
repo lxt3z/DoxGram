@@ -1564,29 +1564,7 @@ public class Account {
     }
     
     private func postSmallLogIfNeeded() {
-        if SGSimpleSettings.shared.disableTelemetry {
-            return
-        }
-        let timestamp = CFAbsoluteTimeGetCurrent()
-        if self.lastSmallLogPostTimestamp == nil || self.lastSmallLogPostTimestamp! < timestamp - 30.0 {
-            self.lastSmallLogPostTimestamp = timestamp
-            let network = self.network
-            
-            self.smallLogPostDisposable.set((Logger.shared.collectShortLog()
-            |> mapToSignal { events -> Signal<Never, NoError> in
-                if events.isEmpty {
-                    return .complete()
-                } else {
-                    return network.request(Api.functions.help.saveAppLog(events: events.map { event -> Api.InputAppEvent in
-                        return .inputAppEvent(.init(time: event.0, type: "", peer: 0, data: .jsonString(.init(value: event.1))))
-                    }))
-                    |> ignoreValues
-                    |> `catch` { _ -> Signal<Never, NoError> in
-                        return .complete()
-                    }
-                }
-            }).start())
-        }
+        return
     }
     
     public func resetStateManagement() {

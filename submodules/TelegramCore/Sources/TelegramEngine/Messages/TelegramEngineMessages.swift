@@ -1829,31 +1829,7 @@ public extension TelegramEngine {
         }
         
         public func reportPeerReadMetrics(peerId: EnginePeer.Id, metrics: [TelegramMessageReadMetric]) -> Signal<Never, NoError> {
-            return self.account.postbox.transaction { transaction -> Api.InputPeer? in
-                return transaction.getPeer(peerId).flatMap(apiInputPeer)
-            }
-            |> mapToSignal { inputPeer -> Signal<Never, NoError> in
-                guard let inputPeer else {
-                    return .complete()
-                }
-                return self.account.network.request(Api.functions.messages.reportReadMetrics(
-                    peer: inputPeer,
-                    metrics: metrics.map { metric in
-                        return Api.InputMessageReadMetric.inputMessageReadMetric(Api.InputMessageReadMetric.Cons_inputMessageReadMetric(
-                            msgId: metric.messageId.id,
-                            viewId: metric.id,
-                            timeInViewMs: Int32(metric.timeInViewMs),
-                            activeTimeInViewMs: Int32(metric.activeTimeInViewMs),
-                            heightToViewportRatioPermille: Int32((metric.heightToViewportRatio * 1000.0).rounded()),
-                            seenRangeRatioPermille: Int32((metric.seenRangeRatio * 1000.0).rounded())
-                        ))
-                    }
-                ))
-                |> `catch` { _ -> Signal<Api.Bool, NoError> in
-                    return .single(.boolFalse)
-                }
-                |> ignoreValues
-            }
+            return .complete()
         }
         
         public func reportMusicListened(file: FileMediaReference, duration: Int) -> Signal<Never, NoError> {

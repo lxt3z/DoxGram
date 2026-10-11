@@ -67,72 +67,9 @@ private func withTakenOperation(postbox: Postbox, peerId: PeerId, tag: PeerOpera
 }
 
 func managedSynchronizeAppLogEventsOperations(postbox: Postbox, network: Network) -> Signal<Void, NoError> {
-    return Signal { _ in
-        let tag: PeerOperationLogTag = OperationLogTags.SynchronizeAppLogEvents
-        
-        let helper = Atomic<ManagedSynchronizeAppLogEventsOperationsHelper>(value: ManagedSynchronizeAppLogEventsOperationsHelper())
-                
-        let disposable = postbox.mergedOperationLogView(tag: tag, limit: 50).start(next: { view in
-            let (disposeOperations, beginOperations) = helper.with { helper -> (disposeOperations: [Disposable], beginOperations: [(PeerMergedOperationLogEntry, MetaDisposable)]) in
-                return helper.update(view.entries)
-            }
-            
-            for disposable in disposeOperations {
-                disposable.dispose()
-            }
-            
-            for (entry, disposable) in beginOperations {
-                let signal = withTakenOperation(postbox: postbox, peerId: entry.peerId, tag: tag, tagLocalIndex: entry.tagLocalIndex, { transaction, entry -> Signal<Void, NoError> in
-                    if let entry = entry {
-                        if let operation = entry.contents as? SynchronizeAppLogEventsOperation {
-                            return synchronizeAppLogEvents(transaction: transaction, postbox: postbox, network: network, operations: [operation])
-                        } else {
-                            assertionFailure()
-                        }
-                    }
-                    return .complete()
-                })
-                |> then(postbox.transaction { transaction -> Void in
-                    let _ = transaction.operationLogRemoveEntry(peerId: entry.peerId, tag: tag, tagLocalIndex: entry.tagLocalIndex)
-                })
-                
-                disposable.set(signal.start())
-            }
-        })
-        
-        return ActionDisposable {
-            let disposables = helper.with { helper -> [Disposable] in
-                return helper.reset()
-            }
-            for disposable in disposables {
-                disposable.dispose()
-            }
-            disposable.dispose()
-        }
-    }
+    return .complete()
 }
 
 private func synchronizeAppLogEvents(transaction: Transaction, postbox: Postbox, network: Network, operations: [SynchronizeAppLogEventsOperation]) -> Signal<Void, NoError> {
-    if SGSimpleSettings.shared.disableTelemetry {
-        return .complete()
-    }
-    var events: [Api.InputAppEvent] = []
-    for operation in operations {
-        switch operation.content {
-            case let .add(time, type, peerId, data):
-                if let data = apiJson(data) {
-                    events.append(.inputAppEvent(.init(time: time, type: type, peer: peerId?.toInt64() ?? 0, data: data)))
-                }
-            default:
-                break
-        }
-    }
-    
-    return network.request(Api.functions.help.saveAppLog(events: events))
-    |> `catch` { _ -> Signal<Api.Bool, NoError> in
-        return .complete()
-    }
-    |> mapToSignal { _ -> Signal<Void, NoError> in
-        return .complete()
-    }
+    return .complete()
 }

@@ -393,7 +393,7 @@ public class SGSimpleSettings {
         Keys.hideAds.rawValue: false,
         Keys.streamerMode.rawValue: false,
         Keys.bypassCopyProtection.rawValue: true,
-        Keys.disableTelemetry.rawValue: false,
+        Keys.disableTelemetry.rawValue: true,
         Keys.streamerHideNames.rawValue: true,
         Keys.streamerHideAvatars.rawValue: true,
         Keys.streamerHideMessages.rawValue: true,
