@@ -106,6 +106,8 @@ static bool notyfyingShiftState = false;
         float maxFps = [UIScreen mainScreen].maximumFramesPerSecond;
         if (maxFps > 61.0f) {
             range = CAFrameRateRangeMake(maxFps, maxFps, maxFps);
+        } else {
+            range = CAFrameRateRangeMake(60.0f, 60.0f, 60.0f);
         }
     }
     
@@ -310,6 +312,8 @@ static NSMutableArray<CALayerSpringParametersOverride *> *currentSpringParameter
                 float maxFps = [UIScreen mainScreen].maximumFramesPerSecond;
                 if (maxFps > 61.0f) {
                     [displayLink setPreferredFrameRateRange:CAFrameRateRangeMake(maxFps, maxFps, maxFps)];
+                } else {
+                    [displayLink setPreferredFrameRateRange:CAFrameRateRangeMake(60.0f, 60.0f, 60.0f)];
                 }
             }
         }

@@ -56,7 +56,8 @@ final class FlipButtonContentComponent: Component {
             animation.duration = animation.settlingDuration
             if #available(iOS 15.0, *) {
                 let maxFps = Float(UIScreen.main.maximumFramesPerSecond)
-                animation.preferredFrameRateRange = CAFrameRateRange(minimum: 30.0, maximum: maxFps, preferred: maxFps)
+                let minFps: Float = maxFps > 61.0 ? 30.0 : 60.0
+                animation.preferredFrameRateRange = CAFrameRateRange(minimum: minFps, maximum: maxFps, preferred: maxFps)
             }
             self.icon.add(animation, forKey: "transform.rotation.z")
         }

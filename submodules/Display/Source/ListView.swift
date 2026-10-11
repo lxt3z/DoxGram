@@ -558,7 +558,12 @@ open class ListViewImpl: ASDisplayNode, ListView, ASScrollViewDelegate, ASGestur
         self.displayLink.add(to: RunLoop.main, forMode: RunLoop.Mode.common)
         
         if #available(iOS 15.0, iOSApplicationExtension 15.0, *) {
-            self.displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: 60.0, maximum: 120.0, preferred: 120.0)
+            let maxFps = Float(UIScreen.main.maximumFramesPerSecond)
+            if maxFps > 61.0 {
+                self.displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: 60.0, maximum: 120.0, preferred: 120.0)
+            } else {
+                self.displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: 60.0, maximum: 60.0, preferred: 60.0)
+            }
         }
         
         self.displayLink.isPaused = true

@@ -61,6 +61,15 @@ CABasicAnimation * _Nonnull makeSpringAnimationImpl(NSString * _Nonnull keyPath,
     springAnimation.damping = 500.0f;
     springAnimation.duration = 0.5;
     springAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionLinear];
+    if (@available(iOS 15.0, *)) {
+        [springAnimation setValue:@(1048619) forKey:@"highFrameRateReason"];
+        float maxFps = [UIScreen mainScreen].maximumFramesPerSecond;
+        if (maxFps > 61.0f) {
+            springAnimation.preferredFrameRateRange = CAFrameRateRangeMake(80.0, 120.0, 120.0);
+        } else {
+            springAnimation.preferredFrameRateRange = CAFrameRateRangeMake(60.0, 60.0, 60.0);
+        }
+    }
     
     return springAnimation;
 }
@@ -77,7 +86,12 @@ CABasicAnimation * _Nonnull make26SpringAnimationImpl(NSString * _Nonnull keyPat
     }
     if (@available(iOS 15.0, *)) {
         [springAnimation setValue:@(1048619) forKey:@"highFrameRateReason"];
-        springAnimation.preferredFrameRateRange = CAFrameRateRangeMake(80.0, 120.0, 120.0);
+        float maxFps = [UIScreen mainScreen].maximumFramesPerSecond;
+        if (maxFps > 61.0f) {
+            springAnimation.preferredFrameRateRange = CAFrameRateRangeMake(80.0, 120.0, 120.0);
+        } else {
+            springAnimation.preferredFrameRateRange = CAFrameRateRangeMake(60.0, 60.0, 60.0);
+        }
     }
     
     return springAnimation;
@@ -100,6 +114,15 @@ CASpringAnimation * _Nonnull makeSpringBounceAnimationImpl(NSString * _Nonnull k
         springAnimation.duration = 0.1;
     }
     springAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionLinear];
+    if (@available(iOS 15.0, *)) {
+        [springAnimation setValue:@(1048619) forKey:@"highFrameRateReason"];
+        float maxFps = [UIScreen mainScreen].maximumFramesPerSecond;
+        if (maxFps > 61.0f) {
+            springAnimation.preferredFrameRateRange = CAFrameRateRangeMake(80.0, 120.0, 120.0);
+        } else {
+            springAnimation.preferredFrameRateRange = CAFrameRateRangeMake(60.0, 60.0, 60.0);
+        }
+    }
     return springAnimation;
 }
 

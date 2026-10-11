@@ -64,6 +64,8 @@ private func adjustFrameRate(animation: CAAnimation) {
                 }
             }
             animation.preferredFrameRateRange = CAFrameRateRange(minimum: 30.0, maximum: preferredFps, preferred: maxFps)
+        } else {
+            animation.preferredFrameRateRange = CAFrameRateRange(minimum: 60.0, maximum: 60.0, preferred: 60.0)
         }
     }
 }

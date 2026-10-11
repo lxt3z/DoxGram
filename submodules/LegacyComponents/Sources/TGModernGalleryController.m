@@ -40,6 +40,8 @@ static void adjustFrameRate(CAAnimation *animation) {
                 }
             }
             animation.preferredFrameRateRange = CAFrameRateRangeMake(30.0, preferredFps, maxFps);
+        } else {
+            animation.preferredFrameRateRange = CAFrameRateRangeMake(60.0f, 60.0f, 60.0f);
         }
     }
 }
