@@ -78,11 +78,11 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         let cleanTitle = track.title.replacingOccurrences(of: ":", with: " ")
         let cleanArtist = track.artist.replacingOccurrences(of: ":", with: " ")
         let tag = "#doxlisten:\(track.id):\(now):\(cleanTitle):\(cleanArtist)"
-        return "🎧 Совместное прослушивание DoxGram\n🎵 \(track.title) — \(track.artist)\n\nНажмите для синхронизации: \(tag)"
+        return "🎧 Совместное прослушивание\n🎵 «\(track.title)» — \(track.artist)\n\n▶️ Нажмите для подключения к эфиру:\n\(tag)"
     }
     
     public func parseSyncTag(text: String, peerId: EnginePeer.Id, senderName: String? = nil) -> SGDoxListenTogetherSessionInfo? {
-        guard let range = text.range(of: "#doxlisten:") else { return nil }
+        guard let range = text.range(of: "#doxlisten:") ?? text.range(of: "doxlisten:") else { return nil }
         let payload = String(text[range.upperBound...])
         
         let components = payload.components(separatedBy: ":")

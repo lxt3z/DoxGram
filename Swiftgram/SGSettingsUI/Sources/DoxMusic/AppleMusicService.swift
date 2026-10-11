@@ -536,24 +536,69 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, mode: SGDoxMusicManager.SGDoxWaveMode = .flow, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
-        let seedArtist = track?.artist.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let favorites = SGDoxMusicManager.shared.favorites
+        let seed = track ?? favorites.randomElement()
+        let seedArtist = seed?.artist.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        
+        let isRussian = favorites.contains { fav in
+            fav.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil ||
+            fav.artist.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil
+        } || (seed?.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil) || Locale.current.languageCode == "ru"
+        
         if seedArtist.isEmpty {
-            self.fetchUserPersonalMusic { personalTracks in
-                completion(personalTracks)
+            let fallbackQuery: String
+            if isRussian {
+                switch mode {
+                case .energy:
+                    fallbackQuery = "Русский драйв хиты"
+                case .chill:
+                    fallbackQuery = "Русский лаунж релакс"
+                case .discovery:
+                    fallbackQuery = "Новинки русской музыки"
+                case .flow:
+                    fallbackQuery = "Популярная русская музыка чарт"
+                }
+            } else {
+                switch mode {
+                case .energy:
+                    fallbackQuery = "Workout Upbeat Electronic"
+                case .chill:
+                    fallbackQuery = "Chill Lofi Relax"
+                case .discovery:
+                    fallbackQuery = "Indie Discover New"
+                case .flow:
+                    fallbackQuery = "Top Hits"
+                }
+            }
+            self.searchITunesPublic(query: fallbackQuery) { tracks, _ in
+                completion(tracks)
             }
             return
         }
         
         let queryForArtist: String
-        switch mode {
-        case .energy:
-            queryForArtist = "\(seedArtist) remix"
-        case .chill:
-            queryForArtist = "\(seedArtist) acoustic"
-        case .discovery:
-            queryForArtist = "\(seedArtist) ft"
-        case .flow:
-            queryForArtist = seedArtist
+        if isRussian {
+            switch mode {
+            case .energy:
+                queryForArtist = "\(seedArtist) ремикс"
+            case .chill:
+                queryForArtist = "\(seedArtist) акустика"
+            case .discovery:
+                queryForArtist = "\(seedArtist) фит"
+            case .flow:
+                queryForArtist = seedArtist
+            }
+        } else {
+            switch mode {
+            case .energy:
+                queryForArtist = "\(seedArtist) remix"
+            case .chill:
+                queryForArtist = "\(seedArtist) acoustic"
+            case .discovery:
+                queryForArtist = "\(seedArtist) ft"
+            case .flow:
+                queryForArtist = seedArtist
+            }
         }
         
         // 1. Fetch tracks by the current seed artist
@@ -564,12 +609,12 @@ public final class AppleMusicService: @unchecked Sendable {
             }
             
             let sourceTracks = primaryTracks.isEmpty ? [] : primaryTracks
-            let filteredArtistTracks = sourceTracks.filter { $0.id != track?.id }
+            let filteredArtistTracks = sourceTracks.filter { $0.id != seed?.id }
             let primaryArtistTracks = Array(filteredArtistTracks.prefix(4))
             
-            // 2. Cross-reference favorites and library to discover favorite artists
+            // 2. Cross-reference favorites and library to discover related artists
             var favoriteArtists: [String] = []
-            for fav in SGDoxMusicManager.shared.favorites {
+            for fav in favorites {
                 let a = fav.artist.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !a.isEmpty && a.caseInsensitiveCompare(seedArtist) != .orderedSame && !favoriteArtists.contains(a) {
                     favoriteArtists.append(a)
@@ -596,18 +641,12 @@ public final class AppleMusicService: @unchecked Sendable {
                     completion(waveList.isEmpty ? filteredArtistTracks : waveList)
                 }
             } else {
-                // If favorites are empty, try Apple Music library artists
-                self.fetchLibrarySongs(limit: 25) { librarySongs in
-                    let libArtists = Array(Set(librarySongs.map { $0.artist })).filter { $0.caseInsensitiveCompare(seedArtist) != .orderedSame && !$0.isEmpty }
-                    if let pickLibArtist = libArtists.randomElement() {
-                        self.search(query: pickLibArtist) { libTracks, _ in
-                            var waveList: [SGDoxMusicTrack] = primaryArtistTracks
-                            waveList.append(contentsOf: Array(libTracks.prefix(3)))
-                            completion(waveList.isEmpty ? filteredArtistTracks : waveList)
-                        }
-                    } else {
-                        completion(filteredArtistTracks)
-                    }
+                // If favorites has only 1 artist, query mode-based Russian/general catalog
+                let discoveryQuery = isRussian ? (mode == .energy ? "Русский рэп бит" : (mode == .chill ? "Русский лаунж" : "Русские новинки")) : "Hot Hits"
+                self.search(query: discoveryQuery) { relatedTracks, _ in
+                    var waveList: [SGDoxMusicTrack] = primaryArtistTracks
+                    waveList.append(contentsOf: Array(relatedTracks.prefix(4)))
+                    completion(waveList.isEmpty ? filteredArtistTracks : waveList)
                 }
             }
         }

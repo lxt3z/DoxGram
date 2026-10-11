@@ -879,7 +879,26 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             guard let self = self else { return }
             var list = tracks
             if list.isEmpty {
-                let query = mode == .energy ? "Workout Upbeat Electronic" : (mode == .chill ? "Chill Lofi Relax" : (mode == .discovery ? "Indie Discover New" : "Top Hits"))
+                let isRussian = self.favorites.contains { fav in
+                    fav.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil ||
+                    fav.artist.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil
+                } || (seedTrack?.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil) || Locale.current.languageCode == "ru"
+                
+                let query: String
+                if isRussian {
+                    switch mode {
+                    case .energy:
+                        query = "Русский клубный бит драйв"
+                    case .chill:
+                        query = "Спокойная русская музыка релакс"
+                    case .discovery:
+                        query = "Новинки русской музыки чарт"
+                    case .flow:
+                        query = "Русские хиты"
+                    }
+                } else {
+                    query = mode == .energy ? "Workout Upbeat Electronic" : (mode == .chill ? "Chill Lofi Relax" : (mode == .discovery ? "Indie Discover New" : "Top Hits"))
+                }
                 AppleMusicService.shared.searchITunesPublic(query: query) { [weak self] fallbackTracks, _ in
                     guard let self = self, !fallbackTracks.isEmpty else { return }
                     var fallbackList = fallbackTracks

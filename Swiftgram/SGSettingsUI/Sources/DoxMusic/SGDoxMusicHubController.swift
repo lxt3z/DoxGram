@@ -69,7 +69,6 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
     let containerCard = UIView()
     let blurView = UIVisualEffectView()
     let ambientGradient = CAGradientLayer()
-    let sheenGradient = CAGradientLayer()
     let aiBadge = UIView()
     let aiIcon = UIImageView()
     let aiLabel = UILabel()
@@ -89,51 +88,42 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
         self.backgroundColor = .clear
         self.selectionStyle = .none
         
-        self.containerCard.layer.cornerRadius = 24
+        self.containerCard.layer.cornerRadius = 20
         self.containerCard.layer.cornerCurve = .continuous
-        self.containerCard.layer.borderWidth = 0.75
-        self.containerCard.layer.borderColor = UIColor(white: 1.0, alpha: 0.28).cgColor
+        self.containerCard.layer.borderWidth = 0.5
+        self.containerCard.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
         self.containerCard.clipsToBounds = true
         self.contentView.addSubview(self.containerCard)
         
         self.ambientGradient.colors = [
-            UIColor(red: 0.40, green: 0.16, blue: 0.85, alpha: 0.95).cgColor,
-            UIColor(red: 0.12, green: 0.44, blue: 0.95, alpha: 0.95).cgColor
+            UIColor(red: 0.12, green: 0.16, blue: 0.28, alpha: 0.75).cgColor,
+            UIColor(red: 0.08, green: 0.10, blue: 0.18, alpha: 0.90).cgColor
         ]
         self.ambientGradient.startPoint = CGPoint(x: 0.0, y: 0.0)
         self.ambientGradient.endPoint = CGPoint(x: 1.0, y: 1.0)
         self.containerCard.layer.insertSublayer(self.ambientGradient, at: 0)
         
-        self.blurView.effect = UIBlurEffect(style: .systemUltraThinMaterialDark)
+        self.blurView.effect = UIBlurEffect(style: .systemMaterialDark)
         self.containerCard.addSubview(self.blurView)
         
-        self.sheenGradient.colors = [
-            UIColor(white: 1.0, alpha: 0.38).cgColor,
-            UIColor(white: 1.0, alpha: 0.08).cgColor,
-            UIColor.clear.cgColor
-        ]
-        self.sheenGradient.locations = [0.0, 0.40, 1.0]
-        self.sheenGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
-        self.sheenGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
-        self.containerCard.layer.addSublayer(self.sheenGradient)
-        
         // AI Badge
-        self.aiBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.16)
+        self.aiBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
         self.aiBadge.layer.cornerRadius = 10
+        self.aiBadge.layer.cornerCurve = .continuous
         self.aiBadge.layer.borderWidth = 0.5
-        self.aiBadge.layer.borderColor = UIColor(white: 1.0, alpha: 0.28).cgColor
+        self.aiBadge.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
         self.aiBadge.clipsToBounds = true
         self.containerCard.addSubview(self.aiBadge)
         
-        let sparkCfg = UIImage.SymbolConfiguration(pointSize: 10, weight: .bold)
+        let sparkCfg = UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
         self.aiIcon.image = UIImage(systemName: "sparkles", withConfiguration: sparkCfg)
-        self.aiIcon.tintColor = UIColor(red: 0.55, green: 0.85, blue: 1.0, alpha: 1.0)
+        self.aiIcon.tintColor = UIColor(red: 0.40, green: 0.75, blue: 1.0, alpha: 1.0)
         self.aiIcon.contentMode = .scaleAspectFit
         self.aiBadge.addSubview(self.aiIcon)
         
         self.aiLabel.text = "AI FLOW"
-        self.aiLabel.font = UIFont.systemFont(ofSize: 10.5, weight: .heavy)
-        self.aiLabel.textColor = .white
+        self.aiLabel.font = UIFont.systemFont(ofSize: 10.5, weight: .bold)
+        self.aiLabel.textColor = UIColor(white: 1.0, alpha: 0.95)
         self.aiBadge.addSubview(self.aiLabel)
         
         // Title & Subtitle
@@ -143,15 +133,15 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
         self.containerCard.addSubview(self.titleLabel)
         
         self.subtitleLabel.text = "Умный персональный поток"
-        self.subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-        self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.80)
+        self.subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+        self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.70)
         self.containerCard.addSubview(self.subtitleLabel)
         
         // Play / Pause Circle
-        self.playCircle.backgroundColor = UIColor(white: 1.0, alpha: 0.22)
+        self.playCircle.backgroundColor = UIColor(red: 0.20, green: 0.55, blue: 0.95, alpha: 0.95)
         self.playCircle.layer.cornerRadius = 22
-        self.playCircle.layer.borderWidth = 0.75
-        self.playCircle.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
+        self.playCircle.layer.borderWidth = 0.5
+        self.playCircle.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
         self.playCircle.clipsToBounds = true
         let playTap = UITapGestureRecognizer(target: self, action: #selector(self.playCircleTapped))
         self.playCircle.addGestureRecognizer(playTap)
@@ -201,17 +191,17 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
             guard i < modes.count else { continue }
             let isSelected = modes[i] == self.currentMode
             if isSelected {
-                btn.backgroundColor = UIColor(white: 1.0, alpha: 0.32)
-                btn.layer.borderWidth = 0.75
-                btn.layer.borderColor = UIColor(white: 1.0, alpha: 0.55).cgColor
+                btn.backgroundColor = UIColor(white: 1.0, alpha: 0.24)
+                btn.layer.borderWidth = 0.5
+                btn.layer.borderColor = UIColor(white: 1.0, alpha: 0.40).cgColor
                 btn.setTitleColor(.white, for: .normal)
                 btn.tintColor = .white
             } else {
-                btn.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+                btn.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
                 btn.layer.borderWidth = 0.5
-                btn.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
-                btn.setTitleColor(UIColor(white: 1.0, alpha: 0.75), for: .normal)
-                btn.tintColor = UIColor(white: 1.0, alpha: 0.75)
+                btn.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
+                btn.setTitleColor(UIColor(white: 1.0, alpha: 0.70), for: .normal)
+                btn.tintColor = UIColor(white: 1.0, alpha: 0.70)
             }
         }
     }
@@ -239,7 +229,6 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
         self.containerCard.frame = CGRect(x: 16, y: 4, width: cardWidth, height: cardHeight)
         self.ambientGradient.frame = self.containerCard.bounds
         self.blurView.frame = self.containerCard.bounds
-        self.sheenGradient.frame = CGRect(x: 0, y: 0, width: cardWidth, height: 70.0)
         
         // AI Badge
         self.aiBadge.frame = CGRect(x: 16, y: 14, width: 78, height: 20)
@@ -497,10 +486,9 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         
         DiscordRPCService.shared.onStatusChanged = { [weak self] _ in
-            guard let self = self else { return }
-            let serviceIndex = IndexPath(row: 2, section: 0)
-            if self.tableView.numberOfSections > 0 && self.tableView.numberOfRows(inSection: 0) > 2 {
-                self.tableView.reloadRows(at: [serviceIndex], with: .none)
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.tableView.reloadData()
             }
         }
         
@@ -823,14 +811,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         if self.isSearching {
             return 1
         }
-        var count = 2
-        if self.hasFavorites {
-            count += 1
-        }
-        if !self.searchResults.isEmpty {
-            count += 1
-        }
-        return count
+        return 4
     }
     
     public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -839,35 +820,37 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         switch section {
         case 0:
-            return 3
-        case 1:
             return 1
+        case 1:
+            return self.hasFavorites ? (1 + min(50, SGDoxMusicManager.shared.favorites.count)) : 0
         case 2:
-            if self.hasFavorites {
-                return 1 + min(50, SGDoxMusicManager.shared.favorites.count)
-            } else {
-                return self.searchResults.count
-            }
-        case 3:
             return self.searchResults.count
+        case 3:
+            return 3
         default:
             return 0
         }
     }
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        if !self.isSearching {
-            if indexPath.section == 0 {
-                return 54.0
-            }
-            if indexPath.section == 1 {
-                return 144.0
-            }
-            if self.hasFavorites && indexPath.section == 2 && indexPath.row == 0 {
+        if self.isSearching {
+            return 58.0
+        }
+        switch indexPath.section {
+        case 0:
+            return 144.0
+        case 1:
+            if indexPath.row == 0 {
                 return 96.0
             }
+            return 58.0
+        case 2:
+            return 58.0
+        case 3:
+            return 54.0
+        default:
+            return 58.0
         }
-        return 58.0
     }
     
     public func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -876,13 +859,13 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         switch section {
         case 0:
-            return "Сервисы и интеграции"
+            return nil
         case 1:
-            return "Умный поток"
+            return self.hasFavorites ? "Моя медиатека" : nil
         case 2:
-            return self.hasFavorites ? "Моя медиатека" : "Недавно прослушано"
+            return self.searchResults.isEmpty ? nil : (SGDoxMusicManager.shared.history.isEmpty ? "Рекомендации" : "Недавно прослушано")
         case 3:
-            return "Недавно прослушано"
+            return "Сервисы и интеграции"
         default:
             return nil
         }
@@ -891,63 +874,23 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let theme = self.presentationData.theme
         
-        if !self.isSearching && indexPath.section == 0 {
-            let cell = tableView.dequeueReusableCell(withIdentifier: "ServiceCell", for: indexPath) as! SGDoxServiceCell
-            cell.backgroundColor = theme.list.itemBlocksBackgroundColor
-            cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
-            cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
-            cell.chevronImageView.tintColor = theme.list.disclosureArrowColor
-            cell.separatorView.backgroundColor = theme.list.itemBlocksSeparatorColor
-            cell.separatorView.isHidden = indexPath.row == 2
-            
-            if indexPath.row == 0 {
-                // Apple Music
-                cell.iconContainer.backgroundColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
-                cell.iconImageView.image = UIImage(systemName: "music.note")
-                cell.titleLabel.text = "Apple Music"
-                let isAuth = AppleMusicService.shared.isAuthorized
-                cell.statusLabel.text = isAuth ? "Подключено (вся медиатека)" : "Нажмите для подключения"
-                cell.statusLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
-            } else if indexPath.row == 1 {
-                // Spotify
-                cell.iconContainer.backgroundColor = UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 1.0)
-                cell.iconImageView.image = UIImage(systemName: "waveform")
-                cell.titleLabel.text = "Spotify"
-                let isAuth = SpotifyService.shared.isAuthorized
-                cell.statusLabel.text = isAuth ? "Подключено к аккаунту" : (SpotifyService.shared.hasCustomClientId ? "Client ID настроен" : "Нажмите для настройки")
-                cell.statusLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
-            } else {
-                // Discord RPC
-                cell.iconContainer.backgroundColor = UIColor(red: 0.35, green: 0.40, blue: 0.95, alpha: 1.0)
-                cell.iconImageView.image = UIImage(systemName: "bubble.left.and.bubble.right.fill")
-                cell.titleLabel.text = "Discord RPC"
-                let isEnabled = SGSimpleSettings.shared.discordRpcEnabled && !SGSimpleSettings.shared.discordRpcToken.isEmpty
-                switch DiscordRPCService.shared.status {
-                case .connected(let username):
-                    cell.statusLabel.text = "В сети: \(username)"
-                    cell.statusLabel.textColor = theme.list.itemAccentColor
-                case .connecting:
-                    cell.statusLabel.text = "Подключение..."
-                    cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
-                case .error:
-                    cell.statusLabel.text = "Ошибка токена"
-                    cell.statusLabel.textColor = theme.list.itemDestructiveColor
-                case .disconnected:
-                    cell.statusLabel.text = isEnabled ? "Включен" : "Настроить токен"
-                    cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
-                }
-            }
+        if self.isSearching {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "TrackCell", for: indexPath) as! SGDoxTrackCell
+            guard indexPath.row < self.searchResults.count else { return cell }
+            let track = self.searchResults[indexPath.row]
+            self.configureTrackCell(cell, track: track, isLast: indexPath.row == self.searchResults.count - 1)
             return cell
         }
         
-        if !self.isSearching && indexPath.section == 1 {
+        switch indexPath.section {
+        case 0:
             let cell = tableView.dequeueReusableCell(withIdentifier: "WaveHeroCell", for: indexPath) as! SGDoxWaveHeroCell
             let manager = SGDoxMusicManager.shared
             cell.updateWaveState(isPlaying: manager.isPlaying && manager.isWaveEnabled, mode: manager.currentWaveMode)
             cell.onSelectMode = { [weak self] mode in
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 SGDoxMusicManager.shared.setWaveMode(mode)
-                self?.tableView.reloadRows(at: [IndexPath(row: 0, section: 1)], with: .none)
+                self?.tableView.reloadRows(at: [IndexPath(row: 0, section: 0)], with: .none)
             }
             cell.onPlayPauseTapped = { [weak self] in
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -956,12 +899,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                 } else {
                     manager.startWave(mode: manager.currentWaveMode)
                 }
-                self?.tableView.reloadRows(at: [IndexPath(row: 0, section: 1)], with: .none)
+                self?.tableView.reloadRows(at: [IndexPath(row: 0, section: 0)], with: .none)
             }
             return cell
-        }
-        
-        if !self.isSearching && self.hasFavorites && indexPath.section == 2 {
+            
+        case 1:
             if indexPath.row == 0 {
                 let cell = tableView.dequeueReusableCell(withIdentifier: "LibraryHeaderCell", for: indexPath) as! SGDoxLibraryHeaderCell
                 cell.backgroundColor = theme.list.itemBlocksBackgroundColor
@@ -1007,13 +949,65 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             let cell = tableView.dequeueReusableCell(withIdentifier: "TrackCell", for: indexPath) as! SGDoxTrackCell
             self.configureTrackCell(cell, track: track, isLast: trackIndex == min(favs.count - 1, 49))
             return cell
+            
+        case 2:
+            let cell = tableView.dequeueReusableCell(withIdentifier: "TrackCell", for: indexPath) as! SGDoxTrackCell
+            guard indexPath.row < self.searchResults.count else { return cell }
+            let track = self.searchResults[indexPath.row]
+            self.configureTrackCell(cell, track: track, isLast: indexPath.row == self.searchResults.count - 1)
+            return cell
+            
+        case 3:
+            let cell = tableView.dequeueReusableCell(withIdentifier: "ServiceCell", for: indexPath) as! SGDoxServiceCell
+            cell.backgroundColor = theme.list.itemBlocksBackgroundColor
+            cell.titleLabel.textColor = theme.list.itemPrimaryTextColor
+            cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
+            cell.chevronImageView.tintColor = theme.list.disclosureArrowColor
+            cell.separatorView.backgroundColor = theme.list.itemBlocksSeparatorColor
+            cell.separatorView.isHidden = indexPath.row == 2
+            
+            if indexPath.row == 0 {
+                // Apple Music
+                cell.iconContainer.backgroundColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
+                cell.iconImageView.image = UIImage(systemName: "music.note")
+                cell.titleLabel.text = "Apple Music"
+                let isAuth = AppleMusicService.shared.isAuthorized
+                cell.statusLabel.text = isAuth ? "Подключено (вся медиатека)" : "Нажмите для подключения"
+                cell.statusLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
+            } else if indexPath.row == 1 {
+                // Spotify
+                cell.iconContainer.backgroundColor = UIColor(red: 0.11, green: 0.73, blue: 0.33, alpha: 1.0)
+                cell.iconImageView.image = UIImage(systemName: "waveform")
+                cell.titleLabel.text = "Spotify"
+                let isAuth = SpotifyService.shared.isAuthorized
+                cell.statusLabel.text = isAuth ? "Подключено к аккаунту" : (SpotifyService.shared.hasCustomClientId ? "Client ID настроен" : "Нажмите для настройки")
+                cell.statusLabel.textColor = isAuth ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
+            } else {
+                // Discord RPC
+                cell.iconContainer.backgroundColor = UIColor(red: 0.35, green: 0.40, blue: 0.95, alpha: 1.0)
+                cell.iconImageView.image = UIImage(systemName: "bubble.left.and.bubble.right.fill")
+                cell.titleLabel.text = "Discord RPC"
+                let isEnabled = SGSimpleSettings.shared.discordRpcEnabled && !SGSimpleSettings.shared.discordRpcToken.isEmpty
+                switch DiscordRPCService.shared.status {
+                case .connected(let username):
+                    cell.statusLabel.text = "В сети: \(username)"
+                    cell.statusLabel.textColor = theme.list.itemAccentColor
+                case .connecting:
+                    cell.statusLabel.text = "Подключение..."
+                    cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
+                case .error(let msg):
+                    cell.statusLabel.text = msg.isEmpty ? "Ошибка токена" : msg
+                    cell.statusLabel.textColor = theme.list.itemDestructiveColor
+                case .disconnected:
+                    cell.statusLabel.text = isEnabled ? "Включен" : "Настроить токен"
+                    cell.statusLabel.textColor = theme.list.itemSecondaryTextColor
+                }
+            }
+            return cell
+            
+        default:
+            return UITableViewCell()
         }
-        
-        let cell = tableView.dequeueReusableCell(withIdentifier: "TrackCell", for: indexPath) as! SGDoxTrackCell
-        guard indexPath.row < self.searchResults.count else { return cell }
-        let track = self.searchResults[indexPath.row]
-        self.configureTrackCell(cell, track: track, isLast: indexPath.row == self.searchResults.count - 1)
-        return cell
     }
     
     private func configureTrackCell(_ cell: SGDoxTrackCell, track: SGDoxMusicTrack, isLast: Bool) {
@@ -1068,27 +1062,23 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         
-        if !self.isSearching && indexPath.section == 0 {
-            if indexPath.row == 0 {
-                AppleMusicService.shared.requestAuthorization { [weak self] _ in
-                    DispatchQueue.main.async { self?.tableView.reloadData() }
-                }
-            } else if indexPath.row == 1 {
-                self.presentSpotifyMenu()
-            } else {
-                self.presentDiscordRpcDialog()
-            }
-            return
-        }
-        
-        if !self.isSearching && indexPath.section == 1 {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            SGDoxMusicManager.shared.startWave()
+        if self.isSearching {
+            guard indexPath.row < self.searchResults.count else { return }
+            let track = self.searchResults[indexPath.row]
+            let searchQueue = Array(self.searchResults.suffix(from: indexPath.row + 1)) + Array(self.searchResults.prefix(upTo: indexPath.row))
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            SGDoxMusicManager.shared.play(track: track, queue: searchQueue)
             self.openPlayer()
             return
         }
         
-        if !self.isSearching && self.hasFavorites && indexPath.section == 2 {
+        switch indexPath.section {
+        case 0:
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            SGDoxMusicManager.shared.startWave()
+            self.openPlayer()
+            
+        case 1:
             if indexPath.row > 0 {
                 let trackIndex = indexPath.row - 1
                 let favs = SGDoxMusicManager.shared.favorites
@@ -1099,25 +1089,41 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
                 SGDoxMusicManager.shared.play(track: track, queue: remaining)
                 self.openPlayer()
             }
-            return
+            
+        case 2:
+            guard indexPath.row < self.searchResults.count else { return }
+            let track = self.searchResults[indexPath.row]
+            let searchQueue = Array(self.searchResults.suffix(from: indexPath.row + 1)) + Array(self.searchResults.prefix(upTo: indexPath.row))
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            SGDoxMusicManager.shared.play(track: track, queue: searchQueue)
+            self.openPlayer()
+            
+        case 3:
+            if indexPath.row == 0 {
+                AppleMusicService.shared.requestAuthorization { [weak self] _ in
+                    DispatchQueue.main.async { self?.tableView.reloadData() }
+                }
+            } else if indexPath.row == 1 {
+                self.presentSpotifyMenu()
+            } else {
+                self.presentDiscordRpcDialog()
+            }
+            
+        default:
+            break
         }
-        
-        guard indexPath.row < self.searchResults.count else { return }
-        let track = self.searchResults[indexPath.row]
-        let searchQueue = Array(self.searchResults.suffix(from: indexPath.row + 1)) + Array(self.searchResults.prefix(upTo: indexPath.row))
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        SGDoxMusicManager.shared.play(track: track, queue: searchQueue)
-        self.openPlayer()
     }
     
     public func tableView(_ tableView: UITableView, contextMenuConfigurationForRowAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         let selectedTrack: SGDoxMusicTrack?
-        if !self.isSearching && self.hasFavorites && indexPath.section == 2 && indexPath.row > 0 {
+        if self.isSearching {
+            selectedTrack = indexPath.row < self.searchResults.count ? self.searchResults[indexPath.row] : nil
+        } else if indexPath.section == 1 && indexPath.row > 0 {
             let favs = SGDoxMusicManager.shared.favorites
             let trackIndex = indexPath.row - 1
             selectedTrack = trackIndex < favs.count ? favs[trackIndex] : nil
-        } else if self.isSearching || (!self.isSearching && indexPath.section == (self.hasFavorites ? 3 : 2)) {
-            selectedTrack = indexPath.row < self.searchResults.count ? self.searchResults[indexPath.row] : nil
+        } else if indexPath.section == 2 && indexPath.row < self.searchResults.count {
+            selectedTrack = self.searchResults[indexPath.row]
         } else {
             selectedTrack = nil
         }

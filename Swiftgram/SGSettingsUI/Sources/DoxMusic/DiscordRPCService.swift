@@ -80,7 +80,11 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         
         guard let url = URL(string: "wss://gateway.discord.gg/?v=10&encoding=json") else { return }
         
-        let task = self.urlSession?.webSocketTask(with: url)
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Discord/220.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://discord.com", forHTTPHeaderField: "Origin")
+        
+        let task = self.urlSession?.webSocketTask(with: request)
         self.webSocketTask = task
         task?.resume()
         
@@ -223,29 +227,42 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
         let token = DiscordRPCService.cleanToken(SGSimpleSettings.shared.discordRpcToken)
         guard !token.isEmpty else { return }
         
+        let isBot = token.hasPrefix("Bot ")
+        let actualToken = isBot ? String(token.dropFirst(4)).trimmingCharacters(in: .whitespaces) : token
+        
         let activity = self.buildActivity(track: self.currentPlayingTrack, isPlaying: self.currentIsPlaying)
         var activities: [[String: Any]] = []
         if let activity = activity {
             activities.append(activity)
         }
         
+        let properties: [String: Any] = [
+            "os": "iOS",
+            "browser": "Discord iOS",
+            "device": "iPhone",
+            "system_locale": "ru-RU",
+            "client_version": "220.0",
+            "release_channel": "stable",
+            "os_version": "17.5"
+        ]
+        
+        var d: [String: Any] = [
+            "token": actualToken,
+            "properties": properties,
+            "presence": [
+                "activities": activities,
+                "status": "online",
+                "since": 0,
+                "afk": false
+            ]
+        ]
+        if isBot {
+            d["intents"] = 0
+        }
+        
         let payload: [String: Any] = [
             "op": 2,
-            "d": [
-                "token": token,
-                "properties": [
-                    "os": "iOS",
-                    "browser": "Discord iOS",
-                    "device": "iPhone"
-                ],
-                "presence": [
-                    "activities": activities,
-                    "status": "online",
-                    "since": 0,
-                    "afk": false
-                ],
-                "intents": 0
-            ]
+            "d": d
         ]
         self.sendJson(payload)
     }

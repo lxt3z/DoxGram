@@ -178,10 +178,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
         }
         
-        let initialH = UIScreen.main.bounds.height > 0 ? UIScreen.main.bounds.height : 900.0
-        self.view.transform = CGAffineTransform(translationX: 0, y: initialH)
-        self.darkDimOverlay.alpha = 0.0
-        self.backgroundBlurView.alpha = 0.0
+        self.darkDimOverlay.alpha = 1.0
+        self.backgroundBlurView.alpha = 1.0
         
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
         panGesture.delegate = self
@@ -832,18 +830,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if !self.hasAnimatedIn {
-            self.hasAnimatedIn = true
-            let initialY = self.view.bounds.height > 0 ? self.view.bounds.height : 850.0
-            self.view.transform = CGAffineTransform(translationX: 0, y: initialY)
-            self.darkDimOverlay.alpha = 0.0
-            self.backgroundBlurView.alpha = 0.0
-            UIView.animate(withDuration: 0.38, delay: 0.0, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.4, options: [.curveEaseOut, .allowUserInteraction], animations: {
-                self.view.transform = .identity
-                self.darkDimOverlay.alpha = 1.0
-                self.backgroundBlurView.alpha = 1.0
-            }, completion: nil)
-        }
     }
     
     public override func viewWillDisappear(_ animated: Bool) {
@@ -1699,18 +1685,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 self?.updateContent()
             }))
         } else {
-            alert.addAction(UIAlertAction(title: "Отправить приглашение", style: .default, handler: { [weak self] _ in
+            alert.addAction(UIAlertAction(title: "💬 Выбрать чат в Telegram", style: .default, handler: { [weak self] _ in
                 guard let self = self else { return }
-                manager.startHostSession(peerId: nil)
-                let inviteText = manager.generateInviteText(for: track)
-                let shareVc = UIActivityViewController(activityItems: [inviteText], applicationActivities: nil)
-                self.present(shareVc, animated: true)
-                self.updateContent()
+                self.presentPeerSelectionForListenTogether(track: track)
             }))
-            alert.addAction(UIAlertAction(title: "Скопировать тег сессии", style: .default, handler: { [weak self] _ in
+            alert.addAction(UIAlertAction(title: "📋 Скопировать приглашение", style: .default, handler: { [weak self] _ in
                 guard let self = self else { return }
                 manager.startHostSession(peerId: nil)
-                let inviteText = manager.generateInviteText(for: track)
+                let inviteText = manager.generateInviteText(for: track, offset: SGDoxMusicManager.shared.currentTime)
                 UIPasteboard.general.string = inviteText
                 let undoController = UndoOverlayController(
                     presentationData: self.presentationData,
@@ -1728,6 +1710,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 self.present(undoController, in: .current)
                 self.updateContent()
             }))
+            alert.addAction(UIAlertAction(title: "Поделиться через систему...", style: .default, handler: { [weak self] _ in
+                guard let self = self else { return }
+                manager.startHostSession(peerId: nil)
+                let inviteText = manager.generateInviteText(for: track, offset: SGDoxMusicManager.shared.currentTime)
+                let shareVc = UIActivityViewController(activityItems: [inviteText], applicationActivities: nil)
+                self.present(shareVc, animated: true)
+                self.updateContent()
+            }))
         }
         
         alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
@@ -1736,6 +1726,55 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             popover.sourceRect = self.listenTogetherButton.bounds
         }
         self.present(alert, animated: true)
+    }
+    
+    private func presentPeerSelectionForListenTogether(track: SGDoxMusicTrack) {
+        let manager = SGDoxListenTogetherManager.shared
+        manager.startHostSession(peerId: nil)
+        let inviteText = manager.generateInviteText(for: track, offset: SGDoxMusicManager.shared.currentTime)
+        
+        let controller = self.context.sharedContext.makePeerSelectionController(
+            PeerSelectionControllerParams(
+                context: self.context,
+                filter: [.onlyWriteable, .excludeDisabled],
+                hasContactSelector: false,
+                title: "Отправить в чат"
+            )
+        )
+        controller.peerSelected = { [weak self, weak controller] peer, threadId in
+            guard let self = self else { return }
+            controller?.dismiss()
+            
+            let enqueueMessage = EnqueueMessage.message(
+                text: inviteText,
+                attributes: [],
+                inlineStickers: [:],
+                mediaReference: nil,
+                threadId: threadId,
+                replyToMessageId: nil,
+                replyToStoryId: nil,
+                localGroupingKey: nil,
+                correlationId: nil,
+                bubbleUpEmojiOrStickersets: []
+            )
+            let _ = (enqueueMessages(account: self.context.account, peerId: peer.id, messages: [enqueueMessage])
+            |> deliverOnMainQueue).start(completed: { [weak self] in
+                guard let self = self else { return }
+                let undo = UndoOverlayController(
+                    presentationData: self.presentationData,
+                    content: .actionSucceeded(title: nil, text: "Приглашение отправлено в чат!", cancel: nil, destructive: false),
+                    elevatedLayout: true,
+                    action: { _ in return false }
+                )
+                self.present(undo, in: .window(.root))
+            })
+            self.updateContent()
+        }
+        if let nav = self.navigationController as? NavigationController {
+            nav.pushViewController(controller)
+        } else {
+            self.present(controller, in: .window(.root))
+        }
     }
     
     @objc private func queueShufflePressed() {
