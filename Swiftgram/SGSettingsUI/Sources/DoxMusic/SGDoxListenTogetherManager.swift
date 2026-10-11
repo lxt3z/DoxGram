@@ -96,7 +96,7 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         let artist = components[3]
         
         let existingArtwork = self.latestInvitesByPeer[peerId]?.artworkUrl
-        var info = SGDoxListenTogetherSessionInfo(
+        let info = SGDoxListenTogetherSessionInfo(
             trackId: trackId,
             title: title,
             artist: artist,
@@ -110,14 +110,16 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         
         // Resolve artwork asynchronously if missing
         if info.artworkUrl == nil || info.artworkUrl?.isEmpty == true {
+            let peerIdRaw = peerId.toInt64()
             AppleMusicService.shared.search(query: "\(title) \(artist)") { [weak self] tracks, _ in
                 if let first = tracks.first(where: { $0.artworkUrl?.isEmpty == false }) {
                     DispatchQueue.main.async {
                         guard let self = self else { return }
-                        if var current = self.latestInvitesByPeer[peerId], current.trackId == trackId {
+                        let targetPeerId = EnginePeer.Id(peerIdRaw)
+                        if var current = self.latestInvitesByPeer[targetPeerId], current.trackId == trackId {
                             current.artworkUrl = first.artworkUrl
-                            self.latestInvitesByPeer[peerId] = current
-                            NotificationCenter.default.post(name: NSNotification.Name("SGDoxListenTogetherUpdated"), object: nil, userInfo: ["peerId": peerId])
+                            self.latestInvitesByPeer[targetPeerId] = current
+                            NotificationCenter.default.post(name: NSNotification.Name("SGDoxListenTogetherUpdated"), object: nil, userInfo: ["peerId": targetPeerId])
                         }
                     }
                 }
