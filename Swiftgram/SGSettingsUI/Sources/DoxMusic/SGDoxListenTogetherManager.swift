@@ -2,6 +2,7 @@ import Foundation
 import TelegramCore
 import AccountContext
 import Display
+import SGSimpleSettings
 
 public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
     public static let shared = SGDoxListenTogetherManager()
