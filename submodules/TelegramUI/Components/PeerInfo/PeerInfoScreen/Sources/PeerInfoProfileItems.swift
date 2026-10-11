@@ -61,7 +61,6 @@ func infoItems(
     var currentPeerInfoSection: InfoSection = .peerInfo
 
     // MARK: Swiftgram
-    var sgItemId = 0
     var idText = ""
     var isMutualContact = false
     //    var isUser = false
@@ -937,12 +936,11 @@ func infoItems(
     
     // MARK: Swiftgram
     if showProfileId {
-        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: "id: \(idText)", text: "", textColor: .primary, action: nil, longTapAction: { sourceNode in
+        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: AnyHashable("sg_profile_id"), label: "id: \(idText)", text: "", textColor: .primary, action: nil, longTapAction: { sourceNode in
             interaction.openPeerInfoContextMenu(.copy(idText), sourceNode, nil)
         }, requestLayout: { _ in
             interaction.requestLayout(false)
         }))
-        sgItemId += 1
     }
     
     if SGSimpleSettings.shared.showDC {
@@ -999,35 +997,32 @@ func infoItems(
         }
 
         if !dcText.isEmpty || !dcLabel.isEmpty {
-            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: dcLabel, text: dcText, textColor: .primary, action: nil, longTapAction: { sourceNode in
+            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: AnyHashable("sg_dc"), label: dcLabel, text: dcText, textColor: .primary, action: nil, longTapAction: { sourceNode in
                 interaction.openPeerInfoContextMenu(.aboutDC, sourceNode, nil)
             }, requestLayout: { _ in
                 interaction.requestLayout(false)
             }))
-            sgItemId += 1
         }
     }
     
     if SGSimpleSettings.shared.showCreationDate {
         if let channelCreationTimestamp = data.channelCreationTimestamp {
             let creationDateString = stringForDate(timestamp: channelCreationTimestamp, strings: presentationData.strings)
-            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: i18n("Chat.Created", presentationData.strings.baseLanguageCode, creationDateString), text: "", action: nil, longTapAction: { sourceNode in
+            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: AnyHashable("sg_creation_date"), label: i18n("Chat.Created", presentationData.strings.baseLanguageCode, creationDateString), text: "", action: nil, longTapAction: { sourceNode in
                 interaction.openPeerInfoContextMenu(.copy(creationDateString), sourceNode, nil)
             }, requestLayout: { _ in
                 interaction.requestLayout(false)
             }))
-            sgItemId += 1
         }
     }
     
     if let invitedAt = nearestChatParticipant.1 {
         let joinedDateString = stringForDate(timestamp: invitedAt, strings: presentationData.strings)
-        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: i18n("Chat.JoinedDateTitle", presentationData.strings.baseLanguageCode, nearestChatParticipant.0 ?? "chat") , text: joinedDateString, action: nil, longTapAction: { sourceNode in
+        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: AnyHashable("sg_joined_date"), label: i18n("Chat.JoinedDateTitle", presentationData.strings.baseLanguageCode, nearestChatParticipant.0 ?? "chat") , text: joinedDateString, action: nil, longTapAction: { sourceNode in
             interaction.openPeerInfoContextMenu(.copy(joinedDateString), sourceNode, nil)
         }, requestLayout: { _ in
             interaction.requestLayout(false)
         }))
-        sgItemId += 1
     }
     
     if SGSimpleSettings.shared.showRegDate {
@@ -1052,19 +1047,17 @@ func infoItems(
             }
         }
         if !regDateString.isEmpty {
-            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: i18n("Chat.RegDate", presentationData.strings.baseLanguageCode), text: regDateString, action: nil, longTapAction: { sourceNode in
+            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: AnyHashable("sg_reg_date"), label: i18n("Chat.RegDate", presentationData.strings.baseLanguageCode), text: regDateString, action: nil, longTapAction: { sourceNode in
                 interaction.openPeerInfoContextMenu(.copy(regDateString), sourceNode, nil)
             }, requestLayout: { _ in
                 interaction.requestLayout(false)
             }))
-            sgItemId += 1
         }
     }
     if isMutualContact {
-        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: i18n("MutualContact.Label", presentationData.strings.baseLanguageCode), text: "", action: nil, longTapAction: { _ in }, requestLayout: { _ in
+        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: AnyHashable("sg_mutual_contact"), label: i18n("MutualContact.Label", presentationData.strings.baseLanguageCode), text: "", action: nil, longTapAction: { _ in }, requestLayout: { _ in
             interaction.requestLayout(false)
         }))
-        sgItemId += 1
     }
 
     if let peer = data.peer {
@@ -1073,7 +1066,7 @@ func infoItems(
         if count > 0 || SGSimpleSettings.shared.antiRecall || SGSimpleSettings.shared.keepViewOnceMedia {
             let labelText = count > 0 ? "\(count)" : ""
             items[.swiftgram]!.append(PeerInfoScreenDisclosureItem(
-                id: sgItemId,
+                id: AnyHashable("sg_deleted_media"),
                 label: .text(labelText),
                 text: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Удалённые медиа" : "Deleted Media",
                 icon: PresentationResourcesSettings.photos,
@@ -1083,7 +1076,6 @@ func infoItems(
                     }
                 }
             ))
-            sgItemId += 1
         }
     }
     

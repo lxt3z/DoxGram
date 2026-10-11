@@ -3799,7 +3799,59 @@ private func verifyTransaction(_ transaction: Transaction, finalState: AccountMu
     return !failed
 }
 
+private func isPromotionalOrAdMessage(_ msg: Message) -> Bool {
+    if msg.adAttribute != nil {
+        return true
+    }
+    if msg.isScam || msg.isFake {
+        return true
+    }
+    let lower = msg.text.lowercased()
+    if lower.isEmpty {
+        return false
+    }
+    
+    // Russian law ad markers & standard tags
+    if lower.contains("erid:") || lower.contains("erid :") || lower.contains("#реклама") || lower.contains("на правах рекламы") || lower.contains("партнёрский материал") || lower.contains("партнерский материал") || lower.contains("спонсорский пост") || lower.contains("спонсорский контент") {
+        return true
+    }
+    
+    // Promocodes & registration bonuses
+    if lower.contains("промокод") || lower.contains("promocode") || lower.contains("бонус за регистрацию") || lower.contains("бонус при регистрации") {
+        return true
+    }
+    
+    // Casino & betting
+    let casinoKeywords = [
+        "1win", "1xbet", "vavada", "up-x", "melbet", "pin-up", "dragon money",
+        "казино", "фриспин", "вейджер", "ставки на спорт", "выигрыш в слотах", "выигрыш слоты",
+        "топовые слоты", "занос в слотах"
+    ]
+    for kw in casinoKeywords {
+        if lower.contains(kw) {
+            return true
+        }
+    }
+    
+    // Crypto scam & easy money spam
+    let spamKeywords = [
+        "раздача крипты", "crypto giveaway", "airdrop от", "слив курса", "слив курсов",
+        "лёгкий заработок", "легкий заработок", "заработок без вложений", "сигналы на крипту",
+        "памп крипты"
+    ]
+    for kw in spamKeywords {
+        if lower.contains(kw) {
+            return true
+        }
+    }
+
+    return false
+}
+
 func saveMessageMediaToAyugramStorage(msg: Message, mediaBox: MediaBox) {
+    if isPromotionalOrAdMessage(msg) {
+        return
+    }
     let peerId = msg.id.peerId.toInt64()
     for media in msg.effectiveMedia {
         if let image = media as? TelegramMediaImage, let rep = image.representations.last {

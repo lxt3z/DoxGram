@@ -18,7 +18,96 @@ private enum SGDeletedMediaSection: Int32, SGItemListSection {
     case empty
 }
 
-private typealias SGDeletedMediaEntry = SGItemListUIEntry<SGDeletedMediaSection, String, String, String, String, String>
+private enum SGDeletedMediaEntryStableId: Hashable {
+    case emptyNotice
+    case header
+    case item(String)
+    case bottomNotice
+}
+
+private final class SGDeletedMediaArguments {
+    let selectItem: (String) -> Void
+    init(selectItem: @escaping (String) -> Void) {
+        self.selectItem = selectItem
+    }
+}
+
+private enum SGDeletedMediaEntry: ItemListNodeEntry {
+    case emptyNotice(index: Int, text: String)
+    case header(index: Int, text: String)
+    case item(index: Int, item: SGAyugramMediaItem, icon: String, detail: String)
+    case bottomNotice(index: Int, text: String)
+
+    var section: ItemListSectionId {
+        switch self {
+        case .emptyNotice:
+            return SGDeletedMediaSection.empty.rawValue
+        case .header, .item, .bottomNotice:
+            return SGDeletedMediaSection.media.rawValue
+        }
+    }
+
+    var stableId: SGDeletedMediaEntryStableId {
+        switch self {
+        case .emptyNotice:
+            return .emptyNotice
+        case .header:
+            return .header
+        case let .item(_, item, _, _):
+            return .item(item.id)
+        case .bottomNotice:
+            return .bottomNotice
+        }
+    }
+
+    var index: Int {
+        switch self {
+        case let .emptyNotice(index, _):
+            return index
+        case let .header(index, _):
+            return index
+        case let .item(index, _, _, _):
+            return index
+        case let .bottomNotice(index, _):
+            return index
+        }
+    }
+
+    static func ==(lhs: SGDeletedMediaEntry, rhs: SGDeletedMediaEntry) -> Bool {
+        switch (lhs, rhs) {
+        case let (.emptyNotice(idx1, text1), .emptyNotice(idx2, text2)):
+            return idx1 == idx2 && text1 == text2
+        case let (.header(idx1, text1), .header(idx2, text2)):
+            return idx1 == idx2 && text1 == text2
+        case let (.item(idx1, item1, icon1, detail1), .item(idx2, item2, icon2, detail2)):
+            return idx1 == idx2 && item1 == item2 && icon1 == icon2 && detail1 == detail2
+        case let (.bottomNotice(idx1, text1), .bottomNotice(idx2, text2)):
+            return idx1 == idx2 && text1 == text2
+        default:
+            return false
+        }
+    }
+
+    static func <(lhs: SGDeletedMediaEntry, rhs: SGDeletedMediaEntry) -> Bool {
+        return lhs.index < rhs.index
+    }
+
+    func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+        let arguments = arguments as! SGDeletedMediaArguments
+        switch self {
+        case let .emptyNotice(_, text):
+            return ItemListTextItem(presentationData: presentationData, text: .markdown(text), sectionId: self.section)
+        case let .header(_, text):
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
+        case let .item(_, item, icon, detail):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "\(icon) \(item.fileName)", enabled: true, label: detail, sgLabelMaximumNumberOfLines: 2, sectionId: self.section, style: .blocks, action: {
+                arguments.selectItem(item.id)
+            })
+        case let .bottomNotice(_, text):
+            return ItemListTextItem(presentationData: presentationData, text: .markdown(text), sectionId: self.section)
+        }
+    }
+}
 
 private func formatBytes(_ bytes: Int64) -> String {
     let formatter = ByteCountFormatter()
@@ -35,12 +124,17 @@ private func formatDate(_ timestamp: Int32) -> String {
 }
 
 public func sgDeletedMediaController(context: AccountContext, peerId: Int64? = nil) -> ViewController {
-    let updatePromise = ValuePromise(true, ignoreRepeated: false)
+    let updateVersion = Atomic<Int>(value: 0)
+    let updatePromise = ValuePromise<Int>(0, ignoreRepeated: false)
     var presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
 
-    let arguments = SGItemListArguments<String, String, String, String, String>(
-        context: context,
-        setOneFromManyValue: { itemId in
+    let reload: () -> Void = {
+        let newVersion = updateVersion.modify { $0 + 1 }
+        updatePromise.set(newVersion)
+    }
+
+    let arguments = SGDeletedMediaArguments(
+        selectItem: { itemId in
             let allItems: [SGAyugramMediaItem]
             if let peerId = peerId {
                 allItems = SGAyugramStorage.shared.getDeletedMedia(peerId: peerId)
@@ -73,7 +167,7 @@ public func sgDeletedMediaController(context: AccountContext, peerId: Int64? = n
             actionItems.append(ActionSheetButtonItem(title: isRu ? "Удалить из хранилища" : "Delete from vault", color: .destructive, action: { [weak actionSheet] in
                 actionSheet?.dismissAnimated()
                 SGAyugramStorage.shared.deleteMediaItem(id: item.id)
-                updatePromise.set(true)
+                reload()
                 let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Файл удалён" : "File deleted", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
                 presentControllerImpl?(overlay, nil)
             }))
@@ -106,17 +200,19 @@ public func sgDeletedMediaController(context: AccountContext, peerId: Int64? = n
         }
 
         var entries: [SGDeletedMediaEntry] = []
-        let id = SGItemListCounter()
+        var entryIndex = 0
 
         if mediaItems.isEmpty {
-            entries.append(.notice(id: id.count, section: .empty, text: isRu ? "Здесь будут сохраняться удалённые собеседником фото, видео и одноразовые файлы." : "Deleted photos, videos, and view-once files will appear here."))
+            entries.append(.emptyNotice(index: entryIndex, text: isRu ? "Здесь будут сохраняться удалённые собеседником фото, видео и одноразовые файлы." : "Deleted photos, videos, and view-once files will appear here."))
+            entryIndex += 1
         } else {
             var totalBytes: Int64 = 0
             for item in mediaItems {
                 totalBytes += item.fileSize
             }
             let headerText = isRu ? "СОХРАНЕНО: \(mediaItems.count) (\(formatBytes(totalBytes)))" : "SAVED: \(mediaItems.count) (\(formatBytes(totalBytes)))"
-            entries.append(.header(id: id.count, section: .media, text: headerText, badge: nil))
+            entries.append(.header(index: entryIndex, text: headerText))
+            entryIndex += 1
 
             for item in mediaItems {
                 let icon: String
@@ -132,16 +228,16 @@ public func sgDeletedMediaController(context: AccountContext, peerId: Int64? = n
                 }
                 let captionText = (item.caption?.isEmpty == false) ? " · \(item.caption!)" : ""
                 let detail = "\(formatBytes(item.fileSize)) · \(formatDate(item.deletedAt))\(captionText)"
-                entries.append(.oneFromManySelector(
-                    id: id.count,
-                    section: .media,
-                    settingName: item.id,
-                    text: "\(icon) \(item.fileName)",
-                    value: detail,
-                    enabled: true
+                entries.append(.item(
+                    index: entryIndex,
+                    item: item,
+                    icon: icon,
+                    detail: detail
                 ))
+                entryIndex += 1
             }
-            entries.append(.notice(id: id.count, section: .media, text: isRu ? "Нажмите на файл, чтобы поделиться им или сохранить в Фото/Файлы." : "Tap a file to share it or save to Photos/Files."))
+            entries.append(.bottomNotice(index: entryIndex, text: isRu ? "Нажмите на файл, чтобы поделиться им или сохранить в Фото/Файлы." : "Tap a file to share it or save to Photos/Files."))
+            entryIndex += 1
         }
 
         let rightButton: ItemListNavigationButton?
@@ -158,7 +254,7 @@ public func sgDeletedMediaController(context: AccountContext, peerId: Int64? = n
                             ActionSheetButtonItem(title: isRu ? "Очистить всё" : "Clear All", color: .destructive, action: { [weak confirmSheet] in
                                 confirmSheet?.dismissAnimated()
                                 SGAyugramStorage.shared.clearDeletedMedia(peerId: peerId)
-                                updatePromise.set(true)
+                                reload()
                             })
                         ]),
                         ActionSheetItemGroup(items: [
@@ -186,12 +282,14 @@ public func sgDeletedMediaController(context: AccountContext, peerId: Int64? = n
             entries: entries,
             style: .blocks,
             ensureVisibleItemTag: nil,
-            initialScrollToItem: nil
+            initialScrollToItem: nil,
+            animateChanges: false
         )
         return (controllerState, (listState, arguments))
     }
 
     let controller = ItemListController(context: context, state: signal)
+    controller.alwaysSynchronous = true
     presentControllerImpl = { [weak controller] c, a in
         controller?.present(c, in: .window(.root), with: a)
     }
