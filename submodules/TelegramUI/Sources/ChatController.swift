@@ -9722,6 +9722,8 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 }
             }))
         })
+    }
+    
     func presentDoxListenTogetherInvite(text: String, peerId: EnginePeer.Id, senderName: String?) {
         if let session = SGDoxListenTogetherManager.shared.parseSyncTag(text: text, peerId: peerId, senderName: senderName) {
             let inviteController = SGDoxListenTogetherInviteController(context: self.context, session: session)
