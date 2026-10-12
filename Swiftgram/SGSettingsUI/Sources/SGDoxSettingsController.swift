@@ -149,7 +149,7 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     let autoDownloadCount = SGSimpleSettings.shared.autoDownloadChannels.count
     let autoDownloadSubtitle = autoDownloadCount > 0 ? "\(autoDownloadCount)" : (isRu ? "Нет" : "None")
     entries.append(.disclosure(id: id.count, section: .media, link: .autoDownloadChannels, text: "\(isRu ? "Автозагрузка медиа в каналах" : "Channel Media Auto-Download") (\(autoDownloadSubtitle))"))
-    entries.append(.notice(id: id.count, section: .media, text: isRu ? "Автоматически загружает фото и видео в фоновом режиме для выбранных каналов, даже если вы в них не заходите. Это сохраняет медиа в памяти, если пост будет удален автором." : "Automatically downloads photos and videos in the background for selected channels without opening them, preserving media if the post is deleted."))
+    entries.append(.notice(id: id.count, section: .media, text: isRu ? "Фоновая загрузка фото и видео из выбранных каналов для их сохранения при возможном удалении автором." : "Automatically downloads media in the background for selected channels to preserve posts if deleted by authors."))
 
     // MARK: - Streamer Mode
     entries.append(.header(id: id.count, section: .streamer, text: i18n("Settings.Ayugram.StreamerHeader", lang), badge: nil))
@@ -161,9 +161,9 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     entries.append(.header(id: id.count, section: .privacy, text: i18n("Settings.Ayugram.PrivacyHeader", lang), badge: nil))
     entries.append(.toggle(id: id.count, section: .privacy, settingName: .hideAds, value: SGSimpleSettings.shared.hideAds, text: i18n("Settings.Ayugram.HideAds", lang), enabled: true))
     entries.append(.toggle(id: id.count, section: .privacy, settingName: .hideChannelAds, value: SGSimpleSettings.shared.hideChannelAds, text: isRu ? "Скрывать рекламу в каналах" : "Hide Channel Ads", enabled: true))
-    entries.append(.notice(id: id.count, section: .privacy, text: isRu ? "Скрывает рекламу, подборки каналов и казино в каналах плашкой в стиле даты. По тапу на «Показать» сообщение раскрывается без автозагрузки медиа." : "Hides ads, channel collections, and casino posts in channels using a date-style badge. Tapping 'Show' reveals the post without auto-loading media."))
+    entries.append(.notice(id: id.count, section: .privacy, text: isRu ? "Сворачивает рекламные публикации, подборки каналов и казино в каналах. Раскрыть или снова скрыть публикацию можно в любой момент." : "Collapses promotional posts, channel recommendations, and casino ads in channels. You can reveal or hide the post back at any time."))
     entries.append(.toggle(id: id.count, section: .privacy, settingName: .blockScreenshotNotifications, value: SGSimpleSettings.shared.blockScreenshotNotifications, text: isRu ? "Блокировать уведомления о скриншотах" : "Block Screenshot Notifications", enabled: true))
-    entries.append(.notice(id: id.count, section: .privacy, text: isRu ? "Собеседник не получит уведомление о том, что вы сделали снимок экрана в секретном чате или при просмотре самоуничтожающихся фото и видео." : "Prevents sending screenshot notifications in secret chats and view-once media."))
+    entries.append(.notice(id: id.count, section: .privacy, text: isRu ? "Блокирует отправку уведомлений о снимке экрана в секретных чатах и при просмотре самоуничтожающихся медиа." : "Prevents sending screenshot notifications in secret chats and view-once media."))
     entries.append(.toggle(id: id.count, section: .privacy, settingName: .bypassCopyProtection, value: SGSimpleSettings.shared.bypassCopyProtection, text: i18n("Settings.Ayugram.BypassCopyProtection", lang), enabled: true))
     entries.append(.notice(id: id.count, section: .privacy, text: i18n("Settings.Ayugram.BypassCopyProtection.Notice", lang)))
     entries.append(.toggle(id: id.count, section: .privacy, settingName: .disableTelemetry, value: SGSimpleSettings.shared.disableTelemetry, text: i18n("Settings.Ayugram.DisableTelemetry", lang), enabled: true))
@@ -193,13 +193,14 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     entries.append(.disclosure(id: id.count, section: .animatedWallpapers, link: .globalAnimatedWallpaper, text: "\(isRu ? "Обои для всех чатов" : "Wallpaper for all chats") (\(globalStatus))"))
     entries.append(.oneFromManySelector(id: id.count, section: .animatedWallpapers, settingName: .animatedWallpaperQuality, text: isRu ? "Качество загрузки видео" : "Video Download Quality", value: SGSimpleSettings.shared.animatedWallpaperQuality, enabled: true))
     entries.append(.disclosure(id: id.count, section: .animatedWallpapers, link: .clearAnimatedWallpaperCache, text: isRu ? "Очистить кэш видео-обоев" : "Clear Video Wallpapers Cache"))
-    entries.append(.notice(id: id.count, section: .animatedWallpapers, text: isRu ? "Установите анимированные видео-обои (MP4, TikTok или из галереи/файлов) для всех чатов сразу либо индивидуально внутри конкретного чата. При включении опции «Установить для обоих» они автоматически применятся у собеседника с DoxGram." : "Set animated video wallpapers (MP4, TikTok, or from gallery/files) globally for all chats or individually inside any chat. If 'Set for Both' is selected, it will also apply for peers using DoxGram."))
+    entries.append(.notice(id: id.count, section: .animatedWallpapers, text: isRu ? "Установка живых видео-обоев (MP4, TikTok, файлы) для всех чатов или конкретного диалога с возможностью синхронизации с собеседником." : "Set animated video wallpapers (MP4, TikTok, or files) globally or for individual chats with optional peer sync."))
 
     // MARK: - Updates
     entries.append(.header(id: id.count, section: .updates, text: isRu ? "Обновления" : "Updates", badge: nil))
     entries.append(.toggle(id: id.count, section: .updates, settingName: .doxCheckForUpdates, value: SGSimpleSettings.shared.doxCheckForUpdates, text: isRu ? "Проверять обновления" : "Check for Updates", enabled: true))
     entries.append(.disclosure(id: id.count, section: .updates, link: .doxCheckUpdatesNow, text: isRu ? "Проверить наличие обновлений" : "Check for Updates Now"))
-    entries.append(.notice(id: id.count, section: .updates, text: isRu ? "При появлении новой версии DoxGram на GitHub приложение покажет уведомление с описанием нововведений и ссылкой на загрузку." : "When a new DoxGram version is released on GitHub, the app will notify you with the changelog and download link."))
+    entries.append(.notice(id: id.count, section: .updates, text: isRu ? "Уведомления о выходе новых релизов DoxGram с описанием изменений и ссылкой на обновление." : "Notifications about new DoxGram releases with changelog and download link."))
+
 
     // MARK: - Debug & Logs
     entries.append(.header(id: id.count, section: .debug, text: i18n("Settings.Ayugram.DebugHeader", lang), badge: nil))

@@ -23,6 +23,12 @@ public final class SGAdFilterState {
         self.revealedMessageIds.insert(id)
     }
     
+    public func hide(_ id: MessageId) {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        self.revealedMessageIds.remove(id)
+    }
+    
     public func reset() {
         self.lock.lock()
         defer { self.lock.unlock() }

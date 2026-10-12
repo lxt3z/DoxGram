@@ -39,6 +39,8 @@ import RichTextAttachmentScreen
 import RichTextEditorMessageConversion
 import ChatRichTextEditorComposer
 import Postbox
+import SGSettingsUI
+import ImageIO
 
 extension ChatControllerImpl {
     enum AttachMenuSubject {
@@ -2114,6 +2116,96 @@ extension ChatControllerImpl {
     func openStickerEditor() {
         self.chatDisplayNode.dismissInput()
 
+        let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
+        let isRu = presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
+            || presentationData.strings.baseLanguageCode.lowercased().hasPrefix("uk")
+            || presentationData.strings.baseLanguageCode.lowercased().hasPrefix("be")
+
+        let actionSheet = ActionSheetController(presentationData: presentationData)
+        var items: [ActionSheetItem] = []
+        items.append(ActionSheetTextItem(title: isRu ? "Создание стикеров и GIF" : "Create Stickers & GIFs"))
+        items.append(ActionSheetButtonItem(title: isRu ? "Создать стикер" : "Create Sticker", color: .accent, action: { [weak self, weak actionSheet] in
+            actionSheet?.dismissAnimated()
+            self?.openStandardStickerEditor()
+        }))
+        items.append(ActionSheetButtonItem(title: isRu ? "Создать GIF" : "Create GIF", color: .accent, action: { [weak self, weak actionSheet] in
+            actionSheet?.dismissAnimated()
+            guard let self else { return }
+            let peerId = self.presentationInterfaceState.renderedPeer?.peer.id
+            SGDoxGifCreator.presentGifCreator(from: self, context: self.context, peerId: peerId, sendGifDirectly: { [weak self] gifData in
+                self?.sendCreatedGif(gifData: gifData)
+            })
+        }))
+        actionSheet.setItemGroups([
+            ActionSheetItemGroup(items: items),
+            ActionSheetItemGroup(items: [
+                ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
+                })
+            ])
+        ])
+        self.present(actionSheet, in: .window(.root))
+    }
+
+    func sendCreatedGif(gifData: Data) {
+        guard let peer = self.presentationInterfaceState.renderedPeer?.peer else {
+            return
+        }
+
+        let firstFrameImage: UIImage?
+        if let source = CGImageSourceCreateWithData(gifData as CFData, nil), let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+            firstFrameImage = UIImage(cgImage: cgImage)
+        } else {
+            firstFrameImage = UIImage(data: gifData)
+        }
+
+        let resource = LocalFileMediaResource(fileId: Int64.random(in: Int64.min ... Int64.max))
+        self.context.account.postbox.mediaBox.storeResourceData(resource.id, data: gifData)
+
+        var representations: [TelegramMediaImageRepresentation] = []
+        if let firstFrameImage = firstFrameImage {
+            let thumbResource = LocalFileMediaResource(fileId: Int64.random(in: Int64.min ... Int64.max))
+            if let thumbData = firstFrameImage.jpegData(compressionQuality: 0.6) {
+                self.context.account.postbox.mediaBox.storeResourceData(thumbResource.id, data: thumbData)
+                representations.append(TelegramMediaImageRepresentation(dimensions: PixelDimensions(firstFrameImage.size), resource: thumbResource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: false))
+            }
+        }
+
+        let mediaFile = TelegramMediaFile(
+            fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: Int64.random(in: Int64.min ... Int64.max)),
+            partialReference: nil,
+            resource: resource,
+            previewRepresentations: representations,
+            videoThumbnails: [],
+            immediateThumbnailData: nil,
+            mimeType: "image/gif",
+            size: Int64(gifData.count),
+            attributes: [
+                .FileName(fileName: "animation.gif"),
+                .Animated,
+                .Video(duration: 3, size: PixelDimensions(firstFrameImage?.size ?? CGSize(width: 512, height: 512)), flags: [.supportsStreaming], preloadSize: nil, coverTime: nil, videoCodec: nil)
+            ]
+        )
+
+        let _ = enqueueMessages(account: self.context.account, peerId: peer.id, messages: [
+            .message(
+                text: "",
+                attributes: [],
+                inlineStickers: [:],
+                mediaReference: .standalone(media: mediaFile),
+                threadId: self.chatLocation.threadId,
+                replyToMessageId: nil,
+                replyToStoryId: nil,
+                localGroupingKey: nil,
+                correlationId: nil,
+                bubbleUpEmojiOrStickersets: []
+            )
+        ]).start()
+    }
+
+    func openStandardStickerEditor() {
+        self.chatDisplayNode.dismissInput()
+
         var dismissImpl: (() -> Void)?
         let mainController = self.context.sharedContext.makeStickerMediaPickerScreen(
             context: self.context,
@@ -2198,6 +2290,7 @@ extension ChatControllerImpl {
         mainController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
         self.push(mainController)
     }
+
 
     func configurePollCreation(sourceMessageId: EngineMessage.Id? = nil, isQuiz: Bool? = nil) -> ViewController? {
         guard let peer = self.presentationInterfaceState.renderedPeer?.peer else {

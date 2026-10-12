@@ -42,6 +42,7 @@ import ChatMessageItemView
 import ChatMessageBubbleItemNode
 import AdsInfoScreen
 import AdsReportScreen
+import ChatMessageBubbleContentNode
  
 private struct MessageContextMenuData {
     let starStatus: Bool?
@@ -1673,6 +1674,28 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                 })
             }))
             actions.append(deletedAction)
+        }
+        
+        if SGSimpleSettings.shared.hideChannelAds {
+            let hasRevealedAd = messages.contains(where: { m in
+                return SGAdFilterState.shared.isRevealed(m.id) || SGAdDetector.isAd(EngineMessage(m))
+            })
+            if hasRevealedAd {
+                let isRu = chatPresentationInterfaceState.strings.baseLanguageCode.lowercased().hasPrefix("ru")
+                    || chatPresentationInterfaceState.strings.baseLanguageCode.lowercased().hasPrefix("uk")
+                    || chatPresentationInterfaceState.strings.baseLanguageCode.lowercased().hasPrefix("be")
+                let hideAdAction = ContextMenuItem.action(ContextMenuActionItem(text: isRu ? "Скрыть рекламу" : "Hide Ad", icon: { theme in
+                    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Clear"), color: theme.actionSheet.primaryTextColor)
+                }, action: { c, _ in
+                    c?.dismiss(completion: {
+                        for m in messages {
+                            SGAdFilterState.shared.hide(m.id)
+                            let _ = controllerInteraction.requestMessageUpdate(m.id, false, nil)
+                        }
+                    })
+                }))
+                actions.append(hideAdAction)
+            }
         }
         
         var threadId: Int64?
