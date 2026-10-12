@@ -654,13 +654,32 @@ public final class AppleMusicService: @unchecked Sendable {
     
     public func fetchArtistDetails(artistName: String, completion: @escaping @Sendable (_ topTracks: [SGDoxMusicTrack], _ albums: [SGDoxAlbum], _ artistImageUrl: String?) -> Void) {
         let cleanName = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let encoded = cleanName.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed), !encoded.isEmpty else {
+        guard !cleanName.isEmpty else {
             DispatchQueue.main.async { completion([], [], nil) }
             return
         }
         
+        // If artistName contains multiple artists like "MORGENSHTERN, SODA LUV" or "Artik & Asti",
+        // try primary artist first, but also prepare fallback
+        let delimiters = CharacterSet(charactersIn: ",/&;")
+        let components = cleanName.components(separatedBy: delimiters).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let primaryArtist = components.first ?? cleanName
+        
+        let primaryEncoded = primaryArtist.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) ?? ""
         let countries = ["KZ", "RU", "US"]
-        self.fetchArtistDetailsRecursive(encodedName: encoded, cleanName: cleanName, countries: countries, index: 0, completion: completion)
+        
+        self.fetchArtistDetailsRecursive(encodedName: primaryEncoded, cleanName: primaryArtist, countries: countries, index: 0) { topTracks, albums, img in
+            if !topTracks.isEmpty || !albums.isEmpty {
+                completion(topTracks, albums, img)
+            } else if primaryArtist != cleanName {
+                // If primary didn't yield results, try full combined query search
+                self.searchITunesPublic(query: cleanName) { tracks, _ in
+                    completion(tracks, [], tracks.first?.artworkUrl)
+                }
+            } else {
+                completion(topTracks, albums, img)
+            }
+        }
     }
     
     private func fetchArtistDetailsRecursive(encodedName: String, cleanName: String, countries: [String], index: Int, completion: @escaping @Sendable ([SGDoxMusicTrack], [SGDoxAlbum], String?) -> Void) {

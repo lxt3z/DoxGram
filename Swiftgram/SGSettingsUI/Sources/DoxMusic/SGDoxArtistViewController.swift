@@ -19,6 +19,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     private let closeButton = UIButton(type: .system)
     private let tableView = UITableView(frame: .zero, style: .grouped)
     private let activityIndicator = UIActivityIndicatorView(style: .large)
+    private let emptyStateLabel = UILabel()
     
     // Apple Music Hero Banner Header
     private let headerView = UIView()
@@ -91,6 +92,10 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         // Fix loading indicator positioning: center inside visible content area
         self.activityIndicator.center = CGPoint(x: layout.size.width * 0.5, y: max(200.0, layout.size.height * 0.42))
         self.view.bringSubviewToFront(self.activityIndicator)
+        
+        let headerBottom = self.headerView.frame.maxY + (inNav ? topInset : 0)
+        self.emptyStateLabel.frame = CGRect(x: 20.0, y: min(layout.size.height - 80.0, headerBottom + 30.0), width: layout.size.width - 40.0, height: 30.0)
+        self.view.bringSubviewToFront(self.emptyStateLabel)
     }
     
     public override func viewDidLoad() {
@@ -136,6 +141,14 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.activityIndicator.hidesWhenStopped = true
         self.view.addSubview(self.activityIndicator)
         self.activityIndicator.startAnimating()
+        
+        // Empty State Label
+        self.emptyStateLabel.textColor = UIColor(white: 1.0, alpha: 0.55)
+        self.emptyStateLabel.font = UIFont.systemFont(ofSize: 15.0, weight: .medium)
+        self.emptyStateLabel.textAlignment = .center
+        self.emptyStateLabel.text = "Треки исполнителя не найдены"
+        self.emptyStateLabel.isHidden = true
+        self.view.addSubview(self.emptyStateLabel)
         
         // Pan gesture to allow smooth swipe-down to dismiss
         let pan = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanDismiss(_:)))
@@ -358,6 +371,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                     self.bannerImageView.tintColor = .white
                 }
                 
+                self.emptyStateLabel.isHidden = !(self.topTracks.isEmpty && self.albums.isEmpty)
                 self.layoutHeader(width: self.view.bounds.width)
                 self.albumsCollectionView.reloadData()
                 self.tableView.reloadData()
