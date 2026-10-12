@@ -182,6 +182,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.darkDimOverlay.alpha = 1.0
         self.backgroundBlurView.alpha = 1.0
         
+        // Initial offscreen state for smooth presentation transition
+        let screenHeight = UIScreen.main.bounds.height
+        let offscreenOffset = screenHeight > 0 ? screenHeight : 900.0
+        self.view.transform = CGAffineTransform(translationX: 0, y: offscreenOffset)
+        
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
         panGesture.delegate = self
         self.view.addGestureRecognizer(panGesture)
@@ -833,6 +838,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        if !self.hasAnimatedIn {
+            self.hasAnimatedIn = true
+            UIView.animate(withDuration: 0.36, delay: 0, usingSpringWithDamping: 0.86, initialSpringVelocity: 0.4, options: [.curveEaseOut, .allowUserInteraction], animations: {
+                self.view.transform = .identity
+            }, completion: nil)
+        }
     }
     
     public override func viewWillDisappear(_ animated: Bool) {

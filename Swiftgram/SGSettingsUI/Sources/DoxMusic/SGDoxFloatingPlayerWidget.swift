@@ -437,14 +437,13 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     
     @objc private func widgetTapped() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        self.openPlayer?()
         UIView.animate(withDuration: 0.10, animations: {
             self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
         }) { _ in
-            UIView.animate(withDuration: 0.18, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.4, options: [.allowUserInteraction], animations: {
+            UIView.animate(withDuration: 0.16, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.4, options: [.allowUserInteraction], animations: {
                 self.transform = .identity
-            }) { _ in
-                self.openPlayer?()
-            }
+            }, completion: nil)
         }
     }
     
