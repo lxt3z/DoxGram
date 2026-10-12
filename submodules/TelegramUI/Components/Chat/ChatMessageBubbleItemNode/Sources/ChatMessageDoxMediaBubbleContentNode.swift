@@ -152,7 +152,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     @objc private func cardPressed() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         guard let item = self.item, !self.rawTag.isEmpty else { return }
-        item.controllerInteraction.openUrl(ChatControllerInteraction.OpenUrl(url: self.rawTag, concealed: false, progress: nil, message: EngineMessage(item.message)))
+        item.controllerInteraction.openUrl(ChatControllerInteraction.OpenUrl(url: self.rawTag, concealed: false, message: item.message))
     }
     
     override public func tapActionAtPoint(_ point: CGPoint, gesture: TapLongTapOrDoubleTapGesture, isEstimating: Bool) -> ChatMessageBubbleContentTapAction {
