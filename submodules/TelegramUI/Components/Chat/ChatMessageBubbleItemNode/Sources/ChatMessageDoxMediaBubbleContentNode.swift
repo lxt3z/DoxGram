@@ -10,10 +10,11 @@ import ChatMessageDateAndStatusNode
 import ChatMessageBubbleContentNode
 import ChatMessageItemCommon
 import ChatControllerInteraction
-import SGSettingsUI
 import SGSimpleSettings
 
 public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleContentNode {
+    private static var artworkCache: [String: UIImage] = [:]
+    
     private let cardBackgroundNode: ASDisplayNode
     private let artworkContainerNode: ASDisplayNode
     private let artworkImageNode: ASImageNode
@@ -25,9 +26,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     private let playIconNode: ASImageNode
     private let dateAndStatusNode: ChatMessageDateAndStatusNode
     
-    private var stateListenerToken: UUID?
     private var currentTrackId: String?
-    private var currentSession: SGDoxListenTogetherSessionInfo?
     private var isMusic: Bool = true
     private var rawTag: String = ""
     
@@ -93,10 +92,6 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     }
     
     deinit {
-        if let token = self.stateListenerToken {
-            SGDoxMusicManager.shared.removeStateListener(token)
-            self.stateListenerToken = nil
-        }
         NotificationCenter.default.removeObserver(self)
     }
     
@@ -106,16 +101,10 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
         let tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.cardPressed))
         self.cardBackgroundNode.view.addGestureRecognizer(tapRecognizer)
         
-        self.stateListenerToken = SGDoxMusicManager.shared.addStateListener { [weak self] in
-            DispatchQueue.main.async {
-                self?.updatePlaybackState(animated: true)
-            }
-        }
-        
-        NotificationCenter.default.addObserver(self, selector: #selector(self.sessionChangedNotification), name: NSNotification.Name("SGDoxListenTogetherSessionChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.playbackStateChanged), name: NSNotification.Name("SGDoxMusicPlaybackStateChanged"), object: nil)
     }
     
-    @objc private func sessionChangedNotification() {
+    @objc private func playbackStateChanged() {
         DispatchQueue.main.async { [weak self] in
             self?.updatePlaybackState(animated: true)
         }
@@ -123,8 +112,8 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     
     private func updatePlaybackState(animated: Bool) {
         guard self.isMusic, let trackId = self.currentTrackId else { return }
-        let manager = SGDoxMusicManager.shared
-        let isPlaying = (manager.currentTrack?.id == trackId) && manager.isPlaying
+        let currentPlayingId = SGSimpleSettings.shared.currentPlayingTrackId
+        let isPlaying = SGSimpleSettings.shared.isMusicPlaying && (currentPlayingId == trackId)
         
         let iconName = isPlaying ? "pause.fill" : "play.fill"
         let iconConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
@@ -145,17 +134,16 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     
     @objc private func playButtonPressed() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        guard let item = self.item else { return }
+        guard let _ = self.item else { return }
         
         if self.isMusic {
-            let manager = SGDoxMusicManager.shared
-            if let trackId = self.currentTrackId, manager.currentTrack?.id == trackId {
-                manager.togglePlay()
-                self.updatePlaybackState(animated: true)
-            } else if let session = self.currentSession {
-                let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: self.rawTag, peerId: item.message.id.peerId, senderName: item.message.author?.debugDisplayTitle, forceJoin: true)
-                self.updatePlaybackState(animated: true)
-            }
+            let trackId = self.currentTrackId ?? ""
+            NotificationCenter.default.post(
+                name: NSNotification.Name("SGDoxMusicTogglePlayRequest"),
+                object: nil,
+                userInfo: ["trackId": trackId, "rawTag": self.rawTag]
+            )
+            self.updatePlaybackState(animated: true)
         } else {
             self.cardPressed()
         }
@@ -211,37 +199,34 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                 var titleText = "Музыкальный трек"
                 var subtitleText = "DoxMusic • Нажмите для синхронизации"
                 var parsedTrackId: String?
-                var parsedArtworkUrl: String?
-                var parsedSession: SGDoxListenTogetherSessionInfo?
                 var resolvedTag = ""
                 
                 if isMusicTag {
-                    let peerId = item.message.id.peerId
-                    let senderName = item.message.author?.debugDisplayTitle
-                    if let session = SGDoxListenTogetherManager.shared.parseSyncTag(text: text, peerId: peerId, senderName: senderName) {
-                        parsedSession = session
-                        parsedTrackId = session.trackId
-                        parsedArtworkUrl = session.artworkUrl
-                        titleText = session.title
-                        subtitleText = session.artist.isEmpty ? "DoxMusic" : session.artist
-                    }
                     if let range = text.range(of: "#doxlisten:") ?? text.range(of: "doxlisten:") {
-                        let remainder = String(text[range.lowerBound...])
-                        resolvedTag = remainder.components(separatedBy: "\n").first ?? text
+                        let remainder = String(text[range.upperBound...])
+                        let components = remainder.components(separatedBy: ":")
+                        if components.count >= 4 {
+                            parsedTrackId = components[0]
+                            titleText = components[2]
+                            subtitleText = components[3].isEmpty ? "DoxMusic" : components[3]
+                        }
+                        let fullTagPart = String(text[range.lowerBound...])
+                        resolvedTag = fullTagPart.components(separatedBy: "\n").first ?? text
                     }
                     badgeText = "🎧 СОВМЕСТНЫЙ ЭФИР"
                 } else if isWallpaperTag {
-                    if let wp = SGDoxAnimatedWallpaperManager.shared.parseSyncTag(from: text) {
-                        titleText = "Живые видео-обои"
-                        subtitleText = "Качество: \(wp.quality) • Нажмите для установки"
-                    } else {
-                        titleText = "Живые обои"
-                        subtitleText = "Нажмите для установки"
-                    }
+                    var quality = "720p"
                     if let range = text.range(of: "#doxwall:") ?? text.range(of: "doxwall:") {
-                        let remainder = String(text[range.lowerBound...])
-                        resolvedTag = remainder.components(separatedBy: "\n").first ?? text
+                        let remainder = String(text[range.upperBound...])
+                        let components = remainder.components(separatedBy: ":")
+                        if let q = components.last?.trimmingCharacters(in: .whitespacesAndNewlines), !q.isEmpty {
+                            quality = q
+                        }
+                        let fullTagPart = String(text[range.lowerBound...])
+                        resolvedTag = fullTagPart.components(separatedBy: "\n").first ?? text
                     }
+                    titleText = "Живые видео-обои"
+                    subtitleText = "Качество: \(quality) • Нажмите для установки"
                     badgeText = "🎬 ЖИВЫЕ ОБОИ"
                 }
                 
@@ -346,7 +331,6 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                         guard let strongSelf = self else { return }
                         strongSelf.item = item
                         strongSelf.currentTrackId = parsedTrackId
-                        strongSelf.currentSession = parsedSession
                         strongSelf.isMusic = isMusicTag
                         strongSelf.rawTag = resolvedTag
                         
@@ -369,21 +353,12 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                         
                         // Artwork content
                         if isMusicTag {
-                            strongSelf.artworkImageNode.image = SGDoxImageLoader.shared.placeholderArtwork()
-                            if let artUrl = parsedArtworkUrl, !artUrl.isEmpty {
-                                SGDoxImageLoader.shared.loadImage(urlString: artUrl) { [weak strongSelf] img in
-                                    if let img = img {
-                                        strongSelf?.artworkImageNode.image = img
-                                    }
-                                }
-                            } else {
-                                let dummy = SGDoxMusicTrack(id: parsedTrackId ?? "sync", title: titleText, artist: subtitleText, duration: 0, service: .appleMusic, artworkUrl: "", previewUrl: nil)
-                                SGDoxImageLoader.shared.loadArtwork(for: dummy, targetSize: CGSize(width: 120, height: 120)) { [weak strongSelf] img in
-                                    if let img = img {
-                                        strongSelf?.artworkImageNode.image = img
-                                    }
-                                }
-                            }
+                            let placeholderCfg = UIImage.SymbolConfiguration(pointSize: 26, weight: .medium)
+                            let placeholderImage = UIImage(systemName: "music.note", withConfiguration: placeholderCfg)?.withTintColor(messageTheme.accentTextColor, renderingMode: .alwaysOriginal)
+                            strongSelf.artworkImageNode.image = placeholderImage
+                            strongSelf.artworkImageNode.backgroundColor = messageTheme.accentTextColor.withAlphaComponent(0.12)
+                            
+                            strongSelf.fetchArtworkIfNeeded(title: titleText, artist: subtitleText)
                         } else {
                             let wpConfig = UIImage.SymbolConfiguration(pointSize: 26, weight: .medium)
                             strongSelf.artworkImageNode.image = UIImage(systemName: "sparkles.tv.fill", withConfiguration: wpConfig)?.withTintColor(messageTheme.accentTextColor, renderingMode: .alwaysOriginal)
@@ -428,5 +403,33 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                 })
             })
         }
+    }
+    
+    private func fetchArtworkIfNeeded(title: String, artist: String) {
+        let cacheKey = "\(title)_\(artist)"
+        if let cached = Self.artworkCache[cacheKey] {
+            self.artworkImageNode.image = cached
+            return
+        }
+        
+        let query = "\(title) \(artist)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        guard let url = URL(string: "https://itunes.apple.com/search?term=\(query)&entity=song&limit=1") else { return }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]],
+                  let first = results.first,
+                  let artUrlString = (first["artworkUrl100"] as? String)?.replacingOccurrences(of: "100x100bb", with: "300x300bb"),
+                  let artUrl = URL(string: artUrlString) else { return }
+            
+            URLSession.shared.dataTask(with: artUrl) { [weak self] imgData, _, _ in
+                guard let imgData = imgData, let img = UIImage(data: imgData) else { return }
+                DispatchQueue.main.async {
+                    Self.artworkCache[cacheKey] = img
+                    self?.artworkImageNode.image = img
+                }
+            }.resume()
+        }.resume()
     }
 }

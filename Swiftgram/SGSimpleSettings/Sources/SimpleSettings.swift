@@ -102,8 +102,10 @@ public class SGSimpleSettings {
     }
     
     public var isMusicPlaying: Bool = false
+    public var currentPlayingTrackId: String = ""
     public var currentPlayingTrackTitle: String = ""
     public var currentPlayingTrackArtist: String = ""
+    public var currentPlayingTrackArtworkUrl: String = ""
     
     public enum Keys: String, CaseIterable {
         case hidePhoneInSettings

@@ -14,8 +14,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     public private(set) var currentTrack: SGDoxMusicTrack? {
         didSet {
+            SGSimpleSettings.shared.currentPlayingTrackId = self.currentTrack?.id ?? ""
             SGSimpleSettings.shared.currentPlayingTrackTitle = self.currentTrack?.title ?? ""
             SGSimpleSettings.shared.currentPlayingTrackArtist = self.currentTrack?.artist ?? ""
+            SGSimpleSettings.shared.currentPlayingTrackArtworkUrl = self.currentTrack?.artworkUrl ?? ""
             NotificationCenter.default.post(name: NSNotification.Name("SGDoxMusicPlaybackStateChanged"), object: nil)
         }
     }
@@ -24,8 +26,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     public private(set) var isPlaying: Bool = false {
         didSet {
             SGSimpleSettings.shared.isMusicPlaying = self.isPlaying
+            SGSimpleSettings.shared.currentPlayingTrackId = self.currentTrack?.id ?? ""
             SGSimpleSettings.shared.currentPlayingTrackTitle = self.currentTrack?.title ?? ""
             SGSimpleSettings.shared.currentPlayingTrackArtist = self.currentTrack?.artist ?? ""
+            SGSimpleSettings.shared.currentPlayingTrackArtworkUrl = self.currentTrack?.artworkUrl ?? ""
             NotificationCenter.default.post(name: NSNotification.Name("SGDoxMusicPlaybackStateChanged"), object: nil)
         }
     }
@@ -359,6 +363,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(self.appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.handleTogglePlayRequest(_:)), name: NSNotification.Name("SGDoxMusicTogglePlayRequest"), object: nil)
         
         AppleMusicService.shared.onTrackDidFinish = { [weak self] in
             DispatchQueue.main.async {
@@ -445,6 +450,18 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.isInBackground = false
         if self.isPlaying && self.playbackTimer != nil {
             self.startTimeTracking()
+        }
+    }
+    
+    @objc private func handleTogglePlayRequest(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let trackId = notification.userInfo?["trackId"] as? String ?? ""
+            if !trackId.isEmpty && self.currentTrack?.id == trackId {
+                self.togglePlay()
+            } else if let rawTag = notification.userInfo?["rawTag"] as? String, !rawTag.isEmpty {
+                let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: rawTag, peerId: EnginePeer.Id(0), senderName: nil, forceJoin: true)
+            }
         }
     }
     
