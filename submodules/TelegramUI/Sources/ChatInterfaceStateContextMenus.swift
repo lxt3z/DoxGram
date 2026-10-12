@@ -1678,7 +1678,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         
         if SGSimpleSettings.shared.hideChannelAds {
             let hasRevealedAd = messages.contains(where: { m in
-                return SGAdFilterState.shared.isRevealed(m.id) || SGAdDetector.isAd(EngineMessage(m))
+                return SGAdFilterState.shared.isRevealed(m.id) || SGAdDetector.isAd(m)
             })
             if hasRevealedAd {
                 let isRu = chatPresentationInterfaceState.strings.baseLanguageCode.lowercased().hasPrefix("ru")

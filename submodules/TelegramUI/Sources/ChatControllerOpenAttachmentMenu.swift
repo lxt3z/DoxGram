@@ -2131,7 +2131,7 @@ extension ChatControllerImpl {
         items.append(ActionSheetButtonItem(title: isRu ? "Создать GIF" : "Create GIF", color: .accent, action: { [weak self, weak actionSheet] in
             actionSheet?.dismissAnimated()
             guard let self else { return }
-            let peerId = self.presentationInterfaceState.renderedPeer?.peer.id
+            let peerId = self.presentationInterfaceState.renderedPeer?.peerId
             SGDoxGifCreator.presentGifCreator(from: self, context: self.context, peerId: peerId, sendGifDirectly: { [weak self] gifData in
                 self?.sendCreatedGif(gifData: gifData)
             })
@@ -2184,7 +2184,8 @@ extension ChatControllerImpl {
                 .FileName(fileName: "animation.gif"),
                 .Animated,
                 .Video(duration: 3, size: PixelDimensions(firstFrameImage?.size ?? CGSize(width: 512, height: 512)), flags: [.supportsStreaming], preloadSize: nil, coverTime: nil, videoCodec: nil)
-            ]
+            ],
+            alternativeRepresentations: []
         )
 
         let _ = enqueueMessages(account: self.context.account, peerId: peer.id, messages: [
