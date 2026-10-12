@@ -320,6 +320,11 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         floatingWidget.setHiddenForSubscreens(self.viewControllers.count > 1)
         
         self.pushViewController(tabBarController, animated: false)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self = self else { return }
+            SGDoxUpdateChecker.shared.checkOnLaunchIfNeeded(context: self.context)
+        }
     }
         
     public func updateRootControllers(showContactsTab: Bool, showCallsTab: Bool) {

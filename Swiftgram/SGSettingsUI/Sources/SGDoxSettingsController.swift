@@ -32,6 +32,7 @@ private enum SGDoxControllerSection: Int32, SGItemListSection {
     case antiDeanon
     case wsProxy
     case animatedWallpapers
+    case updates
     case debug
 }
 
@@ -57,6 +58,7 @@ private enum SGDoxBoolSetting: String {
     case tgWsProxyEnabled
     case tgWsProxyFakeTLS
     case hideProxyButton
+    case doxCheckForUpdates
     case ayugramDebugger
     case discordRpcEnabled
 }
@@ -81,6 +83,7 @@ private enum SGDoxDisclosureLink: String {
     case tgWsProxyWorkerDomain
     case globalAnimatedWallpaper
     case clearAnimatedWallpaperCache
+    case doxCheckUpdatesNow
     case ayugramExportLogs
     case ayugramClearLogs
 }
@@ -192,6 +195,12 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     entries.append(.disclosure(id: id.count, section: .animatedWallpapers, link: .clearAnimatedWallpaperCache, text: isRu ? "Очистить кэш видео-обоев" : "Clear Video Wallpapers Cache"))
     entries.append(.notice(id: id.count, section: .animatedWallpapers, text: isRu ? "Установите анимированные видео-обои (MP4, TikTok или из галереи/файлов) для всех чатов сразу либо индивидуально внутри конкретного чата. При включении опции «Установить для обоих» они автоматически применятся у собеседника с DoxGram." : "Set animated video wallpapers (MP4, TikTok, or from gallery/files) globally for all chats or individually inside any chat. If 'Set for Both' is selected, it will also apply for peers using DoxGram."))
 
+    // MARK: - Updates
+    entries.append(.header(id: id.count, section: .updates, text: isRu ? "Обновления" : "Updates", badge: nil))
+    entries.append(.toggle(id: id.count, section: .updates, settingName: .doxCheckForUpdates, value: SGSimpleSettings.shared.doxCheckForUpdates, text: isRu ? "Проверять обновления" : "Check for Updates", enabled: true))
+    entries.append(.disclosure(id: id.count, section: .updates, link: .doxCheckUpdatesNow, text: isRu ? "Проверить наличие обновлений" : "Check for Updates Now"))
+    entries.append(.notice(id: id.count, section: .updates, text: isRu ? "При появлении новой версии DoxGram на GitHub приложение покажет уведомление с описанием нововведений и ссылкой на загрузку." : "When a new DoxGram version is released on GitHub, the app will notify you with the changelog and download link."))
+
     // MARK: - Debug & Logs
     entries.append(.header(id: id.count, section: .debug, text: i18n("Settings.Ayugram.DebugHeader", lang), badge: nil))
     entries.append(.toggle(id: id.count, section: .debug, settingName: .ayugramDebugger, value: SGSimpleSettings.shared.ayugramDebugger, text: i18n("Settings.Ayugram.Debugger", lang), enabled: true))
@@ -277,6 +286,9 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
             simplePromise.set(true)
         case .hideProxyButton:
             SGSimpleSettings.shared.hideProxyButton = value
+            simplePromise.set(true)
+        case .doxCheckForUpdates:
+            SGSimpleSettings.shared.doxCheckForUpdates = value
             simplePromise.set(true)
         case .ayugramDebugger:
             SGSimpleSettings.shared.ayugramDebugger = value
@@ -594,6 +606,10 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
             SGDoxAnimatedWallpaperManager.shared.clearCache()
             let overlay = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: isRu ? "Кэш видео-обоев очищен" : "Video wallpaper cache cleared", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
             presentControllerImpl?(overlay, nil)
+        case .doxCheckUpdatesNow:
+            SGDoxUpdateChecker.shared.checkManually(context: context, presentationData: presentationData, present: { controller in
+                presentControllerImpl?(controller, nil)
+            })
         case .ayugramExportLogs:
             if let url = SGAyugramLogger.getLogFileUrl(), FileManager.default.fileExists(atPath: url.path) {
                 let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)

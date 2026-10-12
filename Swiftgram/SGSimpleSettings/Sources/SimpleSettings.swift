@@ -232,6 +232,9 @@ public class SGSimpleSettings {
         case discordRpcToken
         case discordRpcApplicationId
         case autoDownloadChannels
+        case doxCheckForUpdates
+        case doxLastDismissedVersion
+        case doxLastUpdateCheckTimestamp
     }
     
     public enum DownloadSpeedBoostValues: String, CaseIterable {
@@ -426,7 +429,10 @@ public class SGSimpleSettings {
         Keys.discordRpcEnabled.rawValue: false,
         Keys.discordRpcToken.rawValue: "",
         Keys.discordRpcApplicationId.rawValue: "1351834928178167818",
-        Keys.autoDownloadChannels.rawValue: [Int64]()
+        Keys.autoDownloadChannels.rawValue: [Int64](),
+        Keys.doxCheckForUpdates.rawValue: true,
+        Keys.doxLastDismissedVersion.rawValue: "",
+        Keys.doxLastUpdateCheckTimestamp.rawValue: 0.0
     ]
     
     public static let groupDefaultValues: [String: Any] = [
@@ -839,6 +845,15 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.discordRpcApplicationId.rawValue)
     public var discordRpcApplicationId: String
+
+    @UserDefault(key: Keys.doxCheckForUpdates.rawValue)
+    public var doxCheckForUpdates: Bool
+
+    @UserDefault(key: Keys.doxLastDismissedVersion.rawValue)
+    public var doxLastDismissedVersion: String
+
+    @UserDefault(key: Keys.doxLastUpdateCheckTimestamp.rawValue)
+    public var doxLastUpdateCheckTimestamp: Double
 }
 
 extension SGSimpleSettings {
