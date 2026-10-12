@@ -329,6 +329,9 @@ private final class SGDoxTrackCell: UITableViewCell {
     let titleLabel = UILabel()
     let downloadedBadge = UIImageView()
     let artistLabel = UILabel()
+    let dolbyBadge = UILabel()
+    let losslessBadge = UILabel()
+    let lyricsBadge = UIImageView()
     let likeButton = UIButton(type: .system)
     let separatorView = UIView()
     var currentTrackId: String?
@@ -362,6 +365,33 @@ private final class SGDoxTrackCell: UITableViewCell {
         self.artistLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         self.contentView.addSubview(self.artistLabel)
         
+        self.dolbyBadge.text = "ATMOS"
+        self.dolbyBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
+        self.dolbyBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.dolbyBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.dolbyBadge.layer.cornerRadius = 2.5
+        self.dolbyBadge.clipsToBounds = true
+        self.dolbyBadge.textAlignment = .center
+        self.dolbyBadge.isHidden = true
+        self.contentView.addSubview(self.dolbyBadge)
+        
+        self.losslessBadge.text = "LOSSLESS"
+        self.losslessBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
+        self.losslessBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.losslessBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.losslessBadge.layer.cornerRadius = 2.5
+        self.losslessBadge.clipsToBounds = true
+        self.losslessBadge.textAlignment = .center
+        self.losslessBadge.isHidden = true
+        self.contentView.addSubview(self.losslessBadge)
+        
+        let quoteConfig = UIImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+        self.lyricsBadge.image = UIImage(systemName: "quote.bubble.fill", withConfiguration: quoteConfig)
+        self.lyricsBadge.tintColor = UIColor(white: 1.0, alpha: 0.65)
+        self.lyricsBadge.contentMode = .scaleAspectFit
+        self.lyricsBadge.isHidden = true
+        self.contentView.addSubview(self.lyricsBadge)
+        
         self.likeButton.addTarget(self, action: #selector(self.likePressed), for: .touchUpInside)
         self.contentView.addSubview(self.likeButton)
         
@@ -385,11 +415,38 @@ private final class SGDoxTrackCell: UITableViewCell {
         
         let textWidth = bounds.width - 70 - 48
         self.titleLabel.frame = CGRect(x: 70, y: 10, width: textWidth, height: 20)
+        
+        let startX: CGFloat = self.downloadedBadge.isHidden ? 70 : 87
+        let maxArtistW = bounds.width - 44 - startX - 8
+        
+        var badgesW: CGFloat = 0.0
+        if !self.dolbyBadge.isHidden { badgesW += 38.0 }
+        if !self.losslessBadge.isHidden { badgesW += 48.0 }
+        if !self.lyricsBadge.isHidden { badgesW += 16.0 }
+        
+        let artistSize = self.artistLabel.sizeThatFits(CGSize(width: maxArtistW, height: 18))
+        let availableArtistW = max(30.0, maxArtistW - badgesW)
+        let artistW = min(artistSize.width, availableArtistW)
+        
         if !self.downloadedBadge.isHidden {
             self.downloadedBadge.frame = CGRect(x: 70, y: 33, width: 13, height: 13)
-            self.artistLabel.frame = CGRect(x: 70 + 17, y: 30, width: textWidth - 17, height: 18)
-        } else {
-            self.artistLabel.frame = CGRect(x: 70, y: 30, width: textWidth, height: 18)
+        }
+        self.artistLabel.frame = CGRect(x: startX, y: 30, width: artistW, height: 18)
+        
+        var badgeX = startX + artistW + 6.0
+        let badgeY: CGFloat = 33.0
+        if !self.dolbyBadge.isHidden {
+            let bW: CGFloat = 34.0
+            self.dolbyBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
+            badgeX += bW + 4.0
+        }
+        if !self.losslessBadge.isHidden {
+            let bW: CGFloat = 44.0
+            self.losslessBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
+            badgeX += bW + 4.0
+        }
+        if !self.lyricsBadge.isHidden {
+            self.lyricsBadge.frame = CGRect(x: badgeX, y: badgeY + 0.5, width: 11.0, height: 11.0)
         }
         
         self.likeButton.frame = CGRect(x: bounds.width - 44, y: 7, width: 36, height: 44)
@@ -1029,6 +1086,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         let isDown = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
         cell.downloadedBadge.isHidden = !isDown
         cell.downloadedBadge.tintColor = theme.list.itemAccentColor
+        
+        cell.dolbyBadge.isHidden = !track.isDolbyAtmos
+        cell.losslessBadge.isHidden = !track.isLossless
+        cell.lyricsBadge.isHidden = !track.hasDynamicLyrics
+        cell.setNeedsLayout()
         
         let isFav = SGDoxMusicManager.shared.isFavorite(track: track)
         let heartConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)

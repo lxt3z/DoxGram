@@ -89,6 +89,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let artistLabel = UILabel()
     private let favoriteButton = UIButton(type: .system)
     
+    // Format Badges: Lossless & Dolby Atmos (Apple Music Style)
+    private let formatBadgesContainer = UIView()
+    private let losslessBadgeButton = UIButton(type: .system)
+    private let dolbyAtmosBadgeButton = UIButton(type: .system)
+    
     private let progressSlider = UISlider()
     private let currentTimeLabel = UILabel()
     private let remainingTimeLabel = UILabel()
@@ -510,6 +515,30 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.favoriteButton.tintColor = .white
         self.favoriteButton.addTarget(self, action: #selector(self.favoritePressed), for: .touchUpInside)
         self.infoContainerView.addSubview(self.favoriteButton)
+        
+        // Format Badges Row (Apple Music Lossless & Dolby Atmos)
+        self.losslessBadgeButton.setTitle("Lossless", for: .normal)
+        self.losslessBadgeButton.setTitleColor(UIColor(white: 1.0, alpha: 0.85), for: .normal)
+        self.losslessBadgeButton.titleLabel?.font = UIFont.systemFont(ofSize: 10, weight: .bold)
+        self.losslessBadgeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.losslessBadgeButton.layer.cornerRadius = 4
+        self.losslessBadgeButton.layer.cornerCurve = .continuous
+        self.losslessBadgeButton.contentEdgeInsets = UIEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
+        self.losslessBadgeButton.addTarget(self, action: #selector(self.losslessBadgePressed), for: .touchUpInside)
+        self.formatBadgesContainer.addSubview(self.losslessBadgeButton)
+        
+        self.dolbyAtmosBadgeButton.setTitle("Dolby Atmos", for: .normal)
+        self.dolbyAtmosBadgeButton.setTitleColor(UIColor(white: 1.0, alpha: 0.85), for: .normal)
+        self.dolbyAtmosBadgeButton.titleLabel?.font = UIFont.systemFont(ofSize: 10, weight: .bold)
+        self.dolbyAtmosBadgeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.dolbyAtmosBadgeButton.layer.cornerRadius = 4
+        self.dolbyAtmosBadgeButton.layer.cornerCurve = .continuous
+        self.dolbyAtmosBadgeButton.contentEdgeInsets = UIEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
+        self.dolbyAtmosBadgeButton.addTarget(self, action: #selector(self.dolbyAtmosBadgePressed), for: .touchUpInside)
+        self.formatBadgesContainer.addSubview(self.dolbyAtmosBadgeButton)
+        
+        self.formatBadgesContainer.isHidden = true
+        self.nowPlayingContainerView.addSubview(self.formatBadgesContainer)
         
         // Slider & Time
         self.progressSlider.minimumValue = 0.0
@@ -998,7 +1027,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         // Info: Title, Artist, Lyrics & Favorite buttons
-        let infoY = artY + artSide + 24.0
+        let infoY = artY + artSide + 20.0
         let btnSize: CGFloat = 38.0
         self.infoContainerView.frame = CGRect(x: 24, y: infoY, width: bounds.width - 48, height: 52)
         let titleW = bounds.width - 48 - (btnSize * 2 + 12) - 10
@@ -1007,8 +1036,28 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.lyricsButton.frame = CGRect(x: bounds.width - 48 - btnSize * 2 - 10, y: 7, width: btnSize, height: btnSize)
         self.favoriteButton.frame = CGRect(x: bounds.width - 48 - btnSize, y: 7, width: btnSize, height: btnSize)
         
+        // Format Badges: Lossless & Dolby Atmos
+        let hasFormatBadges = !self.losslessBadgeButton.isHidden || !self.dolbyAtmosBadgeButton.isHidden
+        self.formatBadgesContainer.isHidden = !hasFormatBadges
+        let formatY = infoY + 54.0
+        if hasFormatBadges {
+            self.formatBadgesContainer.frame = CGRect(x: 24, y: formatY, width: bounds.width - 48, height: 18)
+            var bX: CGFloat = 0.0
+            if !self.losslessBadgeButton.isHidden {
+                let size = self.losslessBadgeButton.sizeThatFits(CGSize(width: 100, height: 18))
+                let w = max(54.0, size.width + 12.0)
+                self.losslessBadgeButton.frame = CGRect(x: bX, y: 0, width: w, height: 18)
+                bX += w + 6.0
+            }
+            if !self.dolbyAtmosBadgeButton.isHidden {
+                let size = self.dolbyAtmosBadgeButton.sizeThatFits(CGSize(width: 100, height: 18))
+                let w = max(72.0, size.width + 12.0)
+                self.dolbyAtmosBadgeButton.frame = CGRect(x: bX, y: 0, width: w, height: 18)
+            }
+        }
+        
         // Progress Slider
-        let sliderY = infoY + 60.0
+        let sliderY = hasFormatBadges ? (formatY + 26.0) : (infoY + 60.0)
         self.progressSlider.frame = CGRect(x: 24, y: sliderY, width: bounds.width - 48, height: 26)
         self.currentTimeLabel.frame = CGRect(x: 24, y: sliderY + 22, width: 60, height: 16)
         self.remainingTimeLabel.frame = CGRect(x: bounds.width - 84, y: sliderY + 22, width: 60, height: 16)
@@ -1176,6 +1225,19 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             SGDoxVideoClipService.shared.fetchVideoClip(for: track) { [weak self] videoUrl in
                 guard let self = self, self.displayedTrackId == track.id else { return }
                 self.setupVideoPlayback(urlString: videoUrl)
+            }
+        }
+        
+        // Format Badges: Lossless & Dolby Atmos
+        let isLossless = track.isLossless
+        let isAtmos = track.isDolbyAtmos
+        self.losslessBadgeButton.isHidden = !isLossless
+        self.dolbyAtmosBadgeButton.isHidden = !isAtmos
+        let hasBadges = isLossless || isAtmos
+        if self.formatBadgesContainer.isHidden == hasBadges {
+            self.formatBadgesContainer.isHidden = !hasBadges
+            if let layout = self.validLayout {
+                self.layoutNowPlayingPane(contentH: layout.size.height)
             }
         }
         
@@ -1790,6 +1852,28 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         })
     }
     
+    @objc private func losslessBadgePressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let alert = UIAlertController(
+            title: "Lossless Audio (ALAC)",
+            message: "Воспроизведение без потери качества. Кодек Apple Lossless Audio Codec (ALAC) сохраняет каждую оригинальную деталь студийной записи в формате 24-бит / 48 кГц.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Понятно", style: .default, handler: nil))
+        self.present(alert, animated: true, completion: nil)
+    }
+    
+    @objc private func dolbyAtmosBadgePressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let alert = UIAlertController(
+            title: "Dolby Atmos",
+            message: "Пространственное аудио. Трек сведен по технологии Dolby Atmos Spatial Audio, создавая трехмерный панорамный звук студийного качества вокруг вас.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Понятно", style: .default, handler: nil))
+        self.present(alert, animated: true, completion: nil)
+    }
+    
     @objc private func videoQualityPressed() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let currentEffective = SGDoxVideoClipService.shared.resolveEffectiveQuality()
@@ -2109,6 +2193,9 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
     private let artworkImageView = UIImageView()
     private let titleLabel = UILabel()
     private let artistLabel = UILabel()
+    private let dolbyBadge = UILabel()
+    private let losslessBadge = UILabel()
+    private let lyricsBadge = UIImageView()
     private let durationLabel = UILabel()
     private let sourceIconView = UIImageView()
     private let downloadedBadge = UIImageView()
@@ -2134,6 +2221,33 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         self.artistLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         self.artistLabel.lineBreakMode = .byTruncatingTail
         self.contentView.addSubview(self.artistLabel)
+        
+        self.dolbyBadge.text = "ATMOS"
+        self.dolbyBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
+        self.dolbyBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.dolbyBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.dolbyBadge.layer.cornerRadius = 2.5
+        self.dolbyBadge.clipsToBounds = true
+        self.dolbyBadge.textAlignment = .center
+        self.dolbyBadge.isHidden = true
+        self.contentView.addSubview(self.dolbyBadge)
+        
+        self.losslessBadge.text = "LOSSLESS"
+        self.losslessBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
+        self.losslessBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.losslessBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.losslessBadge.layer.cornerRadius = 2.5
+        self.losslessBadge.clipsToBounds = true
+        self.losslessBadge.textAlignment = .center
+        self.losslessBadge.isHidden = true
+        self.contentView.addSubview(self.losslessBadge)
+        
+        let quoteConfig = UIImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+        self.lyricsBadge.image = UIImage(systemName: "quote.bubble.fill", withConfiguration: quoteConfig)
+        self.lyricsBadge.tintColor = UIColor(white: 1.0, alpha: 0.65)
+        self.lyricsBadge.contentMode = .scaleAspectFit
+        self.lyricsBadge.isHidden = true
+        self.contentView.addSubview(self.lyricsBadge)
         
         let downCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         self.downloadedBadge.image = UIImage(systemName: "arrow.down.circle.fill", withConfiguration: downCfg)
@@ -2164,6 +2278,10 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         let isDown = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
         self.downloadedBadge.isHidden = !isDown
         
+        self.dolbyBadge.isHidden = !track.isDolbyAtmos
+        self.losslessBadge.isHidden = !track.isLossless
+        self.lyricsBadge.isHidden = !track.hasDynamicLyrics
+        
         let d = Int(track.duration)
         self.durationLabel.text = d > 0 ? String(format: "%d:%02d", d / 60, d % 60) : ""
         self.sourceIconView.image = UIImage(systemName: track.source.iconName)
@@ -2174,6 +2292,7 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
                 self?.artworkImageView.image = img
             }
         }
+        self.setNeedsLayout()
     }
     
     override func layoutSubviews() {
@@ -2193,16 +2312,41 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         let textW = max(0, self.sourceIconView.frame.minX - textX - 8.0)
         self.titleLabel.frame = CGRect(x: textX, y: 11, width: textW, height: 20)
         
+        var badgesW: CGFloat = 0.0
+        if !self.dolbyBadge.isHidden { badgesW += 38.0 }
+        if !self.losslessBadge.isHidden { badgesW += 48.0 }
+        if !self.lyricsBadge.isHidden { badgesW += 16.0 }
+        
+        let artistStartX = self.downloadedBadge.isHidden ? textX : (textX + 17.0)
+        let maxArtistW = textW - (self.downloadedBadge.isHidden ? 0 : 17.0)
+        let artistSize = self.artistLabel.sizeThatFits(CGSize(width: maxArtistW, height: 18))
+        let availableArtistW = max(30.0, maxArtistW - badgesW)
+        let artistW = min(artistSize.width, availableArtistW)
+        
         if !self.downloadedBadge.isHidden {
             self.downloadedBadge.frame = CGRect(x: textX, y: 34, width: 13, height: 13)
-            self.artistLabel.frame = CGRect(x: textX + 17, y: 31, width: textW - 17, height: 18)
-        } else {
-            self.artistLabel.frame = CGRect(x: textX, y: 31, width: textW, height: 18)
+        }
+        self.artistLabel.frame = CGRect(x: artistStartX, y: 31, width: artistW, height: 18)
+        
+        var badgeX = artistStartX + artistW + 6.0
+        let badgeY: CGFloat = 34.0
+        if !self.dolbyBadge.isHidden {
+            let bW: CGFloat = 34.0
+            self.dolbyBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
+            badgeX += bW + 4.0
+        }
+        if !self.losslessBadge.isHidden {
+            let bW: CGFloat = 44.0
+            self.losslessBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
+            badgeX += bW + 4.0
+        }
+        if !self.lyricsBadge.isHidden {
+            self.lyricsBadge.frame = CGRect(x: badgeX, y: badgeY + 0.5, width: 11.0, height: 11.0)
         }
     }
 }
 
-// MARK: - In-Player Lyrics Cell
+// MARK: - In-Player Lyrics Cell (Apple Music Dynamic Floating Synced Lyrics)
 
 private final class SGDoxLyricsCell: UITableViewCell {
     private let lineLabel = UILabel()
@@ -2212,10 +2356,15 @@ private final class SGDoxLyricsCell: UITableViewCell {
         self.backgroundColor = .clear
         self.selectionStyle = .none
         
-        self.lineLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
+        self.lineLabel.font = UIFont.systemFont(ofSize: 24, weight: .bold)
         self.lineLabel.numberOfLines = 0
         self.lineLabel.textAlignment = .left
-        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.4)
+        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.32)
+        self.lineLabel.layer.anchorPoint = CGPoint(x: 0.0, y: 0.5)
+        self.lineLabel.layer.shadowColor = UIColor.white.cgColor
+        self.lineLabel.layer.shadowRadius = 8.0
+        self.lineLabel.layer.shadowOffset = .zero
+        self.lineLabel.layer.shadowOpacity = 0.0
         self.contentView.addSubview(self.lineLabel)
     }
     
@@ -2230,17 +2379,22 @@ private final class SGDoxLyricsCell: UITableViewCell {
     }
     
     func setIsActive(_ isActive: Bool, animated: Bool) {
-        let targetColor = isActive ? UIColor.white : UIColor.white.withAlphaComponent(0.4)
-        let targetScale: CGFloat = isActive ? 1.04 : 1.0
+        let targetColor = isActive ? UIColor.white : UIColor.white.withAlphaComponent(0.32)
+        let targetScale: CGFloat = isActive ? 1.06 : 1.0
+        let targetShadowOpacity: Float = isActive ? 0.72 : 0.0
         
-        if animated {
-            UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
-                self.lineLabel.textColor = targetColor
-                self.lineLabel.transform = isActive ? CGAffineTransform(scaleX: targetScale, y: targetScale) : .identity
-            })
-        } else {
+        let applyChanges = {
             self.lineLabel.textColor = targetColor
             self.lineLabel.transform = isActive ? CGAffineTransform(scaleX: targetScale, y: targetScale) : .identity
+            self.lineLabel.layer.shadowOpacity = targetShadowOpacity
+        }
+        
+        if animated {
+            UIView.animate(withDuration: 0.38, delay: 0, usingSpringWithDamping: 0.76, initialSpringVelocity: 0.3, options: [.curveEaseOut, .allowUserInteraction], animations: {
+                applyChanges()
+            })
+        } else {
+            applyChanges()
         }
     }
     
@@ -2250,13 +2404,15 @@ private final class SGDoxLyricsCell: UITableViewCell {
         let vInset: CGFloat = 13.0
         let w = max(0, self.contentView.bounds.width - hInset * 2.0)
         let textH = self.lineLabel.sizeThatFits(CGSize(width: w, height: .greatestFiniteMagnitude)).height
-        self.lineLabel.frame = CGRect(x: hInset, y: vInset, width: w, height: textH)
+        self.lineLabel.bounds = CGRect(x: 0, y: 0, width: w, height: textH)
+        self.lineLabel.center = CGPoint(x: hInset, y: vInset + textH * 0.5)
     }
     
     override func prepareForReuse() {
         super.prepareForReuse()
         self.lineLabel.transform = .identity
-        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.4)
+        self.lineLabel.layer.shadowOpacity = 0.0
+        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.32)
     }
 }
 

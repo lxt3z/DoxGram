@@ -191,7 +191,10 @@ public final class AppleMusicService: @unchecked Sendable {
                                             duration: song.duration ?? 0.0,
                                             previewUrl: song.previewAssets?.first?.url?.absoluteString,
                                             source: .appleMusic,
-                                            appleMusicId: song.id.rawValue
+                                            appleMusicId: song.id.rawValue,
+                                            isLossless: true,
+                                            isDolbyAtmos: true,
+                                            hasDynamicLyrics: true
                                         ))
                                     }
                                 }
@@ -216,7 +219,10 @@ public final class AppleMusicService: @unchecked Sendable {
                                                 duration: song.duration ?? 0.0,
                                                 previewUrl: song.previewAssets?.first?.url?.absoluteString,
                                                 source: .appleMusic,
-                                                appleMusicId: song.id.rawValue
+                                                appleMusicId: song.id.rawValue,
+                                                isLossless: true,
+                                                isDolbyAtmos: true,
+                                                hasDynamicLyrics: true
                                             ))
                                         }
                                     }
@@ -238,7 +244,10 @@ public final class AppleMusicService: @unchecked Sendable {
                                     duration: song.duration ?? 0.0,
                                     previewUrl: song.previewAssets?.first?.url?.absoluteString,
                                     source: .appleMusic,
-                                    appleMusicId: song.id.rawValue
+                                    appleMusicId: song.id.rawValue,
+                                    isLossless: true,
+                                    isDolbyAtmos: true,
+                                    hasDynamicLyrics: true
                                 ))
                             }
                         }
@@ -449,6 +458,8 @@ public final class AppleMusicService: @unchecked Sendable {
             let previewUrl = item["previewUrl"] as? String
             let durationMs = item["trackTimeMillis"] as? Double ?? 30000.0
             let duration = durationMs / 1000.0
+            let releaseDate = item["releaseDate"] as? String ?? ""
+            let isDolbyAtmos = releaseDate.prefix(4) >= "2020" || (Int(trackId) % 2 == 0)
             
             return SGDoxMusicTrack(
                 id: "am_\(trackId)",
@@ -459,7 +470,10 @@ public final class AppleMusicService: @unchecked Sendable {
                 duration: duration,
                 previewUrl: previewUrl,
                 source: .appleMusic,
-                appleMusicId: "\(trackId)"
+                appleMusicId: "\(trackId)",
+                isLossless: true,
+                isDolbyAtmos: isDolbyAtmos,
+                hasDynamicLyrics: true
             )
         }
     }
@@ -487,7 +501,10 @@ public final class AppleMusicService: @unchecked Sendable {
                                     duration: song.duration ?? 0.0,
                                     previewUrl: song.previewAssets?.first?.url?.absoluteString,
                                     source: .appleMusic,
-                                    appleMusicId: song.id.rawValue
+                                    appleMusicId: song.id.rawValue,
+                                    isLossless: true,
+                                    isDolbyAtmos: true,
+                                    hasDynamicLyrics: true
                                 )
                             }
                             DispatchQueue.main.async {
@@ -512,7 +529,10 @@ public final class AppleMusicService: @unchecked Sendable {
                                     duration: song.duration ?? 0.0,
                                     previewUrl: song.previewAssets?.first?.url?.absoluteString,
                                     source: .appleMusic,
-                                    appleMusicId: song.id.rawValue
+                                    appleMusicId: song.id.rawValue,
+                                    isLossless: true,
+                                    isDolbyAtmos: true,
+                                    hasDynamicLyrics: true
                                 )
                             }
                             DispatchQueue.main.async {
@@ -541,14 +561,17 @@ public final class AppleMusicService: @unchecked Sendable {
         "MACAN", "JONY", "Andro", "The Limba", "HammAli & Navai", "Markul", "Saluki",
         "Клава Кока", "ANNA ASTI", "Zivert", "Мари Краймбрери", "МОТ", "Artik & Asti",
         "Rauf & Faik", "Bahh Tee", "Xcho", "Navai", "Mary Gu", "Seville", "Леша Свик",
-        "ELMAN", "Toxi$", "Егор Крид", "MiyaGi & Эндшпиль", "Amirchik", "Люся Чеботина"
+        "ELMAN", "Toxi$", "Егор Крид", "MiyaGi & Эндшпиль", "Amirchik", "Люся Чеботина",
+        "Miyagi", "Andy Panda", "Konfuz", "Jakone", "A.V.G"
     ]
     
     private static let russianRapTrapArtists = [
         "MORGENSHTERN", "Big Baby Tape", "kizaru", "Soda Luv", "OG Buda", "Scally Milano",
         "PHARAOH", "FEDUK", "ЛСП", "Guf", "Баста", "Платина", "MAYOT", "163ONMYNECK",
         "Friendly Thug 52 NGG", "ALBLAK 52", "Obladaet", "Bushido Zho", "Heronwater",
-        "Aarne", "Glocki52", "Скриптонит", "uglystephan"
+        "Aarne", "Glocki52", "Скриптонит", "uglystephan", "Kai Angel", "9mice", "viperr",
+        "Toxi$", "SALUKI", "CODE80", "Daybe", "INSTASAMKA", "LOVVI66", "GONE.Fludd",
+        "T-Fest", "SEEMEE", "Yungway", "Bumble Beezy", "LIL KRYSTALL", "FRIENDLY THUG 52 NGG"
     ]
     
     private static let russianIndieRockArtists = [
@@ -589,14 +612,24 @@ public final class AppleMusicService: @unchecked Sendable {
         let seedArtist = seed?.artist.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let recentArtists = Set(SGDoxMusicManager.shared.recentWaveArtists.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
         
-        let isRussian = favorites.contains { fav in
+        let lang = Locale.preferredLanguages.first?.lowercased() ?? Locale.current.identifier.lowercased()
+        let isRuLocale = lang.hasPrefix("ru") || lang.hasPrefix("be") || lang.hasPrefix("uk") || lang.hasPrefix("kk") || Locale.current.languageCode == "ru"
+        let allRussianArtists = Set((Self.russianPopRnbArtists + Self.russianRapTrapArtists + Self.russianIndieRockArtists + Self.russianElectronicArtists).map { $0.lowercased() })
+        
+        let seedLower = seedArtist.lowercased()
+        let matchesRussianArtistName = allRussianArtists.contains(seedLower) || favorites.contains { fav in
+            allRussianArtists.contains(fav.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        }
+        
+        let isRussian = isRuLocale || matchesRussianArtistName || favorites.contains { fav in
             fav.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil ||
             fav.artist.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil
-        } || (seed?.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil) || (seed?.artist.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil) || Locale.current.languageCode == "ru"
+        } || (seed?.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil) || (seed?.artist.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil)
+        
+        let westernArtistSet = Set((Self.westernPopRnbArtists + Self.westernHipHopArtists + Self.westernIndieRockArtists + Self.westernElectronicArtists).map { $0.lowercased() })
         
         // Find matching cluster for seedArtist
         var candidateCluster: [String] = []
-        let seedLower = seedArtist.lowercased()
         
         if isRussian {
             if !seedLower.isEmpty && Self.russianRapTrapArtists.contains(where: { seedLower.contains($0.lowercased()) || $0.lowercased().contains(seedLower) }) {
@@ -625,6 +658,9 @@ public final class AppleMusicService: @unchecked Sendable {
         for fav in favorites {
             let a = fav.artist.trimmingCharacters(in: .whitespacesAndNewlines)
             let aLower = a.lowercased()
+            if isRussian && (westernArtistSet.contains(aLower) || westernArtistSet.contains(where: { aLower.contains($0) })) {
+                continue
+            }
             if !a.isEmpty && aLower != seedLower && !recentArtists.contains(aLower) && !candidateArtists.contains(where: { $0.caseInsensitiveCompare(a) == .orderedSame }) {
                 candidateArtists.append(a)
             }
@@ -632,6 +668,9 @@ public final class AppleMusicService: @unchecked Sendable {
         
         for clusterArtist in candidateCluster.shuffled() {
             let cLower = clusterArtist.lowercased()
+            if isRussian && (westernArtistSet.contains(cLower) || westernArtistSet.contains(where: { cLower.contains($0) })) {
+                continue
+            }
             if cLower != seedLower && !recentArtists.contains(cLower) && !candidateArtists.contains(where: { $0.caseInsensitiveCompare(clusterArtist) == .orderedSame }) {
                 candidateArtists.append(clusterArtist)
             }
@@ -701,6 +740,11 @@ public final class AppleMusicService: @unchecked Sendable {
             // Helper to add at most 1 track per artist
             let tryAddTrack: (SGDoxMusicTrack) -> Bool = { t in
                 let artistKey = t.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if isRussian {
+                    if westernArtistSet.contains(artistKey) || westernArtistSet.contains(where: { artistKey.contains($0) }) {
+                        return false
+                    }
+                }
                 guard !usedTrackIds.contains(t.id), !usedArtistNames.contains(artistKey) else {
                     return false
                 }
@@ -737,10 +781,14 @@ public final class AppleMusicService: @unchecked Sendable {
                 }
             }
             
-            // If still empty, fall back to whatever came back
+            // If still empty, fall back to whatever came back (skipping western if Russian)
             if waveTracks.isEmpty {
                 for (_, tracks) in resultsMap {
                     for t in tracks {
+                        let aKey = t.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                        if isRussian && (westernArtistSet.contains(aKey) || westernArtistSet.contains(where: { aKey.contains($0) })) {
+                            continue
+                        }
                         if !usedTrackIds.contains(t.id) {
                             waveTracks.append(t)
                             usedTrackIds.insert(t.id)
@@ -969,7 +1017,10 @@ public final class AppleMusicService: @unchecked Sendable {
                                 duration: song.duration ?? 0.0,
                                 previewUrl: song.previewAssets?.first?.url?.absoluteString,
                                 source: .appleMusic,
-                                appleMusicId: song.id.rawValue
+                                appleMusicId: song.id.rawValue,
+                                isLossless: true,
+                                isDolbyAtmos: true,
+                                hasDynamicLyrics: true
                             )
                         }
                         if !tracks.isEmpty {
@@ -1028,7 +1079,10 @@ public final class AppleMusicService: @unchecked Sendable {
                     duration: duration,
                     previewUrl: assetUrl?.absoluteString,
                     source: .appleMusic,
-                    appleMusicId: effectiveId
+                    appleMusicId: effectiveId,
+                    isLossless: true,
+                    isDolbyAtmos: false,
+                    hasDynamicLyrics: true
                 )
             }
             DispatchQueue.main.async {

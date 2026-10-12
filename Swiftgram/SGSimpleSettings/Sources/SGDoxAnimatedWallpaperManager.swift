@@ -306,27 +306,46 @@ public final class SGDoxAnimatedWallpaperManager {
         guard let host = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines))?.host?.lowercased() else {
             return false
         }
-        return host.contains("tiktok.com") || host.contains("tikwm.com") || host.contains("tiktokcdn")
+        if host.contains("tiktok.com") || host.contains("tikwm.com") || host.contains("tiktokcdn") || host.contains("tiktokv") || host.contains("douyin") {
+            return true
+        }
+        if host == "tt.me" || host.hasSuffix(".tt.me") || host.contains("tt.video") || host.hasPrefix("tt.") || host.contains(".tt.") {
+            return true
+        }
+        return false
     }
 
     private func expandShortUrlIfNeeded(_ urlString: String, completion: @escaping (String) -> Void) {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed),
-              let host = url.host?.lowercased(),
-              host.contains("vt.tiktok.com") || host.contains("vm.tiktok.com") else {
+              let host = url.host?.lowercased() else {
+            completion(trimmed)
+            return
+        }
+        
+        let isShortLink = host.contains("vt.tiktok.com") ||
+                          host.contains("vm.tiktok.com") ||
+                          host == "tt.me" ||
+                          host.hasSuffix(".tt.me") ||
+                          host.contains("tt.video") ||
+                          host.hasPrefix("tt.") ||
+                          host.contains(".tt.") ||
+                          (host.contains("tiktok.com") && url.path.hasPrefix("/t/"))
+
+        if !isShortLink {
             completion(trimmed)
             return
         }
         
         var request = URLRequest(url: url)
-        request.httpMethod = "HEAD"
+        request.httpMethod = "GET"
         request.timeoutInterval = 10.0
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
         
         let task = URLSession.shared.dataTask(with: request) { _, response, _ in
             if let http = response as? HTTPURLResponse, let location = http.allHeaderFields["Location"] as? String, !location.isEmpty {
                 completion(location)
-            } else if let resolvedUrl = response?.url?.absoluteString, !resolvedUrl.isEmpty, resolvedUrl != trimmed {
+            } else if let resolvedUrl = response?.url?.absoluteString, !resolvedUrl.isEmpty {
                 completion(resolvedUrl)
             } else {
                 completion(trimmed)

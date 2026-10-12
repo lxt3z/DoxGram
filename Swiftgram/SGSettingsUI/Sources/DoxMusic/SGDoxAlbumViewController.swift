@@ -311,6 +311,9 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
 private final class AlbumTrackCell: UITableViewCell {
     private let indexLabel = UILabel()
     private let titleLabel = UILabel()
+    private let dolbyBadge = UILabel()
+    private let losslessBadge = UILabel()
+    private let lyricsBadge = UIImageView()
     private let durationLabel = UILabel()
     private let playingIndicator = UIImageView()
     
@@ -328,6 +331,33 @@ private final class AlbumTrackCell: UITableViewCell {
         self.titleLabel.textColor = .white
         self.titleLabel.lineBreakMode = .byTruncatingTail
         self.contentView.addSubview(self.titleLabel)
+        
+        self.dolbyBadge.text = "ATMOS"
+        self.dolbyBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
+        self.dolbyBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.dolbyBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.dolbyBadge.layer.cornerRadius = 2.5
+        self.dolbyBadge.clipsToBounds = true
+        self.dolbyBadge.textAlignment = .center
+        self.dolbyBadge.isHidden = true
+        self.contentView.addSubview(self.dolbyBadge)
+        
+        self.losslessBadge.text = "LOSSLESS"
+        self.losslessBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
+        self.losslessBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.losslessBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.losslessBadge.layer.cornerRadius = 2.5
+        self.losslessBadge.clipsToBounds = true
+        self.losslessBadge.textAlignment = .center
+        self.losslessBadge.isHidden = true
+        self.contentView.addSubview(self.losslessBadge)
+        
+        let quoteConfig = UIImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+        self.lyricsBadge.image = UIImage(systemName: "quote.bubble.fill", withConfiguration: quoteConfig)
+        self.lyricsBadge.tintColor = UIColor(white: 1.0, alpha: 0.65)
+        self.lyricsBadge.contentMode = .scaleAspectFit
+        self.lyricsBadge.isHidden = true
+        self.contentView.addSubview(self.lyricsBadge)
         
         self.durationLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         self.durationLabel.textColor = UIColor(white: 1.0, alpha: 0.45)
@@ -354,9 +384,32 @@ private final class AlbumTrackCell: UITableViewCell {
         self.durationLabel.frame = CGRect(x: bounds.width - durW - 16, y: (bounds.height - 18) * 0.5, width: durW, height: 18)
         self.playingIndicator.frame = CGRect(x: bounds.width - 36, y: (bounds.height - 18) * 0.5, width: 18, height: 18)
         
+        var badgesW: CGFloat = 0.0
+        if !self.dolbyBadge.isHidden { badgesW += 38.0 }
+        if !self.losslessBadge.isHidden { badgesW += 48.0 }
+        if !self.lyricsBadge.isHidden { badgesW += 16.0 }
+        
         let titleX: CGFloat = 48
-        let titleW: CGFloat = bounds.width - titleX - durW - 24
+        let availableTitleW = bounds.width - titleX - durW - 24 - badgesW
+        let titleSize = self.titleLabel.sizeThatFits(CGSize(width: max(40.0, availableTitleW), height: 20))
+        let titleW = min(titleSize.width, max(40.0, availableTitleW))
         self.titleLabel.frame = CGRect(x: titleX, y: (bounds.height - 20) * 0.5, width: titleW, height: 20)
+        
+        var badgeX = titleX + titleW + 6.0
+        let badgeY = (bounds.height - 12.5) * 0.5
+        if !self.dolbyBadge.isHidden {
+            let bW: CGFloat = 34.0
+            self.dolbyBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
+            badgeX += bW + 4.0
+        }
+        if !self.losslessBadge.isHidden {
+            let bW: CGFloat = 44.0
+            self.losslessBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
+            badgeX += bW + 4.0
+        }
+        if !self.lyricsBadge.isHidden {
+            self.lyricsBadge.frame = CGRect(x: badgeX, y: badgeY + 0.5, width: 11.0, height: 11.0)
+        }
     }
     
     func configure(track: SGDoxMusicTrack, index: Int, isCurrent: Bool) {
@@ -369,5 +422,10 @@ private final class AlbumTrackCell: UITableViewCell {
         self.durationLabel.text = track.duration > 0 ? String(format: "%d:%02d", durM, durS) : ""
         self.durationLabel.isHidden = isCurrent
         self.playingIndicator.isHidden = !isCurrent
+        
+        self.dolbyBadge.isHidden = !track.isDolbyAtmos
+        self.losslessBadge.isHidden = !track.isLossless
+        self.lyricsBadge.isHidden = !track.hasDynamicLyrics
+        self.setNeedsLayout()
     }
 }

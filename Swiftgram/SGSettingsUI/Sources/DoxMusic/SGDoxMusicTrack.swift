@@ -29,6 +29,9 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
     public let spotifyUri: String?
     public let appleMusicId: String?
     public let telegramFile: FileMediaReference?
+    public var isLossless: Bool
+    public var isDolbyAtmos: Bool
+    public var hasDynamicLyrics: Bool
     
     public init(
         id: String,
@@ -42,7 +45,10 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         source: SGDoxMusicSource,
         spotifyUri: String? = nil,
         appleMusicId: String? = nil,
-        telegramFile: FileMediaReference? = nil
+        telegramFile: FileMediaReference? = nil,
+        isLossless: Bool = false,
+        isDolbyAtmos: Bool = false,
+        hasDynamicLyrics: Bool = true
     ) {
         self.id = id
         self.title = title
@@ -56,6 +62,9 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         self.spotifyUri = spotifyUri
         self.appleMusicId = appleMusicId
         self.telegramFile = telegramFile
+        self.isLossless = isLossless
+        self.isDolbyAtmos = isDolbyAtmos
+        self.hasDynamicLyrics = hasDynamicLyrics
     }
     
     public static func == (lhs: SGDoxMusicTrack, rhs: SGDoxMusicTrack) -> Bool {
@@ -68,7 +77,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
     }
     
     private enum CodingKeys: String, CodingKey {
-        case id, title, artist, album, artworkUrl, duration, previewUrl, videoUrl, source, spotifyUri, appleMusicId
+        case id, title, artist, album, artworkUrl, duration, previewUrl, videoUrl, source, spotifyUri, appleMusicId, isLossless, isDolbyAtmos, hasDynamicLyrics
     }
     
     public init(from decoder: Decoder) throws {
@@ -85,6 +94,9 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         self.spotifyUri = try container.decodeIfPresent(String.self, forKey: .spotifyUri)
         self.appleMusicId = try container.decodeIfPresent(String.self, forKey: .appleMusicId)
         self.telegramFile = nil
+        self.isLossless = try container.decodeIfPresent(Bool.self, forKey: .isLossless) ?? false
+        self.isDolbyAtmos = try container.decodeIfPresent(Bool.self, forKey: .isDolbyAtmos) ?? false
+        self.hasDynamicLyrics = try container.decodeIfPresent(Bool.self, forKey: .hasDynamicLyrics) ?? true
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -100,6 +112,9 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         try container.encode(self.source, forKey: .source)
         try container.encodeIfPresent(self.spotifyUri, forKey: .spotifyUri)
         try container.encodeIfPresent(self.appleMusicId, forKey: .appleMusicId)
+        try container.encode(self.isLossless, forKey: .isLossless)
+        try container.encode(self.isDolbyAtmos, forKey: .isDolbyAtmos)
+        try container.encode(self.hasDynamicLyrics, forKey: .hasDynamicLyrics)
     }
 }
 

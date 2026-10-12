@@ -564,6 +564,9 @@ private final class ArtistTrackCell: UITableViewCell {
     private let artworkImageView = UIImageView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
+    private let dolbyBadge = UILabel()
+    private let losslessBadge = UILabel()
+    private let lyricsBadge = UIImageView()
     private let playingIndicator = UIImageView()
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -590,6 +593,33 @@ private final class ArtistTrackCell: UITableViewCell {
         self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.55)
         self.contentView.addSubview(self.subtitleLabel)
         
+        self.dolbyBadge.text = "ATMOS"
+        self.dolbyBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
+        self.dolbyBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.dolbyBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.dolbyBadge.layer.cornerRadius = 2.5
+        self.dolbyBadge.clipsToBounds = true
+        self.dolbyBadge.textAlignment = .center
+        self.dolbyBadge.isHidden = true
+        self.contentView.addSubview(self.dolbyBadge)
+        
+        self.losslessBadge.text = "LOSSLESS"
+        self.losslessBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
+        self.losslessBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
+        self.losslessBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.losslessBadge.layer.cornerRadius = 2.5
+        self.losslessBadge.clipsToBounds = true
+        self.losslessBadge.textAlignment = .center
+        self.losslessBadge.isHidden = true
+        self.contentView.addSubview(self.losslessBadge)
+        
+        let quoteConfig = UIImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+        self.lyricsBadge.image = UIImage(systemName: "quote.bubble.fill", withConfiguration: quoteConfig)
+        self.lyricsBadge.tintColor = UIColor(white: 1.0, alpha: 0.65)
+        self.lyricsBadge.contentMode = .scaleAspectFit
+        self.lyricsBadge.isHidden = true
+        self.contentView.addSubview(self.lyricsBadge)
+        
         self.playingIndicator.image = UIImage(systemName: "waveform")
         self.playingIndicator.tintColor = UIColor(red: 0.98, green: 0.20, blue: 0.35, alpha: 1.0)
         self.playingIndicator.isHidden = true
@@ -609,8 +639,33 @@ private final class ArtistTrackCell: UITableViewCell {
         
         let textX: CGFloat = 88
         let textW: CGFloat = bounds.width - textX - 44
-        self.titleLabel.frame = CGRect(x: textX, y: 10, width: textW, height: 20)
-        self.subtitleLabel.frame = CGRect(x: textX, y: 30, width: textW, height: 16)
+        self.titleLabel.frame = CGRect(x: textX, y: 9, width: textW, height: 20)
+        
+        var badgesW: CGFloat = 0.0
+        if !self.dolbyBadge.isHidden { badgesW += 38.0 }
+        if !self.losslessBadge.isHidden { badgesW += 48.0 }
+        if !self.lyricsBadge.isHidden { badgesW += 16.0 }
+        
+        let subSize = self.subtitleLabel.sizeThatFits(CGSize(width: textW, height: 16))
+        let availableSubW = max(30.0, textW - badgesW)
+        let subW = min(subSize.width, availableSubW)
+        self.subtitleLabel.frame = CGRect(x: textX, y: 31, width: subW, height: 16)
+        
+        var badgeX = textX + subW + 6.0
+        let badgeY: CGFloat = 33.0
+        if !self.dolbyBadge.isHidden {
+            let bW: CGFloat = 34.0
+            self.dolbyBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
+            badgeX += bW + 4.0
+        }
+        if !self.losslessBadge.isHidden {
+            let bW: CGFloat = 44.0
+            self.losslessBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
+            badgeX += bW + 4.0
+        }
+        if !self.lyricsBadge.isHidden {
+            self.lyricsBadge.frame = CGRect(x: badgeX, y: badgeY + 0.5, width: 11.0, height: 11.0)
+        }
         
         self.playingIndicator.frame = CGRect(x: bounds.width - 34, y: (bounds.height - 20) * 0.5, width: 20, height: 20)
     }
@@ -629,6 +684,10 @@ private final class ArtistTrackCell: UITableViewCell {
         let sub = track.album.isEmpty ? durStr : (durStr.isEmpty ? track.album : "\(track.album) • \(durStr)")
         self.subtitleLabel.text = sub
         
+        self.dolbyBadge.isHidden = !track.isDolbyAtmos
+        self.losslessBadge.isHidden = !track.isLossless
+        self.lyricsBadge.isHidden = !track.hasDynamicLyrics
+        
         self.playingIndicator.isHidden = !isCurrent
         
         self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
@@ -639,6 +698,7 @@ private final class ArtistTrackCell: UITableViewCell {
                 }
             }
         }
+        self.setNeedsLayout()
     }
 }
 
