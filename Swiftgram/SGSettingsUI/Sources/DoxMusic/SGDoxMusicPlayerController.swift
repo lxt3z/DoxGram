@@ -63,7 +63,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var currentLyrics: SGDoxLyrics?
     private var activeLyricsIndex: Int = -1
     private var isUserScrollingLyrics = false
-    private var userScrollTimer: Timer?
+    private var userScrollTimer: Foundation.Timer?
     private let lyricsButton = UIButton(type: .system)
     
     // --- Now Playing Pane ---
@@ -233,6 +233,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func detachListeners() {
+        self.userScrollTimer?.invalidate()
+        self.userScrollTimer = nil
         if let token = self.stateToken {
             SGDoxMusicManager.shared.removeStateListener(token)
             self.stateToken = nil
@@ -1872,7 +1874,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         if scrollView == self.lyricsTableView {
             self.isUserScrollingLyrics = true
             self.userScrollTimer?.invalidate()
-            self.userScrollTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: false) { [weak self] _ in
+            self.userScrollTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 3.5, repeats: false) { [weak self] _ in
                 self?.isUserScrollingLyrics = false
                 self?.syncLyricsPosition(currentTime: SGDoxMusicManager.shared.currentTime, animated: true)
             }
