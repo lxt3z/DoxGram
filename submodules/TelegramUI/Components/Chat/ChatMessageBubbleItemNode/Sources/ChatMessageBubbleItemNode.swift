@@ -405,6 +405,9 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
                     }
                     
                     
+                    let isDoxMediaMessage = messageText.contains("doxlisten:") || messageText.contains("doxwall:")
+                    let contentNodeType: AnyClass = isDoxMediaMessage ? ChatMessageDoxMediaBubbleContentNode.self : ChatMessageTextBubbleContentNode.self
+                    
                     if isMediaInverted {
                         var targetIndex = 0
                         if addedPriceInfo || addedPollMedia {
@@ -413,9 +416,9 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
                         if addedQuizAnswer {
                             targetIndex += 1
                         }
-                        result.insert((message, ChatMessageTextBubbleContentNode.self, itemAttributes, BubbleItemAttributes(isAttachment: false, neighborType: .text, neighborSpacing: isFile ? .condensed : .default)), at: targetIndex)
+                        result.insert((message, contentNodeType, itemAttributes, BubbleItemAttributes(isAttachment: false, neighborType: .text, neighborSpacing: isFile ? .condensed : .default)), at: targetIndex)
                     } else {
-                        result.append((message, ChatMessageTextBubbleContentNode.self, itemAttributes, BubbleItemAttributes(isAttachment: false, neighborType: .text, neighborSpacing: isFile ? .condensed : .default)))
+                        result.append((message, contentNodeType, itemAttributes, BubbleItemAttributes(isAttachment: false, neighborType: .text, neighborSpacing: isFile ? .condensed : .default)))
                         needReactions = false
                     }
                 }
