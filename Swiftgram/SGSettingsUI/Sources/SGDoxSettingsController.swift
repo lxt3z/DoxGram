@@ -630,8 +630,9 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
         }
     })
 
+    typealias ArgumentsType = SGItemListArguments<SGDoxBoolSetting, AnyHashable, SGDoxOneFromManySetting, SGDoxDisclosureLink, AnyHashable>
     let signal = combineLatest(context.sharedContext.presentationData, simplePromise.get())
-    |> map { presentationData, _ -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, _ -> (ItemListControllerState, (ItemListNodeState, ArgumentsType)) in
         let entries = SGDoxControllerEntries(presentationData: presentationData)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text("DoxGram"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: entries, style: .blocks, ensureVisibleItemTag: nil, initialScrollToItem: nil)

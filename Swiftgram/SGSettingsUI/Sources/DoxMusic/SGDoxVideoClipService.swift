@@ -42,7 +42,21 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
     
     private var videoCache: [String: String] = [:]
     private let cacheLock = NSLock()
-    private var activeQueries: [String: [(String?) -> Void]] = [:]
+    private var activeQueries: [String: [(@MainActor (String?) -> Void)]] = [:]
+    
+    private func dispatchMain(videoUrl: String?, completion: @escaping @MainActor (String?) -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                completion(videoUrl)
+            }
+        } else {
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    completion(videoUrl)
+                }
+            }
+        }
+    }
     
     public var preferredQuality: SGDoxVideoQuality {
         get {
@@ -101,9 +115,9 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
         }
     }
     
-    public func fetchVideoClip(for track: SGDoxMusicTrack, completion: @escaping @Sendable (String?) -> Void) {
+    public func fetchVideoClip(for track: SGDoxMusicTrack, completion: @escaping @MainActor (String?) -> Void) {
         guard self.isVideoEnabled else {
-            DispatchQueue.main.async { completion(nil) }
+            self.dispatchMain(videoUrl: nil, completion: completion)
             return
         }
         
@@ -112,14 +126,14 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
         self.cacheLock.lock()
         if let cached = self.videoCache[trackKey] {
             self.cacheLock.unlock()
-            DispatchQueue.main.async { completion(cached.isEmpty ? nil : cached) }
+            self.dispatchMain(videoUrl: cached.isEmpty ? nil : cached, completion: completion)
             return
         }
         
         if let directUrl = track.videoUrl, !directUrl.isEmpty {
             self.videoCache[trackKey] = directUrl
             self.cacheLock.unlock()
-            DispatchQueue.main.async { completion(directUrl) }
+            self.dispatchMain(videoUrl: directUrl, completion: completion)
             return
         }
         
@@ -145,10 +159,8 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
             let callbacks = self.activeQueries.removeValue(forKey: trackKey) ?? []
             self.cacheLock.unlock()
             
-            DispatchQueue.main.async {
-                for cb in callbacks {
-                    cb(videoUrl)
-                }
+            for cb in callbacks {
+                self.dispatchMain(videoUrl: videoUrl, completion: cb)
             }
         }
     }

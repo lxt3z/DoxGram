@@ -1,8 +1,10 @@
 import Foundation
 import UIKit
+import Display
 import AccountContext
 import SGSimpleSettings
 import OverlayStatusController
+import PresentationDataUtils
 import TelegramPresentationData
 import UndoUI
 
@@ -98,10 +100,8 @@ public final class SGDoxUpdateChecker: @unchecked Sendable {
     
     private func presentUpdateModal(context: AccountContext, release: SGDoxReleaseInfo) {
         let modal = SGDoxUpdateModalController(context: context, releaseInfo: release)
-        if let root = context.sharedContext.mainWindow?.viewController as? NavigationController {
-            root.present(modal, in: .window(.root))
-        } else if let top = context.sharedContext.mainWindow?.viewController {
-            top.present(modal, animated: true)
+        if let mainWindow = context.sharedContext.mainWindow {
+            mainWindow.present(modal, on: .root)
         }
     }
     

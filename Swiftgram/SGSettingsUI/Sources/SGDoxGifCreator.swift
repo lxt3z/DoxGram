@@ -13,6 +13,7 @@ import Postbox
 import SwiftSignalKit
 import TelegramPresentationData
 import OverlayStatusController
+import PresentationDataUtils
 import UndoUI
 
 public final class SGDoxGifCreator: NSObject, PHPickerViewControllerDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
@@ -22,7 +23,7 @@ public final class SGDoxGifCreator: NSObject, PHPickerViewControllerDelegate, UI
     private var currentContext: AccountContext?
     private var currentPeerId: PeerId?
     private var currentSendDirectly: ((Data) -> Void)?
-    private var loadingController: OverlayStatusController?
+    private var loadingController: ViewController?
     
     private override init() {
         super.init()
@@ -275,7 +276,7 @@ public final class SGDoxGifCreator: NSObject, PHPickerViewControllerDelegate, UI
         if show {
             if self.loadingController == nil, let context = self.currentContext {
                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                let status = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelling: nil))
+                let status = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
                 self.loadingController = status
                 self.currentParentController?.present(status, in: .window(.root))
             }
@@ -315,7 +316,7 @@ public final class SGDoxGifCreator: NSObject, PHPickerViewControllerDelegate, UI
             }, completionHandler: { success, _ in
                 DispatchQueue.main.async {
                     if success {
-                        parent?.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: isRu ? "GIF сохранена в галерею" : "GIF saved to Photos", timeout: nil, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in }), in: .window(.root))
+                        parent?.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: isRu ? "GIF сохранена в галерею" : "GIF saved to Photos", timeout: nil, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
                     }
                 }
             })

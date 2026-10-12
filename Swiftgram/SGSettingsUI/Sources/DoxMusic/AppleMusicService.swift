@@ -717,19 +717,23 @@ public final class AppleMusicService: @unchecked Sendable {
         
         let group = DispatchGroup()
         let lock = NSLock()
-        var resultsMap: [String: [SGDoxMusicTrack]] = [:]
+        final class ResultsBox: @unchecked Sendable {
+            var map: [String: [SGDoxMusicTrack]] = [:]
+        }
+        let resultsBox = ResultsBox()
         
         for q in queriesToFetch {
             group.enter()
             self.search(query: q) { tracks, _ in
                 lock.lock()
-                resultsMap[q] = tracks
+                resultsBox.map[q] = tracks
                 lock.unlock()
                 group.leave()
             }
         }
         
         group.notify(queue: .main) {
+            let resultsMap = resultsBox.map
             var waveTracks: [SGDoxMusicTrack] = []
             var usedArtistNames = Set<String>()
             var usedTrackIds = Set<String>()
