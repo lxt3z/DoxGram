@@ -24,6 +24,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
     public var artworkUrl: String?
     public let duration: Double
     public var previewUrl: String?
+    public var videoUrl: String?
     public let source: SGDoxMusicSource
     public let spotifyUri: String?
     public let appleMusicId: String?
@@ -37,6 +38,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         artworkUrl: String? = nil,
         duration: Double = 0.0,
         previewUrl: String? = nil,
+        videoUrl: String? = nil,
         source: SGDoxMusicSource,
         spotifyUri: String? = nil,
         appleMusicId: String? = nil,
@@ -49,6 +51,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         self.artworkUrl = artworkUrl
         self.duration = duration
         self.previewUrl = previewUrl
+        self.videoUrl = videoUrl
         self.source = source
         self.spotifyUri = spotifyUri
         self.appleMusicId = appleMusicId
@@ -65,7 +68,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
     }
     
     private enum CodingKeys: String, CodingKey {
-        case id, title, artist, album, artworkUrl, duration, previewUrl, source, spotifyUri, appleMusicId
+        case id, title, artist, album, artworkUrl, duration, previewUrl, videoUrl, source, spotifyUri, appleMusicId
     }
     
     public init(from decoder: Decoder) throws {
@@ -77,6 +80,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         self.artworkUrl = try container.decodeIfPresent(String.self, forKey: .artworkUrl)
         self.duration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? 0.0
         self.previewUrl = try container.decodeIfPresent(String.self, forKey: .previewUrl)
+        self.videoUrl = try container.decodeIfPresent(String.self, forKey: .videoUrl)
         self.source = try container.decode(SGDoxMusicSource.self, forKey: .source)
         self.spotifyUri = try container.decodeIfPresent(String.self, forKey: .spotifyUri)
         self.appleMusicId = try container.decodeIfPresent(String.self, forKey: .appleMusicId)
@@ -92,6 +96,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         try container.encodeIfPresent(self.artworkUrl, forKey: .artworkUrl)
         try container.encode(self.duration, forKey: .duration)
         try container.encodeIfPresent(self.previewUrl, forKey: .previewUrl)
+        try container.encodeIfPresent(self.videoUrl, forKey: .videoUrl)
         try container.encode(self.source, forKey: .source)
         try container.encodeIfPresent(self.spotifyUri, forKey: .spotifyUri)
         try container.encodeIfPresent(self.appleMusicId, forKey: .appleMusicId)

@@ -25,7 +25,10 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     private let headerView = UIView()
     private let heroContainer = UIView()
     private let bannerImageView = UIImageView()
+    private let backdropBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let bannerGradient = CAGradientLayer()
+    private let avatarContainerView = UIView()
+    private let avatarImageView = UIImageView()
     private let verifiedBadge = UIImageView()
     private let nameLabel = UILabel()
     private let subtitleLabel = UILabel()
@@ -34,7 +37,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     private let albumsSectionLabel = UILabel()
     private var albumsCollectionView: UICollectionView!
     
-    private let heroBannerHeight: CGFloat = 280.0
+    private let heroBannerHeight: CGFloat = 340.0
     private var panGesture: UIPanGestureRecognizer?
     
     public init(context: AccountContext, artistName: String) {
@@ -171,23 +174,38 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.heroContainer.clipsToBounds = true
         self.headerView.addSubview(self.heroContainer)
         
-        // Banner Image View (Apple Music Style)
+        // Ambient Backdrop Image View
         self.bannerImageView.contentMode = .scaleAspectFill
         self.bannerImageView.clipsToBounds = true
         self.bannerImageView.backgroundColor = UIColor(white: 0.12, alpha: 1.0)
         self.heroContainer.addSubview(self.bannerImageView)
         
+        // Ambient Blur layer
+        self.backdropBlurView.clipsToBounds = true
+        self.heroContainer.addSubview(self.backdropBlurView)
+        
         // Gradient overlay fading hero banner into dark background
         self.bannerGradient.colors = [
-            UIColor.clear.cgColor,
-            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.40).cgColor,
-            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.90).cgColor,
+            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.20).cgColor,
+            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.60).cgColor,
+            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.95).cgColor,
             UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.00).cgColor
         ]
-        self.bannerGradient.locations = [0.0, 0.45, 0.80, 1.0]
+        self.bannerGradient.locations = [0.0, 0.45, 0.82, 1.0]
         self.bannerGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
         self.bannerGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
         self.heroContainer.layer.addSublayer(self.bannerGradient)
+        
+        // Circular Artist Avatar
+        self.avatarContainerView.backgroundColor = .clear
+        self.headerView.addSubview(self.avatarContainerView)
+        
+        self.avatarImageView.contentMode = .scaleAspectFill
+        self.avatarImageView.clipsToBounds = true
+        self.avatarImageView.backgroundColor = UIColor(white: 0.16, alpha: 1.0)
+        self.avatarImageView.layer.borderWidth = 3.5
+        self.avatarImageView.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
+        self.avatarContainerView.addSubview(self.avatarImageView)
         
         // Verified Badge
         let badgeConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
@@ -198,9 +216,10 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         
         // Name Label (Apple Music Large Title)
         self.nameLabel.text = self.artistName
-        self.nameLabel.font = UIFont.systemFont(ofSize: 26, weight: .bold)
+        self.nameLabel.font = UIFont.systemFont(ofSize: 25, weight: .bold)
         self.nameLabel.textColor = .white
         self.nameLabel.numberOfLines = 2
+        self.nameLabel.textAlignment = .center
         self.nameLabel.shadowColor = UIColor.black.withAlphaComponent(0.6)
         self.nameLabel.shadowOffset = CGSize(width: 0, height: 1.5)
         self.headerView.addSubview(self.nameLabel)
@@ -209,6 +228,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.subtitleLabel.text = "Исполнитель • Apple Music"
         self.subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.70)
+        self.subtitleLabel.textAlignment = .center
         self.headerView.addSubview(self.subtitleLabel)
         
         // Play All Button (Apple Music Red Capsule)
@@ -271,17 +291,33 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         let heroH = self.heroBannerHeight
         self.heroContainer.frame = CGRect(x: 0, y: 0, width: screenW, height: heroH)
         self.bannerImageView.frame = self.heroContainer.bounds
+        self.backdropBlurView.frame = self.heroContainer.bounds
         self.bannerGradient.frame = self.heroContainer.bounds
         
-        let contentY = heroH - 95.0
-        let nameW = screenW - 70.0
-        self.nameLabel.frame = CGRect(x: 20, y: contentY, width: nameW, height: 32)
-        self.verifiedBadge.frame = CGRect(x: min(screenW - 40, self.nameLabel.intrinsicContentSize.width + 24), y: contentY + 6, width: 20, height: 20)
-        self.subtitleLabel.frame = CGRect(x: 20, y: self.nameLabel.frame.maxY + 2, width: screenW - 40, height: 18)
+        let avatarSide: CGFloat = 104.0
+        let avatarX = (screenW - avatarSide) * 0.5
+        let avatarY: CGFloat = 48.0
+        self.avatarContainerView.frame = CGRect(x: avatarX, y: avatarY, width: avatarSide, height: avatarSide)
+        self.avatarImageView.frame = self.avatarContainerView.bounds
+        self.avatarImageView.layer.cornerRadius = avatarSide * 0.5
+        self.avatarContainerView.layer.shadowPath = UIBezierPath(roundedRect: self.avatarContainerView.bounds, cornerRadius: avatarSide * 0.5).cgPath
+        
+        // Name & Verified Badge
+        let nameY = avatarY + avatarSide + 14.0
+        let nameSize = self.nameLabel.sizeThatFits(CGSize(width: screenW - 80.0, height: 40.0))
+        let nameW = min(screenW - 80.0, nameSize.width)
+        let badgeSize: CGFloat = 19.0
+        let totalTitleW = nameW + badgeSize + 6.0
+        let titleStartX = floor((screenW - totalTitleW) * 0.5)
+        
+        self.nameLabel.frame = CGRect(x: titleStartX, y: nameY, width: nameW, height: 30)
+        self.verifiedBadge.frame = CGRect(x: titleStartX + nameW + 6.0, y: nameY + 5.0, width: badgeSize, height: badgeSize)
+        
+        self.subtitleLabel.frame = CGRect(x: 20, y: self.nameLabel.frame.maxY + 3, width: screenW - 40, height: 18)
         
         let btnW = (screenW - 48 - 12) * 0.5
         let btnH: CGFloat = 40.0
-        let btnY = self.subtitleLabel.frame.maxY + 14
+        let btnY = self.subtitleLabel.frame.maxY + 16
         
         self.playAllButton.frame = CGRect(x: 20, y: btnY, width: btnW, height: btnH)
         self.shuffleButton.frame = CGRect(x: self.playAllButton.frame.maxX + 12, y: btnY, width: btnW, height: btnH)
@@ -290,7 +326,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.albumsSectionLabel.isHidden = !hasAlbums
         self.albumsCollectionView.isHidden = !hasAlbums
         
-        let collY = btnY + btnH + 20
+        let collY = btnY + btnH + 22
         let totalH: CGFloat
         if hasAlbums {
             self.albumsSectionLabel.frame = CGRect(x: 20, y: collY, width: screenW - 40, height: 24)
@@ -311,7 +347,13 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                 let stretch = abs(offsetY)
                 self.heroContainer.frame = CGRect(x: 0, y: offsetY, width: self.view.bounds.width, height: self.heroBannerHeight + stretch)
                 self.bannerImageView.frame = self.heroContainer.bounds
+                self.backdropBlurView.frame = self.heroContainer.bounds
                 self.bannerGradient.frame = self.heroContainer.bounds
+                
+                let scale = 1.0 + min(0.35, stretch / 320.0)
+                self.avatarContainerView.transform = CGAffineTransform(scaleX: scale, y: scale)
+            } else {
+                self.avatarContainerView.transform = .identity
             }
         }
     }
@@ -365,10 +407,14 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                         UIView.transition(with: self.bannerImageView, duration: 0.35, options: [.transitionCrossDissolve], animations: {
                             self.bannerImageView.image = loadedImage
                         })
+                        UIView.transition(with: self.avatarImageView, duration: 0.35, options: [.transitionCrossDissolve], animations: {
+                            self.avatarImageView.image = loadedImage
+                        })
                     }
                 } else {
-                    self.bannerImageView.image = UIImage(systemName: "music.mic")
-                    self.bannerImageView.tintColor = .white
+                    self.bannerImageView.image = nil
+                    self.avatarImageView.image = UIImage(systemName: "music.mic")
+                    self.avatarImageView.tintColor = .white
                 }
                 
                 self.emptyStateLabel.isHidden = !(self.topTracks.isEmpty && self.albums.isEmpty)

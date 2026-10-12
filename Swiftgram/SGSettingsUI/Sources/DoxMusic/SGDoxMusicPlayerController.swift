@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import AVFoundation
 import Display
 import SwiftSignalKit
 import TelegramCore
@@ -18,6 +19,17 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let ambientGradientLayer = CAGradientLayer()
     private let backgroundBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let darkDimOverlay = UIView()
+    
+    // Video Clip Background & Quality Layer
+    private let videoContainerView = UIView()
+    private var videoPlayer: AVPlayer?
+    private var videoPlayerLayer: AVPlayerLayer?
+    private var videoItem: AVPlayerItem?
+    private var currentVideoClipUrl: String?
+    private var videoEndObserver: Any?
+    private var isImmersiveVideoMode = false
+    private let videoDimOverlay = UIView()
+    private let videoQualityButton = UIButton(type: .system)
     
     // Header
     private let grabberView = UIView()
@@ -198,6 +210,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             DispatchQueue.main.async {
                 self?.updateContent()
                 self?.reloadQueueData()
+                if let p = self?.videoPlayer {
+                    if SGDoxMusicManager.shared.isPlaying {
+                        p.play()
+                    } else {
+                        p.pause()
+                    }
+                }
             }
         }
         
@@ -206,6 +225,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             let d = duration > 0 ? duration : 30.0
             let currentSecond = Int(current)
             let progress = Float(current / d)
+            
+            if let vp = self.videoPlayer {
+                let vTime = vp.currentTime().seconds
+                if vTime.isFinite && !vTime.isNaN && abs(vTime - current) > 1.2 {
+                    vp.seek(to: CMTime(seconds: current, preferredTimescale: 600))
+                }
+            }
             
             switch self.currentMode {
             case .nowPlaying:
@@ -240,6 +266,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func detachListeners() {
         self.userScrollTimer?.invalidate()
         self.userScrollTimer = nil
+        self.teardownVideoPlayback()
         if let token = self.stateToken {
             SGDoxMusicManager.shared.removeStateListener(token)
             self.stateToken = nil
@@ -318,6 +345,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         self.darkDimOverlay.backgroundColor = UIColor(red: 0.05, green: 0.06, blue: 0.10, alpha: 0.38)
         self.view.addSubview(self.darkDimOverlay)
+        
+        // Video layer: fills entire player
+        self.videoContainerView.clipsToBounds = true
+        self.videoContainerView.backgroundColor = .clear
+        self.videoContainerView.alpha = 0.0
+        self.view.insertSubview(self.videoContainerView, aboveSubview: self.darkDimOverlay)
+        
+        self.videoDimOverlay.backgroundColor = UIColor(white: 0.0, alpha: 0.35)
+        self.videoContainerView.addSubview(self.videoDimOverlay)
         
         // 2. Header
         self.grabberView.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
@@ -432,6 +468,21 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let artTap = UITapGestureRecognizer(target: self, action: #selector(self.artworkTapped))
         self.artworkContainerView.isUserInteractionEnabled = true
         self.artworkContainerView.addGestureRecognizer(artTap)
+        
+        // Video Quality & Resolution Pill
+        self.videoQualityButton.backgroundColor = UIColor(white: 0.0, alpha: 0.50)
+        self.videoQualityButton.layer.cornerRadius = 14
+        self.videoQualityButton.layer.cornerCurve = .continuous
+        self.videoQualityButton.layer.borderWidth = 0.5
+        self.videoQualityButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
+        self.videoQualityButton.clipsToBounds = true
+        self.videoQualityButton.tintColor = .white
+        self.videoQualityButton.titleLabel?.font = UIFont.systemFont(ofSize: 11.5, weight: .bold)
+        self.videoQualityButton.setTitle("🎥 Авто", for: .normal)
+        self.videoQualityButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+        self.videoQualityButton.isHidden = true
+        self.videoQualityButton.addTarget(self, action: #selector(self.videoQualityPressed), for: .touchUpInside)
+        self.nowPlayingContainerView.addSubview(self.videoQualityButton)
         
         // Info Area: Title, Artist, Lyrics & Favorite
         self.nowPlayingContainerView.addSubview(self.infoContainerView)
@@ -865,6 +916,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.ambientGradientLayer.frame = bounds
         self.backgroundBlurView.frame = bounds
         self.darkDimOverlay.frame = bounds
+        self.videoContainerView.frame = bounds
+        self.videoDimOverlay.frame = bounds
+        self.videoPlayerLayer?.frame = bounds
         
         let topY = max(safeArea.top, 48.0)
         self.grabberView.frame = .zero
@@ -935,6 +989,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.artworkAmbientGlowView.layer.cornerRadius = (artSide + glowPadding) * 0.5
         self.artworkGlowGradientLayer.frame = self.artworkAmbientGlowView.bounds
         self.artworkGlowGradientLayer.cornerRadius = (artSide + glowPadding) * 0.5
+        
+        // Video Quality & Resolution Pill
+        if self.isImmersiveVideoMode {
+            self.videoQualityButton.frame = CGRect(x: (bounds.width - 92.0) * 0.5, y: 16.0, width: 92.0, height: 28.0)
+        } else {
+            self.videoQualityButton.frame = CGRect(x: artX + artSide - 84.0, y: artY + 10.0, width: 74.0, height: 28.0)
+        }
         
         // Info: Title, Artist, Lyrics & Favorite buttons
         let infoY = artY + artSide + 24.0
@@ -1110,6 +1171,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.currentLyrics = nil
             self.activeLyricsIndex = -1
             self.loadLyricsIfNeeded()
+            
+            // Fetch video clip for the track
+            SGDoxVideoClipService.shared.fetchVideoClip(for: track) { [weak self] videoUrl in
+                guard let self = self, self.displayedTrackId == track.id else { return }
+                self.setupVideoPlayback(urlString: videoUrl)
+            }
         }
         
         // Source
@@ -1626,6 +1693,149 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let duration = SGDoxMusicManager.shared.duration > 0 ? SGDoxMusicManager.shared.duration : 30.0
         let target = Double(self.progressSlider.value) * duration
         SGDoxMusicManager.shared.seek(to: target)
+        self.videoPlayer?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+    }
+    
+    // MARK: - Video Playback & Quality Controls
+    
+    private func setupVideoPlayback(urlString: String?) {
+        guard let urlString = urlString, let url = URL(string: urlString), SGDoxVideoClipService.shared.isVideoEnabled else {
+            self.teardownVideoPlayback()
+            return
+        }
+        
+        self.currentVideoClipUrl = urlString
+        let item = AVPlayerItem(url: url)
+        SGDoxVideoClipService.shared.applyQuality(to: item)
+        self.videoItem = item
+        
+        if let player = self.videoPlayer {
+            player.replaceCurrentItem(with: item)
+        } else {
+            let player = AVPlayer(playerItem: item)
+            player.isMuted = true
+            player.actionAtItemEnd = .none
+            self.videoPlayer = player
+            
+            let layer = AVPlayerLayer(player: player)
+            layer.videoGravity = .resizeAspectFill
+            layer.frame = self.videoContainerView.bounds
+            self.videoContainerView.layer.insertSublayer(layer, at: 0)
+            self.videoPlayerLayer = layer
+        }
+        
+        if let obs = self.videoEndObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        self.videoEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            self?.videoPlayer?.seek(to: .zero)
+            if SGDoxMusicManager.shared.isPlaying {
+                self?.videoPlayer?.play()
+            }
+        }
+        
+        let currentSec = SGDoxMusicManager.shared.currentTime
+        if currentSec > 0 {
+            self.videoPlayer?.seek(to: CMTime(seconds: currentSec, preferredTimescale: 600))
+        }
+        
+        if SGDoxMusicManager.shared.isPlaying {
+            self.videoPlayer?.play()
+        }
+        
+        UIView.animate(withDuration: 0.45, delay: 0, options: [.curveEaseInOut], animations: {
+            self.videoContainerView.alpha = 1.0
+            self.videoQualityButton.alpha = 1.0
+        })
+        self.videoQualityButton.isHidden = false
+        self.updateVideoQualityButtonTitle()
+    }
+    
+    private func teardownVideoPlayback() {
+        if let obs = self.videoEndObserver {
+            NotificationCenter.default.removeObserver(obs)
+            self.videoEndObserver = nil
+        }
+        self.videoPlayer?.pause()
+        self.videoPlayer = nil
+        self.videoPlayerLayer?.removeFromSuperlayer()
+        self.videoPlayerLayer = nil
+        self.videoItem = nil
+        self.currentVideoClipUrl = nil
+        
+        UIView.animate(withDuration: 0.35, animations: {
+            self.videoContainerView.alpha = 0.0
+            self.videoQualityButton.alpha = 0.0
+        }) { [weak self] _ in
+            self?.videoQualityButton.isHidden = true
+        }
+    }
+    
+    @objc private func toggleImmersiveVideo() {
+        guard self.videoPlayer != nil, self.videoContainerView.alpha > 0.0 else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        self.isImmersiveVideoMode.toggle()
+        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.3, options: [.allowUserInteraction], animations: {
+            self.artworkContainerView.alpha = self.isImmersiveVideoMode ? 0.0 : 1.0
+            self.artworkAmbientGlowView.alpha = self.isImmersiveVideoMode ? 0.0 : 1.0
+            if let layout = self.validLayout {
+                self.applyLayout(bounds: CGRect(origin: .zero, size: layout.size), safeArea: layout.safeInsets)
+            } else {
+                self.applyLayout(bounds: self.view.bounds, safeArea: self.view.safeAreaInsets)
+            }
+        })
+    }
+    
+    @objc private func videoQualityPressed() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let currentEffective = SGDoxVideoClipService.shared.resolveEffectiveQuality()
+        let alert = UIAlertController(title: "Видео-клип к треку", message: "Текущее качество: \(currentEffective.title)", preferredStyle: .actionSheet)
+        
+        let qualities: [SGDoxVideoQuality] = [.auto, .p1080, .p720, .p480]
+        for q in qualities {
+            let isCurrent = SGDoxVideoClipService.shared.preferredQuality == q
+            let prefix = isCurrent ? "✓ " : ""
+            alert.addAction(UIAlertAction(title: "\(prefix)\(q.title)", style: .default, handler: { [weak self] _ in
+                SGDoxVideoClipService.shared.preferredQuality = q
+                self?.refreshVideoQuality()
+            }))
+        }
+        
+        let toggleTitle = self.isImmersiveVideoMode ? "Показать обложку альбома" : "Клип во весь экран (скрыть обложку)"
+        alert.addAction(UIAlertAction(title: toggleTitle, style: .default, handler: { [weak self] _ in
+            self?.toggleImmersiveVideo()
+        }))
+        
+        alert.addAction(UIAlertAction(title: "Выключить видео", style: .destructive, handler: { [weak self] _ in
+            SGDoxVideoClipService.shared.preferredQuality = .off
+            self?.refreshVideoQuality()
+        }))
+        
+        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
+        self.present(alert, animated: true, completion: nil)
+    }
+    
+    private func refreshVideoQuality() {
+        guard let item = self.videoItem, SGDoxVideoClipService.shared.isVideoEnabled else {
+            self.teardownVideoPlayback()
+            return
+        }
+        SGDoxVideoClipService.shared.applyQuality(to: item)
+        self.updateVideoQualityButtonTitle()
+    }
+    
+    private func updateVideoQualityButtonTitle() {
+        let eff = SGDoxVideoClipService.shared.resolveEffectiveQuality()
+        let pref = SGDoxVideoClipService.shared.preferredQuality
+        if pref == .auto {
+            self.videoQualityButton.setTitle("🎥 \(eff.shortTitle)", for: .normal)
+        } else {
+            self.videoQualityButton.setTitle("🎥 \(pref.shortTitle)", for: .normal)
+        }
     }
     
     @objc private func wavePressed() {
