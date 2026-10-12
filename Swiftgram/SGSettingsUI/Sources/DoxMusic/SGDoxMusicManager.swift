@@ -35,6 +35,17 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     }
     public private(set) var currentTime: Double = 0.0
     public private(set) var duration: Double = 0.0
+    public private(set) var recentWaveArtists: [String] = []
+    
+    public func recordWaveArtist(_ artist: String) {
+        let clean = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        self.recentWaveArtists.removeAll { $0.caseInsensitiveCompare(clean) == .orderedSame }
+        self.recentWaveArtists.append(clean)
+        if self.recentWaveArtists.count > 25 {
+            self.recentWaveArtists.removeFirst(self.recentWaveArtists.count - 25)
+        }
+    }
     
     public var isWaveEnabled: Bool {
         get {
@@ -570,6 +581,10 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.isPlaying = true
         self.startTimeTracking()
         
+        if self.isWaveEnabled {
+            self.recordWaveArtist(track.artist)
+        }
+        
         if !queue.isEmpty {
             var q = queue.filter { $0.id != track.id }
             if self.isShuffleEnabled {
@@ -873,6 +888,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         }
         self.isWaveEnabled = true
         let track = seedTrack ?? self.currentTrack
+        if let artist = track?.artist {
+            self.recordWaveArtist(artist)
+        }
         let currentMode = self.currentWaveMode
         
         if SpotifyService.shared.isAuthorized {
@@ -955,9 +973,24 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     private func replenishWaveQueueWithPublicMusic(track: SGDoxMusicTrack?) {
         AppleMusicService.shared.fetchWaveTracks(basedOn: track, mode: self.currentWaveMode) { [weak self] tracks in
             guard let self = self else { return }
-            let uniqueTracks = tracks.filter { t in !self.queue.contains(where: { $0.id == t.id }) && t.id != self.currentTrack?.id }
-            self.queue.append(contentsOf: uniqueTracks)
-            self.notifyStateChanged()
+            let existingIds = Set(self.queue.map { $0.id }).union([self.currentTrack?.id ?? ""])
+            var existingArtists = Set(self.queue.map { $0.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
+            if let curr = self.currentTrack?.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !curr.isEmpty {
+                existingArtists.insert(curr)
+            }
+            
+            var uniqueTracks: [SGDoxMusicTrack] = []
+            for t in tracks {
+                let a = t.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !existingIds.contains(t.id) && !existingArtists.contains(a) {
+                    uniqueTracks.append(t)
+                    existingArtists.insert(a)
+                }
+            }
+            if !uniqueTracks.isEmpty {
+                self.queue.append(contentsOf: uniqueTracks)
+                self.notifyStateChanged()
+            }
         }
     }
     

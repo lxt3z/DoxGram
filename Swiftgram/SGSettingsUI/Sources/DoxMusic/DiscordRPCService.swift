@@ -41,7 +41,7 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
     private var lastSentStartTimestamp: Int64?
     private var externalAssetCache: [String: String] = [:]
     private var resolvingUrls: Set<String> = []
-    private let doxgramIconUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Telegram/Telegram-iOS/SGDefault.alticon/SGDefault%403x.png"
+    private let doxgramIconUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Swiftgram/SGSettingsUI/Images.xcassets/DoxgramSettings.imageset/DoxgramSettings.png"
     
     private override init() {
         super.init()
@@ -428,6 +428,13 @@ public final class DiscordRPCService: NSObject, URLSessionWebSocketDelegate, @un
                 assets["large_image"] = artwork
             } else {
                 self.resolveExternalAsset(imageUrl: artwork)
+            }
+        } else {
+            if let cachedDox = self.externalAssetCache[self.doxgramIconUrl] {
+                assets["large_image"] = cachedDox
+                assets["large_text"] = "DoxGram Music"
+            } else {
+                self.resolveExternalAsset(imageUrl: self.doxgramIconUrl)
             }
         }
         

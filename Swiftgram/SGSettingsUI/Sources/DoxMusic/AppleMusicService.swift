@@ -535,120 +535,222 @@ public final class AppleMusicService: @unchecked Sendable {
         }
     }
     
+    // MARK: - Wave Recommendations & Artist Clustering
+    
+    private static let russianPopRnbArtists = [
+        "MACAN", "JONY", "Andro", "The Limba", "HammAli & Navai", "Markul", "Saluki",
+        "Клава Кока", "ANNA ASTI", "Zivert", "Мари Краймбрери", "МОТ", "Artik & Asti",
+        "Rauf & Faik", "Bahh Tee", "Xcho", "Navai", "Mary Gu", "Seville", "Леша Свик",
+        "ELMAN", "Toxi$", "Егор Крид", "MiyaGi & Эндшпиль", "Amirchik", "Люся Чеботина"
+    ]
+    
+    private static let russianRapTrapArtists = [
+        "MORGENSHTERN", "Big Baby Tape", "kizaru", "Soda Luv", "OG Buda", "Scally Milano",
+        "PHARAOH", "FEDUK", "ЛСП", "Guf", "Баста", "Платина", "MAYOT", "163ONMYNECK",
+        "Friendly Thug 52 NGG", "ALBLAK 52", "Obladaet", "Bushido Zho", "Heronwater",
+        "Aarne", "Glocki52", "Скриптонит", "uglystephan"
+    ]
+    
+    private static let russianIndieRockArtists = [
+        "Три дня дождя", "Пошлая Молли", "кис-кис", "Дайте танк (!)", "Космонавтов Нет",
+        "Земфира", "Мумий Тролль", "Моя Мишель", "Сироткин", "DEAD BLONDE", "GSPD",
+        "Хадн Дадн", "Комсомольск", "Zoloto", "polnalyubvi", "Перемотка", "Алёна Швец"
+    ]
+    
+    private static let russianElectronicArtists = [
+        "DVRST", "Shadowraze", "Slider & Magnit", "Filatov & Karas", "Swanky Tunes",
+        "Cosmo & Skoro", "VOLAC", "Rompasso"
+    ]
+    
+    private static let westernPopRnbArtists = [
+        "The Weeknd", "Drake", "Post Malone", "Dua Lipa", "Doja Cat", "Ariana Grande",
+        "Bruno Mars", "Billie Eilish", "Justin Bieber", "SZA", "Khalid", "Frank Ocean"
+    ]
+    
+    private static let westernHipHopArtists = [
+        "Travis Scott", "Kendrick Lamar", "Future", "Metro Boomin", "21 Savage",
+        "Playboi Carti", "Lil Baby", "Juice WRLD", "Gunna", "Don Toliver", "Kanye West",
+        "Eminem", "A$AP Rocky", "Jack Harlow"
+    ]
+    
+    private static let westernIndieRockArtists = [
+        "Arctic Monkeys", "The Neighbourhood", "Chase Atlantic", "Imagine Dragons",
+        "Coldplay", "Radiohead", "Deftones", "Gorillaz", "Tame Impala", "Glass Animals"
+    ]
+    
+    private static let westernElectronicArtists = [
+        "Calvin Harris", "David Guetta", "Tiësto", "Avicii", "Skrillex", "Fred again..",
+        "Martin Garrix", "Disclosure", "Fisher", "Kygo"
+    ]
+
     public func fetchWaveTracks(basedOn track: SGDoxMusicTrack?, mode: SGDoxMusicManager.SGDoxWaveMode = .flow, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
         let favorites = SGDoxMusicManager.shared.favorites
         let seed = track ?? favorites.randomElement()
         let seedArtist = seed?.artist.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let recentArtists = Set(SGDoxMusicManager.shared.recentWaveArtists.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
         
         let isRussian = favorites.contains { fav in
             fav.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil ||
             fav.artist.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil
-        } || (seed?.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil) || Locale.current.languageCode == "ru"
+        } || (seed?.title.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil) || (seed?.artist.range(of: "\\p{Cyrillic}", options: .regularExpression) != nil) || Locale.current.languageCode == "ru"
         
-        if seedArtist.isEmpty {
-            let fallbackQuery: String
-            if isRussian {
-                switch mode {
-                case .energy:
-                    fallbackQuery = "Русский драйв хиты"
-                case .chill:
-                    fallbackQuery = "Русский лаунж релакс"
-                case .discovery:
-                    fallbackQuery = "Новинки русской музыки"
-                case .flow:
-                    fallbackQuery = "Популярная русская музыка чарт"
-                }
+        // Find matching cluster for seedArtist
+        var candidateCluster: [String] = []
+        let seedLower = seedArtist.lowercased()
+        
+        if isRussian {
+            if !seedLower.isEmpty && Self.russianRapTrapArtists.contains(where: { seedLower.contains($0.lowercased()) || $0.lowercased().contains(seedLower) }) {
+                candidateCluster = Self.russianRapTrapArtists + Self.russianPopRnbArtists
+            } else if !seedLower.isEmpty && Self.russianIndieRockArtists.contains(where: { seedLower.contains($0.lowercased()) || $0.lowercased().contains(seedLower) }) {
+                candidateCluster = Self.russianIndieRockArtists
+            } else if !seedLower.isEmpty && Self.russianElectronicArtists.contains(where: { seedLower.contains($0.lowercased()) || $0.lowercased().contains(seedLower) }) {
+                candidateCluster = Self.russianElectronicArtists
             } else {
-                switch mode {
-                case .energy:
-                    fallbackQuery = "Workout Upbeat Electronic"
-                case .chill:
-                    fallbackQuery = "Chill Lofi Relax"
-                case .discovery:
-                    fallbackQuery = "Indie Discover New"
-                case .flow:
-                    fallbackQuery = "Top Hits"
-                }
+                candidateCluster = Self.russianPopRnbArtists + Self.russianRapTrapArtists
             }
-            self.searchITunesPublic(query: fallbackQuery) { tracks, _ in
-                completion(tracks)
+        } else {
+            if !seedLower.isEmpty && Self.westernHipHopArtists.contains(where: { seedLower.contains($0.lowercased()) || $0.lowercased().contains(seedLower) }) {
+                candidateCluster = Self.westernHipHopArtists + Self.westernPopRnbArtists
+            } else if !seedLower.isEmpty && Self.westernIndieRockArtists.contains(where: { seedLower.contains($0.lowercased()) || $0.lowercased().contains(seedLower) }) {
+                candidateCluster = Self.westernIndieRockArtists
+            } else if !seedLower.isEmpty && Self.westernElectronicArtists.contains(where: { seedLower.contains($0.lowercased()) || $0.lowercased().contains(seedLower) }) {
+                candidateCluster = Self.westernElectronicArtists
+            } else {
+                candidateCluster = Self.westernPopRnbArtists + Self.westernHipHopArtists
             }
-            return
         }
         
-        let queryForArtist: String
+        // Collect candidate artists (excluding recentWaveArtists and seedArtist)
+        var candidateArtists: [String] = []
+        for fav in favorites {
+            let a = fav.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+            let aLower = a.lowercased()
+            if !a.isEmpty && aLower != seedLower && !recentArtists.contains(aLower) && !candidateArtists.contains(where: { $0.caseInsensitiveCompare(a) == .orderedSame }) {
+                candidateArtists.append(a)
+            }
+        }
+        
+        for clusterArtist in candidateCluster.shuffled() {
+            let cLower = clusterArtist.lowercased()
+            if cLower != seedLower && !recentArtists.contains(cLower) && !candidateArtists.contains(where: { $0.caseInsensitiveCompare(clusterArtist) == .orderedSame }) {
+                candidateArtists.append(clusterArtist)
+            }
+        }
+        
+        // Pick 4 distinct target artists
+        let selectedArtists = Array(candidateArtists.prefix(4))
+        
+        // Mode-based general query
+        let modeQuery: String
         if isRussian {
             switch mode {
             case .energy:
-                queryForArtist = "\(seedArtist) ремикс"
+                modeQuery = "Русский клубный бит драйв"
             case .chill:
-                queryForArtist = "\(seedArtist) акустика"
+                modeQuery = "Русский лаунж релакс"
             case .discovery:
-                queryForArtist = "\(seedArtist) фит"
+                modeQuery = "Новинки русской музыки чарт"
             case .flow:
-                queryForArtist = seedArtist
+                modeQuery = "Популярная русская музыка чарт"
             }
         } else {
             switch mode {
             case .energy:
-                queryForArtist = "\(seedArtist) remix"
+                modeQuery = "Workout Upbeat Electronic"
             case .chill:
-                queryForArtist = "\(seedArtist) acoustic"
+                modeQuery = "Chill Lofi Relax"
             case .discovery:
-                queryForArtist = "\(seedArtist) ft"
+                modeQuery = "Indie Discover New"
             case .flow:
-                queryForArtist = seedArtist
+                modeQuery = "Top Hits"
             }
         }
         
-        // 1. Fetch tracks by the current seed artist
-        self.search(query: queryForArtist) { [weak self] primaryTracks, _ in
-            guard let self = self else {
-                completion(primaryTracks)
-                return
+        // Query tasks list
+        var queriesToFetch: [String] = selectedArtists
+        queriesToFetch.append(modeQuery)
+        
+        // Only include seed artist if NOT in recentWaveArtists and not empty
+        let includeSeedArtist = !seedArtist.isEmpty && !recentArtists.contains(seedLower)
+        if includeSeedArtist {
+            queriesToFetch.insert(seedArtist, at: 0)
+        }
+        
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var resultsMap: [String: [SGDoxMusicTrack]] = [:]
+        
+        for q in queriesToFetch {
+            group.enter()
+            self.search(query: q) { tracks, _ in
+                lock.lock()
+                resultsMap[q] = tracks
+                lock.unlock()
+                group.leave()
+            }
+        }
+        
+        group.notify(queue: .main) {
+            var waveTracks: [SGDoxMusicTrack] = []
+            var usedArtistNames = Set<String>()
+            var usedTrackIds = Set<String>()
+            if let seedId = seed?.id {
+                usedTrackIds.insert(seedId)
             }
             
-            let sourceTracks = primaryTracks.isEmpty ? [] : primaryTracks
-            let filteredArtistTracks = sourceTracks.filter { $0.id != seed?.id }
-            let primaryArtistTracks = Array(filteredArtistTracks.prefix(4))
+            // Helper to add at most 1 track per artist
+            let tryAddTrack: (SGDoxMusicTrack) -> Bool = { t in
+                let artistKey = t.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                guard !usedTrackIds.contains(t.id), !usedArtistNames.contains(artistKey) else {
+                    return false
+                }
+                usedArtistNames.insert(artistKey)
+                usedTrackIds.insert(t.id)
+                waveTracks.append(t)
+                return true
+            }
             
-            // 2. Cross-reference favorites and library to discover related artists
-            var favoriteArtists: [String] = []
-            for fav in favorites {
-                let a = fav.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !a.isEmpty && a.caseInsensitiveCompare(seedArtist) != .orderedSame && !favoriteArtists.contains(a) {
-                    favoriteArtists.append(a)
+            // 1. If seed artist was queried, add at most 1 track
+            if includeSeedArtist, let seedTracks = resultsMap[seedArtist] {
+                for t in seedTracks {
+                    if tryAddTrack(t) { break }
                 }
             }
             
-            if let pickArtist = favoriteArtists.randomElement() {
-                self.search(query: pickArtist) { libTracks, _ in
-                    var waveList: [SGDoxMusicTrack] = []
-                    var artistIter = primaryArtistTracks.makeIterator()
-                    var libIter = libTracks.prefix(3).makeIterator()
-                    
-                    if let t1 = artistIter.next() { waveList.append(t1) }
-                    if let t2 = artistIter.next() { waveList.append(t2) }
-                    if let l1 = libIter.next() { waveList.append(l1) }
-                    while let a = artistIter.next() {
-                        waveList.append(a)
-                        if let l = libIter.next() { waveList.append(l) }
+            // 2. From each selected artist, take at most 1 track
+            for artistName in selectedArtists {
+                if let tracks = resultsMap[artistName] {
+                    for t in tracks {
+                        if tryAddTrack(t) { break }
                     }
-                    while let l = libIter.next() {
-                        waveList.append(l)
-                    }
-                    
-                    completion(waveList.isEmpty ? filteredArtistTracks : waveList)
-                }
-            } else {
-                // If favorites has only 1 artist, query mode-based Russian/general catalog
-                let discoveryQuery = isRussian ? (mode == .energy ? "Русский рэп бит" : (mode == .chill ? "Русский лаунж" : "Русские новинки")) : "Hot Hits"
-                self.search(query: discoveryQuery) { relatedTracks, _ in
-                    var waveList: [SGDoxMusicTrack] = primaryArtistTracks
-                    waveList.append(contentsOf: Array(relatedTracks.prefix(4)))
-                    completion(waveList.isEmpty ? filteredArtistTracks : waveList)
                 }
             }
+            
+            // 3. From mode query, add up to 3 diverse tracks from different artists
+            if let modeTracks = resultsMap[modeQuery] {
+                var addedFromMode = 0
+                for t in modeTracks {
+                    if tryAddTrack(t) {
+                        addedFromMode += 1
+                        if addedFromMode >= 3 { break }
+                    }
+                }
+            }
+            
+            // If still empty, fall back to whatever came back
+            if waveTracks.isEmpty {
+                for (_, tracks) in resultsMap {
+                    for t in tracks {
+                        if !usedTrackIds.contains(t.id) {
+                            waveTracks.append(t)
+                            usedTrackIds.insert(t.id)
+                            break
+                        }
+                    }
+                }
+            }
+            
+            completion(waveTracks)
         }
     }
     
