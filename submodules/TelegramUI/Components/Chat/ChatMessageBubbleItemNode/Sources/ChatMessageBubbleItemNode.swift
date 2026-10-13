@@ -348,6 +348,7 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
         if let updatingMedia = itemAttributes.updatingMedia {
             messageText = updatingMedia.text
         }
+        let isDoxMediaMessage = messageText.contains("doxlisten:") || messageText.contains("doxwall:") || messageText.contains("music.apple.com")
         
         var richText: RichTextMessageAttribute?
         if let updatingMedia = itemAttributes.updatingMedia {
@@ -405,7 +406,6 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
                     }
                     
                     
-                    let isDoxMediaMessage = messageText.contains("doxlisten:") || messageText.contains("doxwall:") || messageText.contains("music.apple.com")
                     let contentNodeType: AnyClass = isDoxMediaMessage ? ChatMessageDoxMediaBubbleContentNode.self : ChatMessageTextBubbleContentNode.self
                     
                     if isMediaInverted {

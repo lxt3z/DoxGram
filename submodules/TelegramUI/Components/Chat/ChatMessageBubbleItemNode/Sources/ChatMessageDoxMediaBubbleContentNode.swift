@@ -25,7 +25,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     private let subtitleNode: TextNode
     private let playButtonNode: HighlightTrackingButtonNode
     private let playIconNode: ASImageNode
-    private let playLabelNode: TextNode
+    private let playLabelNode: ImmediateTextNode
     private let dateAndStatusNode: ChatMessageDateAndStatusNode
     
     private var currentTrackId: String?
@@ -78,7 +78,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
         self.playIconNode.displaysAsynchronously = false
         self.playIconNode.isUserInteractionEnabled = false
         
-        self.playLabelNode = TextNode()
+        self.playLabelNode = ImmediateTextNode()
         self.playLabelNode.isUserInteractionEnabled = false
         self.playLabelNode.displaysAsynchronously = false
         
@@ -142,6 +142,8 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
             font: Font.semibold(12.5),
             textColor: .white
         )
+        let labelSize = self.playLabelNode.updateLayout(CGSize(width: 50.0, height: .greatestFiniteMagnitude))
+        self.playLabelNode.frame = CGRect(x: 27.0, y: 6.0, width: labelSize.width, height: labelSize.height)
         
         if animated {
             UIView.animate(withDuration: 0.12, animations: {
@@ -206,7 +208,6 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
         let makeMoreDotsLayout = TextNode.asyncLayout(self.moreDotsNode)
         let makeTitleLayout = TextNode.asyncLayout(self.titleNode)
         let makeSubtitleLayout = TextNode.asyncLayout(self.subtitleNode)
-        let makePlayLabelLayout = TextNode.asyncLayout(self.playLabelNode)
         let statusLayout = self.dateAndStatusNode.asyncLayout()
         
         return { item, layoutConstants, _, _, constrainedSize, _ in
@@ -342,7 +343,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                     ),
                     backgroundColor: nil,
                     maximumNumberOfLines: 1,
-                    truncationType: .none,
+                    truncationType: .end,
                     constrainedSize: CGSize(width: 30.0, height: .greatestFiniteMagnitude),
                     alignment: .natural,
                     cutout: nil,
@@ -374,25 +375,6 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                     maximumNumberOfLines: 1,
                     truncationType: .end,
                     constrainedSize: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
-                    alignment: .natural,
-                    cutout: nil,
-                    insets: UIEdgeInsets()
-                ))
-                
-                let currentPlayingId = SGSimpleSettings.shared.currentPlayingTrackId
-                let isCurrentlyPlaying = SGSimpleSettings.shared.isMusicPlaying && (parsedTrackId == nil || currentPlayingId == parsedTrackId)
-                let playTextString = isCurrentlyPlaying ? "Pause" : "Play"
-                
-                let (playLabelLayout, playLabelApply) = makePlayLabelLayout(TextNodeLayoutArguments(
-                    attributedString: NSAttributedString(
-                        string: playTextString,
-                        font: Font.semibold(12.5),
-                        textColor: UIColor.white
-                    ),
-                    backgroundColor: nil,
-                    maximumNumberOfLines: 1,
-                    truncationType: .none,
-                    constrainedSize: CGSize(width: 50.0, height: .greatestFiniteMagnitude),
                     alignment: .natural,
                     cutout: nil,
                     insets: UIEdgeInsets()
@@ -530,9 +512,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                         strongSelf.playButtonNode.frame = CGRect(x: textX, y: 72.0, width: btnWidth, height: btnHeight)
                         strongSelf.playButtonNode.backgroundColor = UIColor(red: 250.0/255.0, green: 45.0/255.0, blue: 85.0/255.0, alpha: 1.0)
                         
-                        let _ = playLabelApply()
                         strongSelf.playIconNode.frame = CGRect(x: 10.0, y: 7.0, width: 14.0, height: 14.0)
-                        strongSelf.playLabelNode.frame = CGRect(x: 27.0, y: 6.0, width: playLabelLayout.size.width, height: playLabelLayout.size.height)
                         
                         if isMusicNode {
                             strongSelf.updatePlaybackState(animated: false)
@@ -544,6 +524,8 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                                 font: Font.semibold(12.5),
                                 textColor: .white
                             )
+                            let labelSize = strongSelf.playLabelNode.updateLayout(CGSize(width: 50.0, height: .greatestFiniteMagnitude))
+                            strongSelf.playLabelNode.frame = CGRect(x: 27.0, y: 6.0, width: labelSize.width, height: labelSize.height)
                             strongSelf.artworkOverlayNode.isHidden = true
                         }
                         
