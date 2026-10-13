@@ -287,30 +287,19 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         floatingWidget.openPlayer = { [weak self, weak floatingWidget] in
             guard let self = self else { return }
             floatingWidget?.setHiddenForSubscreens(true)
-            let playerController = SGDoxMusicPlayerController(context: self.context)
-            playerController.navigationPresentation = .flatModal
-            playerController.flatReceivesModalTransition = true
-            playerController.onDismissBegin = { [weak self, weak floatingWidget] in
+            SGDoxMusicPlayerController.present(context: self.context, onDismissBegin: { [weak self, weak floatingWidget] in
                 guard let self = self else { return }
                 floatingWidget?.setHiddenForSubscreens(self.viewControllers.count > 1)
                 if let layout = self.validLayout {
                     floatingWidget?.updateLayout(size: layout.size, insets: layout.insets(options: []), transition: .animated(duration: 0.25, curve: .easeInOut))
                 }
-            }
-            playerController.onDismiss = { [weak self, weak floatingWidget] in
+            }, onDismiss: { [weak self, weak floatingWidget] in
                 guard let self = self else { return }
                 floatingWidget?.setHiddenForSubscreens(self.viewControllers.count > 1)
                 if let layout = self.validLayout {
                     floatingWidget?.updateLayout(size: layout.size, insets: layout.insets(options: []), transition: .immediate)
                 }
-            }
-            if let topNavigationController = self.topViewController as? NavigationController {
-                topNavigationController.pushViewController(playerController)
-            } else if let topViewController = self.topViewController as? ViewController {
-                topViewController.push(playerController)
-            } else {
-                self.pushViewController(playerController)
-            }
+            })
         }
         self.floatingMusicWidget = floatingWidget
         tabBarController.view.addSubview(floatingWidget)

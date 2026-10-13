@@ -216,12 +216,13 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
                     let normItemArtist = Self.normalizeForComparison(itemArtist)
                     let normItemTrack = Self.normalizeForComparison(itemTrack)
                     
-                    let artistMatches = (normItemArtist as NSString).range(of: normTargetArtist).location != NSNotFound
-                        || (normTargetArtist as NSString).range(of: normItemArtist).location != NSNotFound
-                        || targetArtistWords.contains(where: { (normItemArtist as NSString).range(of: $0).location != NSNotFound })
+                    let artistMatches = (normItemArtist == normTargetArtist)
+                        || (normTargetArtist.count >= 4 && normItemArtist.contains(normTargetArtist))
+                        || (normItemArtist.count >= 4 && normTargetArtist.contains(normItemArtist))
                         
-                    let titleMatches = (normItemTrack as NSString).range(of: normTargetTitle).location != NSNotFound
-                        || (normTargetTitle as NSString).range(of: normItemTrack).location != NSNotFound
+                    let titleMatches = (normItemTrack == normTargetTitle)
+                        || (normTargetTitle.count >= 4 && normItemTrack.contains(normTargetTitle))
+                        || (normItemTrack.count >= 4 && normTargetTitle.contains(normItemTrack))
                         
                     if artistMatches && titleMatches {
                         completion(previewUrl)

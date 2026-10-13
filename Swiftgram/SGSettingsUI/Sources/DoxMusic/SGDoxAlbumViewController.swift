@@ -256,18 +256,7 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
     }
     
     private func openPlayer() {
-        if let navigationController = self.navigationController as? NavigationController {
-            if let existing = navigationController.viewControllers.first(where: { $0 is SGDoxMusicPlayerController }) as? ViewController {
-                navigationController.filterController(existing, animated: false)
-            }
-            let playerController = SGDoxMusicPlayerController(context: self.context)
-            playerController.navigationPresentation = .modal
-            navigationController.pushViewController(playerController)
-        } else {
-            let playerController = SGDoxMusicPlayerController(context: self.context)
-            playerController.navigationPresentation = .modal
-            self.present(playerController, in: .window(.root))
-        }
+        SGDoxMusicPlayerController.present(context: self.context)
     }
     
     // MARK: - UITableViewDataSource & Delegate

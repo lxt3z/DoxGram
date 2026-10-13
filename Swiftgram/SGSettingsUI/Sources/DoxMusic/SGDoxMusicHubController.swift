@@ -1390,12 +1390,6 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     }
     
     private func openPlayer() {
-        let playerController = SGDoxMusicPlayerController(context: self.context)
-        playerController.navigationPresentation = .modal
-        if let navigationController = self.navigationController as? NavigationController {
-            navigationController.pushViewController(playerController)
-        } else {
-            self.push(playerController)
-        }
+        SGDoxMusicPlayerController.present(context: self.context)
     }
 }
