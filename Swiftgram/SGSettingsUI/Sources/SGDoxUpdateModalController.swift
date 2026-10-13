@@ -241,7 +241,8 @@ public final class SGDoxUpdateModalController: ViewController {
         self.closeButton.frame = CGRect(x: cardWidth - 42.0, y: 12.0, width: 30.0, height: 30.0)
         
         // Badge
-        let badgeWidth: CGFloat = min(150.0, cardWidth - 100.0)
+        let badgeTextSize = self.versionBadgeLabel.sizeThatFits(CGSize(width: cardWidth - 100.0, height: 26.0))
+        let badgeWidth = min(cardWidth - 80.0, max(85.0, ceil(badgeTextSize.width) + 38.0))
         self.versionBadgeContainer.frame = CGRect(x: (cardWidth - badgeWidth) * 0.5, y: 22.0, width: badgeWidth, height: 26.0)
         self.versionBadgeIcon.frame = CGRect(x: 8.0, y: 5.0, width: 16.0, height: 16.0)
         self.versionBadgeLabel.frame = CGRect(x: 28.0, y: 0, width: badgeWidth - 36.0, height: 26.0)
