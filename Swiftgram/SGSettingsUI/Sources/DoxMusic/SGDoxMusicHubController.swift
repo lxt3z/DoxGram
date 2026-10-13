@@ -367,8 +367,8 @@ private final class SGDoxTrackCell: UITableViewCell {
         
         self.dolbyBadge.text = "ATMOS"
         self.dolbyBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
-        self.dolbyBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
-        self.dolbyBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.dolbyBadge.textColor = UIColor(white: 0.5, alpha: 1.0)
+        self.dolbyBadge.backgroundColor = UIColor(white: 0.5, alpha: 0.14)
         self.dolbyBadge.layer.cornerRadius = 2.5
         self.dolbyBadge.clipsToBounds = true
         self.dolbyBadge.textAlignment = .center
@@ -377,8 +377,8 @@ private final class SGDoxTrackCell: UITableViewCell {
         
         self.losslessBadge.text = "LOSSLESS"
         self.losslessBadge.font = UIFont.systemFont(ofSize: 7.5, weight: .bold)
-        self.losslessBadge.textColor = UIColor(white: 1.0, alpha: 0.85)
-        self.losslessBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.14)
+        self.losslessBadge.textColor = UIColor(white: 0.5, alpha: 1.0)
+        self.losslessBadge.backgroundColor = UIColor(white: 0.5, alpha: 0.14)
         self.losslessBadge.layer.cornerRadius = 2.5
         self.losslessBadge.clipsToBounds = true
         self.losslessBadge.textAlignment = .center
@@ -387,7 +387,7 @@ private final class SGDoxTrackCell: UITableViewCell {
         
         let quoteConfig = UIImage.SymbolConfiguration(pointSize: 9, weight: .bold)
         self.lyricsBadge.image = UIImage(systemName: "quote.bubble.fill", withConfiguration: quoteConfig)
-        self.lyricsBadge.tintColor = UIColor(white: 1.0, alpha: 0.65)
+        self.lyricsBadge.tintColor = UIColor(white: 0.5, alpha: 0.8)
         self.lyricsBadge.contentMode = .scaleAspectFit
         self.lyricsBadge.isHidden = true
         self.contentView.addSubview(self.lyricsBadge)
@@ -1086,6 +1086,14 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         let isDown = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
         cell.downloadedBadge.isHidden = !isDown
         cell.downloadedBadge.tintColor = theme.list.itemAccentColor
+        
+        let badgeTextColor = theme.overallDarkAppearance ? UIColor(white: 0.90, alpha: 0.90) : theme.list.itemSecondaryTextColor
+        let badgeBgColor = theme.overallDarkAppearance ? UIColor(white: 1.0, alpha: 0.14) : theme.list.itemSecondaryTextColor.withAlphaComponent(0.12)
+        cell.dolbyBadge.textColor = badgeTextColor
+        cell.dolbyBadge.backgroundColor = badgeBgColor
+        cell.losslessBadge.textColor = badgeTextColor
+        cell.losslessBadge.backgroundColor = badgeBgColor
+        cell.lyricsBadge.tintColor = badgeTextColor
         
         cell.dolbyBadge.isHidden = !track.isDolbyAtmos
         cell.losslessBadge.isHidden = !track.isLossless

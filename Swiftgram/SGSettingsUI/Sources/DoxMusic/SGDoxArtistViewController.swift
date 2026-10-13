@@ -478,9 +478,8 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     
     private func openPlayer() {
         if let navigationController = self.navigationController as? NavigationController {
-            if let _ = navigationController.viewControllers.first(where: { $0 is SGDoxMusicPlayerController }) {
-                navigationController.filterController(self, animated: true)
-                return
+            if let existing = navigationController.viewControllers.first(where: { $0 is SGDoxMusicPlayerController }) as? ViewController {
+                navigationController.filterController(existing, animated: false)
             }
             let playerController = SGDoxMusicPlayerController(context: self.context)
             playerController.navigationPresentation = .modal

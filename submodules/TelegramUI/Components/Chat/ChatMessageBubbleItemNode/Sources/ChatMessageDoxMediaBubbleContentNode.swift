@@ -33,14 +33,14 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     required public init() {
         self.cardBackgroundNode = ASDisplayNode()
         self.cardBackgroundNode.clipsToBounds = true
-        self.cardBackgroundNode.cornerRadius = 14.0
+        self.cardBackgroundNode.cornerRadius = 16.0
         
         self.artworkContainerNode = ASDisplayNode()
         self.artworkContainerNode.clipsToBounds = true
-        self.artworkContainerNode.cornerRadius = 10.0
+        self.artworkContainerNode.cornerRadius = 12.0
         
         self.artworkImageNode = ASImageNode()
-        self.artworkImageNode.contentMode = .scaleAspectFill
+        self.artworkImageNode.contentMode = .center
         self.artworkImageNode.displaysAsynchronously = false
         
         self.artworkOverlayNode = ASImageNode()
@@ -62,7 +62,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
         
         self.playButtonNode = HighlightTrackingButtonNode()
         self.playButtonNode.clipsToBounds = true
-        self.playButtonNode.cornerRadius = 19.0
+        self.playButtonNode.cornerRadius = 20.0
         
         self.playIconNode = ASImageNode()
         self.playIconNode.contentMode = .center
@@ -195,7 +195,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                 let isMusicTag = text.contains("doxlisten:")
                 let isWallpaperTag = text.contains("doxwall:")
                 
-                var badgeText = "🎧 СОВМЕСТНЫЙ ЭФИР"
+                var badgeText = "СОВМЕСТНЫЙ ЭФИР"
                 var titleText = "Музыкальный трек"
                 var subtitleText = "DoxMusic • Нажмите для синхронизации"
                 var parsedTrackId: String?
@@ -213,7 +213,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                         let fullTagPart = String(text[range.lowerBound...])
                         resolvedTag = fullTagPart.components(separatedBy: "\n").first ?? text
                     }
-                    badgeText = "🎧 СОВМЕСТНЫЙ ЭФИР"
+                    badgeText = "СОВМЕСТНЫЙ ЭФИР"
                 } else if isWallpaperTag {
                     var quality = "720p"
                     if let range = text.range(of: "#doxwall:") ?? text.range(of: "doxwall:") {
@@ -227,10 +227,10 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                     }
                     titleText = "Живые видео-обои"
                     subtitleText = "Качество: \(quality) • Нажмите для установки"
-                    badgeText = "🎬 ЖИВЫЕ ОБОИ"
+                    badgeText = "ЖИВЫЕ ОБОИ"
                 }
                 
-                let badgeFont = Font.bold(10.5)
+                let badgeFont = Font.bold(10.0)
                 let titleFont = Font.semibold(14.5)
                 let subtitleFont = Font.regular(12.5)
                 
@@ -353,14 +353,16 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                         
                         // Artwork content
                         if isMusicTag {
-                            let placeholderCfg = UIImage.SymbolConfiguration(pointSize: 26, weight: .medium)
+                            let placeholderCfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
                             let placeholderImage = UIImage(systemName: "music.note", withConfiguration: placeholderCfg)?.withTintColor(messageTheme.accentTextColor, renderingMode: .alwaysOriginal)
+                            strongSelf.artworkImageNode.contentMode = .center
                             strongSelf.artworkImageNode.image = placeholderImage
                             strongSelf.artworkImageNode.backgroundColor = messageTheme.accentTextColor.withAlphaComponent(0.12)
                             
                             strongSelf.fetchArtworkIfNeeded(title: titleText, artist: subtitleText)
                         } else {
-                            let wpConfig = UIImage.SymbolConfiguration(pointSize: 26, weight: .medium)
+                            let wpConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+                            strongSelf.artworkImageNode.contentMode = .center
                             strongSelf.artworkImageNode.image = UIImage(systemName: "sparkles.tv.fill", withConfiguration: wpConfig)?.withTintColor(messageTheme.accentTextColor, renderingMode: .alwaysOriginal)
                             strongSelf.artworkImageNode.backgroundColor = messageTheme.accentTextColor.withAlphaComponent(0.14)
                         }
@@ -375,7 +377,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                         strongSelf.subtitleNode.frame = CGRect(x: 78.0, y: 46.0, width: textWidth, height: subtitleLayout.size.height)
                         
                         // Button
-                        let btnSide: CGFloat = 38.0
+                        let btnSide: CGFloat = 40.0
                         let btnX = cardRect.width - btnSide - 10.0
                         let btnY = floor((cardHeight - btnSide) * 0.5)
                         strongSelf.playButtonNode.frame = CGRect(x: btnX, y: btnY, width: btnSide, height: btnSide)
@@ -406,14 +408,18 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     }
     
     private func fetchArtworkIfNeeded(title: String, artist: String) {
-        let cacheKey = "\(title)_\(artist)"
+        let cleanT = title.replacingOccurrences(of: "«", with: "").replacingOccurrences(of: "»", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanA = artist.replacingOccurrences(of: "DoxMusic", with: "").replacingOccurrences(of: "•", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let cacheKey = "\(cleanT)_\(cleanA)"
         if let cached = Self.artworkCache[cacheKey] {
+            self.artworkImageNode.contentMode = .scaleAspectFill
             self.artworkImageNode.image = cached
             return
         }
         
-        let query = "\(title) \(artist)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        guard let url = URL(string: "https://itunes.apple.com/search?term=\(query)&entity=song&limit=1") else { return }
+        let queryTerm = "\(cleanT) \(cleanA)".trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let encoded = queryTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&entity=song&limit=1") else { return }
         
         URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
             guard let data = data,
@@ -427,6 +433,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
                 guard let imgData = imgData, let img = UIImage(data: imgData) else { return }
                 DispatchQueue.main.async {
                     Self.artworkCache[cacheKey] = img
+                    self?.artworkImageNode.contentMode = .scaleAspectFill
                     self?.artworkImageNode.image = img
                 }
             }.resume()

@@ -193,7 +193,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                             source: .appleMusic,
                                             appleMusicId: song.id.rawValue,
                                             isLossless: true,
-                                            isDolbyAtmos: true,
+                                            isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
                                             hasDynamicLyrics: true
                                         ))
                                     }
@@ -221,7 +221,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                                 source: .appleMusic,
                                                 appleMusicId: song.id.rawValue,
                                                 isLossless: true,
-                                                isDolbyAtmos: true,
+                                                isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
                                                 hasDynamicLyrics: true
                                             ))
                                         }
@@ -246,7 +246,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                     source: .appleMusic,
                                     appleMusicId: song.id.rawValue,
                                     isLossless: true,
-                                    isDolbyAtmos: true,
+                                    isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
                                     hasDynamicLyrics: true
                                 ))
                             }
@@ -459,7 +459,7 @@ public final class AppleMusicService: @unchecked Sendable {
             let durationMs = item["trackTimeMillis"] as? Double ?? 30000.0
             let duration = durationMs / 1000.0
             let releaseDate = item["releaseDate"] as? String ?? ""
-            let isDolbyAtmos = releaseDate.prefix(4) >= "2020" || (Int(trackId) % 2 == 0)
+            let isDolbyAtmos = false
             
             return SGDoxMusicTrack(
                 id: "am_\(trackId)",
@@ -503,7 +503,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                     source: .appleMusic,
                                     appleMusicId: song.id.rawValue,
                                     isLossless: true,
-                                    isDolbyAtmos: true,
+                                    isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
                                     hasDynamicLyrics: true
                                 )
                             }
@@ -531,7 +531,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                     source: .appleMusic,
                                     appleMusicId: song.id.rawValue,
                                     isLossless: true,
-                                    isDolbyAtmos: true,
+                                    isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
                                     hasDynamicLyrics: true
                                 )
                             }
@@ -1023,7 +1023,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                 source: .appleMusic,
                                 appleMusicId: song.id.rawValue,
                                 isLossless: true,
-                                isDolbyAtmos: true,
+                                isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
                                 hasDynamicLyrics: true
                             )
                         }

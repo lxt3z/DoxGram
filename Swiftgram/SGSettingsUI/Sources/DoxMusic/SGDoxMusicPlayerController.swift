@@ -116,6 +116,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     public var onDismiss: (() -> Void)?
     public var onDismissBegin: (() -> Void)?
     private var hasBegunDismissal = false
+    private var isDismissing = false
     
     private func triggerDismissBeginIfNeeded() {
         guard !self.hasBegunDismissal else { return }
@@ -271,7 +272,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func detachListeners() {
         self.userScrollTimer?.invalidate()
         self.userScrollTimer = nil
-        self.teardownVideoPlayback()
+        self.teardownVideoPlayback(animated: false)
         if let token = self.stateToken {
             SGDoxMusicManager.shared.removeStateListener(token)
             self.stateToken = nil
@@ -309,7 +310,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 self.view.transform = .identity
             }
         case .ended, .cancelled:
-            if translation.y > 120 || velocity.y > 600 {
+            if (translation.y > 120 || velocity.y > 600) && !self.isDismissing {
+                self.isDismissing = true
+                self.detachListeners()
                 self.triggerDismissBeginIfNeeded()
                 let remainingDistance = max(0, self.view.bounds.height - translation.y)
                 let velocityY = max(800.0, velocity.y)
@@ -321,9 +324,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                     self.backgroundBlurView.alpha = 0.0
                 }) { [weak self] _ in
                     guard let self = self else { return }
-                    self.dismiss(animated: false)
+                    self.finishDismiss(completion: nil)
                 }
-            } else {
+            } else if !self.isDismissing {
                 UIView.animate(withDuration: 0.28, delay: 0, usingSpringWithDamping: 0.82, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
                     self.view.transform = .identity
                     self.darkDimOverlay.alpha = 1.0
@@ -475,16 +478,19 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.artworkContainerView.addGestureRecognizer(artTap)
         
         // Video Quality & Resolution Pill
-        self.videoQualityButton.backgroundColor = UIColor(white: 0.0, alpha: 0.50)
+        self.videoQualityButton.backgroundColor = UIColor(red: 0.10, green: 0.10, blue: 0.14, alpha: 0.82)
         self.videoQualityButton.layer.cornerRadius = 14
         self.videoQualityButton.layer.cornerCurve = .continuous
-        self.videoQualityButton.layer.borderWidth = 0.5
-        self.videoQualityButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
+        self.videoQualityButton.layer.borderWidth = 0.75
+        self.videoQualityButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.35).cgColor
         self.videoQualityButton.clipsToBounds = true
         self.videoQualityButton.tintColor = .white
+        let tvCfg = UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        self.videoQualityButton.setImage(UIImage(systemName: "tv.fill", withConfiguration: tvCfg), for: .normal)
         self.videoQualityButton.titleLabel?.font = UIFont.systemFont(ofSize: 11.5, weight: .bold)
-        self.videoQualityButton.setTitle("🎥 Авто", for: .normal)
-        self.videoQualityButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+        self.videoQualityButton.setTitle("Авто ▾", for: .normal)
+        self.videoQualityButton.contentEdgeInsets = UIEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
+        self.videoQualityButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -4, bottom: 0, right: 4)
         self.videoQualityButton.isHidden = true
         self.videoQualityButton.addTarget(self, action: #selector(self.videoQualityPressed), for: .touchUpInside)
         self.nowPlayingContainerView.addSubview(self.videoQualityButton)
@@ -518,21 +524,25 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Format Badges Row (Apple Music Lossless & Dolby Atmos)
         self.losslessBadgeButton.setTitle("Lossless", for: .normal)
-        self.losslessBadgeButton.setTitleColor(UIColor(white: 1.0, alpha: 0.85), for: .normal)
+        self.losslessBadgeButton.setTitleColor(.white, for: .normal)
         self.losslessBadgeButton.titleLabel?.font = UIFont.systemFont(ofSize: 10, weight: .bold)
-        self.losslessBadgeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
-        self.losslessBadgeButton.layer.cornerRadius = 4
+        self.losslessBadgeButton.backgroundColor = UIColor(white: 0.0, alpha: 0.35)
+        self.losslessBadgeButton.layer.cornerRadius = 5
         self.losslessBadgeButton.layer.cornerCurve = .continuous
+        self.losslessBadgeButton.layer.borderWidth = 0.5
+        self.losslessBadgeButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.30).cgColor
         self.losslessBadgeButton.contentEdgeInsets = UIEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
         self.losslessBadgeButton.addTarget(self, action: #selector(self.losslessBadgePressed), for: .touchUpInside)
         self.formatBadgesContainer.addSubview(self.losslessBadgeButton)
         
         self.dolbyAtmosBadgeButton.setTitle("Dolby Atmos", for: .normal)
-        self.dolbyAtmosBadgeButton.setTitleColor(UIColor(white: 1.0, alpha: 0.85), for: .normal)
+        self.dolbyAtmosBadgeButton.setTitleColor(.white, for: .normal)
         self.dolbyAtmosBadgeButton.titleLabel?.font = UIFont.systemFont(ofSize: 10, weight: .bold)
-        self.dolbyAtmosBadgeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
-        self.dolbyAtmosBadgeButton.layer.cornerRadius = 4
+        self.dolbyAtmosBadgeButton.backgroundColor = UIColor(white: 0.0, alpha: 0.35)
+        self.dolbyAtmosBadgeButton.layer.cornerRadius = 5
         self.dolbyAtmosBadgeButton.layer.cornerCurve = .continuous
+        self.dolbyAtmosBadgeButton.layer.borderWidth = 0.5
+        self.dolbyAtmosBadgeButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.30).cgColor
         self.dolbyAtmosBadgeButton.contentEdgeInsets = UIEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
         self.dolbyAtmosBadgeButton.addTarget(self, action: #selector(self.dolbyAtmosBadgePressed), for: .touchUpInside)
         self.formatBadgesContainer.addSubview(self.dolbyAtmosBadgeButton)
@@ -935,7 +945,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         super.viewDidDisappear(animated)
         self.detachListeners()
         self.triggerDismissBeginIfNeeded()
-        self.onDismiss?()
+        if !self.isDismissing {
+            self.isDismissing = true
+            self.onDismiss?()
+        }
     }
     
     private func applyLayout(bounds: CGRect, safeArea: UIEdgeInsets) {
@@ -1021,10 +1034,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Video Quality & Resolution Pill
         if self.isImmersiveVideoMode {
-            self.videoQualityButton.frame = CGRect(x: (bounds.width - 92.0) * 0.5, y: 16.0, width: 92.0, height: 28.0)
+            self.videoQualityButton.frame = CGRect(x: (bounds.width - 100.0) * 0.5, y: 16.0, width: 100.0, height: 30.0)
         } else {
-            self.videoQualityButton.frame = CGRect(x: artX + artSide - 84.0, y: artY + 10.0, width: 74.0, height: 28.0)
+            self.videoQualityButton.frame = CGRect(x: artX + artSide - 94.0, y: artY + 12.0, width: 82.0, height: 28.0)
         }
+        self.nowPlayingContainerView.bringSubviewToFront(self.videoQualityButton)
         
         // Info: Title, Artist, Lyrics & Favorite buttons
         let infoY = artY + artSide + 20.0
@@ -1607,35 +1621,35 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         super.dismiss(animated: false, completion: completion)
     }
     
+    private func finishDismiss(completion: (() -> Void)? = nil) {
+        self.onDismiss?()
+        if let navigationController = self.navigationController as? NavigationController {
+            navigationController.filterController(self, animated: false)
+            completion?()
+        } else if let presenting = self.presentingViewController {
+            presenting.dismiss(animated: false, completion: completion)
+        } else {
+            self.performSuperDismiss(completion: completion)
+        }
+    }
+    
     public override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
+        guard !self.isDismissing else { return }
+        self.isDismissing = true
+        self.detachListeners()
         self.triggerDismissBeginIfNeeded()
+        
         if flag {
-            UIView.animate(withDuration: 0.32, delay: 0, options: [.curveEaseIn], animations: {
+            UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseIn], animations: {
                 self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
                 self.darkDimOverlay.alpha = 0.0
                 self.backgroundBlurView.alpha = 0.0
             }) { [weak self] _ in
                 guard let self = self else { return }
-                self.onDismiss?()
-                if let navigationController = self.navigationController as? NavigationController {
-                    navigationController.filterController(self, animated: false)
-                    completion?()
-                } else if let presenting = self.presentingViewController {
-                    presenting.dismiss(animated: false, completion: completion)
-                } else {
-                    self.performSuperDismiss(completion: completion)
-                }
+                self.finishDismiss(completion: completion)
             }
         } else {
-            self.onDismiss?()
-            if let navigationController = self.navigationController as? NavigationController {
-                navigationController.filterController(self, animated: false)
-                completion?()
-            } else if let presenting = self.presentingViewController {
-                presenting.dismiss(animated: false, completion: completion)
-            } else {
-                self.performSuperDismiss(completion: completion)
-            }
+            self.finishDismiss(completion: completion)
         }
     }
     
@@ -1817,7 +1831,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.updateVideoQualityButtonTitle()
     }
     
-    private func teardownVideoPlayback() {
+    private func teardownVideoPlayback(animated: Bool = false) {
         if let obs = self.videoEndObserver {
             NotificationCenter.default.removeObserver(obs)
             self.videoEndObserver = nil
@@ -1829,11 +1843,17 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.videoItem = nil
         self.currentVideoClipUrl = nil
         
-        UIView.animate(withDuration: 0.35, animations: {
+        if animated && !self.isDismissing {
+            UIView.animate(withDuration: 0.35, animations: {
+                self.videoContainerView.alpha = 0.0
+                self.videoQualityButton.alpha = 0.0
+            }) { [weak self] _ in
+                self?.videoQualityButton.isHidden = true
+            }
+        } else {
             self.videoContainerView.alpha = 0.0
             self.videoQualityButton.alpha = 0.0
-        }) { [weak self] _ in
-            self?.videoQualityButton.isHidden = true
+            self.videoQualityButton.isHidden = true
         }
     }
     
@@ -1877,35 +1897,51 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     @objc private func videoQualityPressed() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let currentEffective = SGDoxVideoClipService.shared.resolveEffectiveQuality()
-        let alert = UIAlertController(title: "Видео-клип к треку", message: "Текущее качество: \(currentEffective.title)", preferredStyle: .actionSheet)
+        let alert = UIAlertController(title: "Качество видео", message: "Текущее качество: \(currentEffective.title)", preferredStyle: .actionSheet)
         
         let qualities: [SGDoxVideoQuality] = [.auto, .p1080, .p720, .p480]
         for q in qualities {
             let isCurrent = SGDoxVideoClipService.shared.preferredQuality == q
-            let prefix = isCurrent ? "✓ " : ""
-            alert.addAction(UIAlertAction(title: "\(prefix)\(q.title)", style: .default, handler: { [weak self] _ in
+            let title = isCurrent ? "\(q.title) (активно)" : q.title
+            let action = UIAlertAction(title: title, style: .default, handler: { [weak self] _ in
                 SGDoxVideoClipService.shared.preferredQuality = q
                 self?.refreshVideoQuality()
-            }))
+            })
+            if isCurrent, let checkImg = UIImage(systemName: "checkmark") {
+                action.setValue(checkImg, forKey: "image")
+            }
+            alert.addAction(action)
         }
         
-        let toggleTitle = self.isImmersiveVideoMode ? "Показать обложку альбома" : "Клип во весь экран (скрыть обложку)"
-        alert.addAction(UIAlertAction(title: toggleTitle, style: .default, handler: { [weak self] _ in
+        let toggleTitle = self.isImmersiveVideoMode ? "Показать обложку альбома" : "Клип во весь экран"
+        let toggleAction = UIAlertAction(title: toggleTitle, style: .default, handler: { [weak self] _ in
             self?.toggleImmersiveVideo()
-        }))
+        })
+        if let modeImg = UIImage(systemName: self.isImmersiveVideoMode ? "photo" : "arrow.up.left.and.arrow.down.right") {
+            toggleAction.setValue(modeImg, forKey: "image")
+        }
+        alert.addAction(toggleAction)
         
-        alert.addAction(UIAlertAction(title: "Выключить видео", style: .destructive, handler: { [weak self] _ in
+        let offAction = UIAlertAction(title: "Выключить видео", style: .destructive, handler: { [weak self] _ in
             SGDoxVideoClipService.shared.preferredQuality = .off
             self?.refreshVideoQuality()
-        }))
+        })
+        if let offImg = UIImage(systemName: "xmark.circle") {
+            offAction.setValue(offImg, forKey: "image")
+        }
+        alert.addAction(offAction)
         
         alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = self.videoQualityButton
+            popover.sourceRect = self.videoQualityButton.bounds
+        }
         self.present(alert, animated: true, completion: nil)
     }
     
     private func refreshVideoQuality() {
         guard let item = self.videoItem, SGDoxVideoClipService.shared.isVideoEnabled else {
-            self.teardownVideoPlayback()
+            self.teardownVideoPlayback(animated: true)
             return
         }
         SGDoxVideoClipService.shared.applyQuality(to: item)
@@ -1915,11 +1951,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func updateVideoQualityButtonTitle() {
         let eff = SGDoxVideoClipService.shared.resolveEffectiveQuality()
         let pref = SGDoxVideoClipService.shared.preferredQuality
-        if pref == .auto {
-            self.videoQualityButton.setTitle("🎥 \(eff.shortTitle)", for: .normal)
-        } else {
-            self.videoQualityButton.setTitle("🎥 \(pref.shortTitle)", for: .normal)
-        }
+        let title = pref == .auto ? eff.shortTitle : pref.shortTitle
+        self.videoQualityButton.setTitle("\(title) ▾", for: .normal)
     }
     
     @objc private func wavePressed() {
@@ -1979,25 +2012,39 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let manager = SGDoxListenTogetherManager.shared
         
         let alert = UIAlertController(
-            title: "🎧 Прослушивание вместе",
-            message: manager.isInSession ? "Вы слушаете музыку совместно с партнером." : "Слушайте трек синхронно с друзьями в DoxGram. Скопируйте ссылку или отправьте приглашение в чат.",
+            title: "Совместный эфир",
+            message: manager.isInSession ? "Вы слушаете музыку совместно." : "Слушайте музыку синхронно с друзьями в DoxGram.",
             preferredStyle: .actionSheet
         )
         
         if manager.isInSession {
-            alert.addAction(UIAlertAction(title: "🔄 Синхронизировать сейчас", style: .default, handler: { _ in
+            let syncAction = UIAlertAction(title: "Синхронизировать", style: .default, handler: { _ in
                 SGDoxMusicManager.shared.seek(to: SGDoxMusicManager.shared.currentTime)
-            }))
-            alert.addAction(UIAlertAction(title: "Покинуть сессию", style: .destructive, handler: { [weak self] _ in
+            })
+            if let img = UIImage(systemName: "arrow.triangle.2.circlepath") {
+                syncAction.setValue(img, forKey: "image")
+            }
+            alert.addAction(syncAction)
+            
+            let leaveAction = UIAlertAction(title: "Завершить эфир", style: .destructive, handler: { [weak self] _ in
                 manager.leaveSession()
                 self?.updateContent()
-            }))
+            })
+            if let img = UIImage(systemName: "xmark.circle") {
+                leaveAction.setValue(img, forKey: "image")
+            }
+            alert.addAction(leaveAction)
         } else {
-            alert.addAction(UIAlertAction(title: "💬 Выбрать чат в Telegram", style: .default, handler: { [weak self] _ in
+            let chatAction = UIAlertAction(title: "Отправить в чат Telegram", style: .default, handler: { [weak self] _ in
                 guard let self = self else { return }
                 self.presentPeerSelectionForListenTogether(track: track)
-            }))
-            alert.addAction(UIAlertAction(title: "📋 Скопировать приглашение", style: .default, handler: { [weak self] _ in
+            })
+            if let img = UIImage(systemName: "paperplane") {
+                chatAction.setValue(img, forKey: "image")
+            }
+            alert.addAction(chatAction)
+            
+            let copyAction = UIAlertAction(title: "Скопировать приглашение", style: .default, handler: { [weak self] _ in
                 guard let self = self else { return }
                 manager.startHostSession(peerId: nil)
                 let inviteText = manager.generateInviteText(for: track, offset: SGDoxMusicManager.shared.currentTime)
@@ -2017,15 +2064,24 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 )
                 self.present(undoController, in: .current)
                 self.updateContent()
-            }))
-            alert.addAction(UIAlertAction(title: "Поделиться через систему...", style: .default, handler: { [weak self] _ in
+            })
+            if let img = UIImage(systemName: "doc.on.doc") {
+                copyAction.setValue(img, forKey: "image")
+            }
+            alert.addAction(copyAction)
+            
+            let shareAction = UIAlertAction(title: "Поделиться...", style: .default, handler: { [weak self] _ in
                 guard let self = self else { return }
                 manager.startHostSession(peerId: nil)
                 let inviteText = manager.generateInviteText(for: track, offset: SGDoxMusicManager.shared.currentTime)
                 let shareVc = UIActivityViewController(activityItems: [inviteText], applicationActivities: nil)
                 self.present(shareVc, animated: true)
                 self.updateContent()
-            }))
+            })
+            if let img = UIImage(systemName: "square.and.arrow.up") {
+                shareAction.setValue(img, forKey: "image")
+            }
+            alert.addAction(shareAction)
         }
         
         alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))

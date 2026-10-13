@@ -149,10 +149,9 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
         
         let cleanArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let queryTerm = "\(cleanArtist) \(cleanTitle)"
         let countries = ["RU", "KZ", "US"]
         
-        self.searchMusicVideoRecursive(term: queryTerm, countries: countries, index: 0) { [weak self] videoUrl in
+        self.searchMusicVideoRecursive(artist: cleanArtist, title: cleanTitle, countries: countries, index: 0) { [weak self] videoUrl in
             guard let self = self else { return }
             self.cacheLock.lock()
             self.videoCache[trackKey] = videoUrl ?? ""
@@ -165,16 +164,34 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
         }
     }
     
-    private func searchMusicVideoRecursive(term: String, countries: [String], index: Int, completion: @escaping @Sendable (String?) -> Void) {
+    private static func normalizeForComparison(_ str: String) -> String {
+        var s = str.lowercased()
+        let regexPatterns = [
+            "\\(.*?\\)",
+            "\\[.*?\\]",
+            "\\b(feat|ft|featuring|remix|prod|live)\\b.*"
+        ]
+        for pattern in regexPatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+                s = regex.stringByReplacingMatches(in: s, options: [], range: NSRange(location: 0, length: s.utf16.count), withTemplate: "")
+            }
+        }
+        let allowed = CharacterSet.alphanumerics.union(.whitespaces)
+        s = s.components(separatedBy: allowed.inverted).joined()
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func searchMusicVideoRecursive(artist: String, title: String, countries: [String], index: Int, completion: @escaping @Sendable (String?) -> Void) {
         guard index < countries.count else {
             completion(nil)
             return
         }
         
         let country = countries[index]
-        guard let encoded = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&entity=musicVideo&limit=3&country=\(country)") else {
-            self.searchMusicVideoRecursive(term: term, countries: countries, index: index + 1, completion: completion)
+        let queryTerm = "\(artist) \(title)"
+        guard let encoded = queryTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&entity=musicVideo&limit=5&country=\(country)") else {
+            self.searchMusicVideoRecursive(artist: artist, title: title, countries: countries, index: index + 1, completion: completion)
             return
         }
         
@@ -185,14 +202,31 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
             if let data = data, error == nil,
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let results = json["results"] as? [[String: Any]] {
+                let normTargetArtist = Self.normalizeForComparison(artist)
+                let normTargetTitle = Self.normalizeForComparison(title)
+                let targetArtistWords = normTargetArtist.split(separator: " ").filter { $0.count > 2 }
+
                 for item in results {
-                    if let previewUrl = item["previewUrl"] as? String, !previewUrl.isEmpty {
+                    guard let previewUrl = item["previewUrl"] as? String, !previewUrl.isEmpty else { continue }
+                    let itemArtist = item["artistName"] as? String ?? ""
+                    let itemTrack = item["trackName"] as? String ?? ""
+                    let normItemArtist = Self.normalizeForComparison(itemArtist)
+                    let normItemTrack = Self.normalizeForComparison(itemTrack)
+                    
+                    let artistMatches = normItemArtist.contains(normTargetArtist)
+                        || normTargetArtist.contains(normItemArtist)
+                        || targetArtistWords.contains(where: { normItemArtist.contains($0) })
+                        
+                    let titleMatches = normItemTrack.contains(normTargetTitle)
+                        || normTargetTitle.contains(normItemTrack)
+                        
+                    if artistMatches && titleMatches {
                         completion(previewUrl)
                         return
                     }
                 }
             }
-            self.searchMusicVideoRecursive(term: term, countries: countries, index: index + 1, completion: completion)
+            self.searchMusicVideoRecursive(artist: artist, title: title, countries: countries, index: index + 1, completion: completion)
         }.resume()
     }
 }
