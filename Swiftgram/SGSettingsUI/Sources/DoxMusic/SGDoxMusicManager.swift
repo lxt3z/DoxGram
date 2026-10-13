@@ -471,7 +471,19 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
             if !trackId.isEmpty && self.currentTrack?.id == trackId {
                 self.togglePlay()
             } else if let rawTag = notification.userInfo?["rawTag"] as? String, !rawTag.isEmpty {
-                let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: rawTag, peerId: EnginePeer.Id(0), senderName: nil, forceJoin: true)
+                if rawTag.contains("doxlisten:") {
+                    let _ = SGDoxListenTogetherManager.shared.handleIncomingSync(text: rawTag, peerId: EnginePeer.Id(0), senderName: nil, forceJoin: true)
+                } else {
+                    let title = notification.userInfo?["title"] as? String ?? ""
+                    let artist = notification.userInfo?["artist"] as? String ?? ""
+                    let query = (!title.isEmpty && !artist.isEmpty) ? "\(title) \(artist)" : rawTag
+                    AppleMusicService.shared.search(query: query) { [weak self] tracks, _ in
+                        DispatchQueue.main.async {
+                            guard let self = self, let first = tracks.first else { return }
+                            self.play(track: first, queue: tracks)
+                        }
+                    }
+                }
             }
         }
     }

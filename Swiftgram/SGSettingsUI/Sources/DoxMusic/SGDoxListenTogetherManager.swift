@@ -77,7 +77,11 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         let now = Int64(Date().timeIntervalSince1970) - Int64(max(0.0, offset))
         let cleanTitle = track.title.replacingOccurrences(of: ":", with: " ")
         let cleanArtist = track.artist.replacingOccurrences(of: ":", with: " ")
-        let tag = "#doxlisten:\(track.id):\(now):\(cleanTitle):\(cleanArtist)"
+        var encodedArt = ""
+        if let art = track.artworkUrl, let data = art.data(using: .utf8) {
+            encodedArt = data.base64EncodedString()
+        }
+        let tag = "#doxlisten:\(track.id):\(now):\(cleanTitle):\(cleanArtist):\(encodedArt)"
         return "🎧 Совместное прослушивание\n🎵 «\(track.title)» — \(track.artist)\n\n▶️ Нажмите для подключения к эфиру:\n\(tag)"
     }
     
@@ -95,7 +99,14 @@ public final class SGDoxListenTogetherManager: NSObject, @unchecked Sendable {
         let title = components[2]
         let artist = components[3]
         
-        let existingArtwork = self.latestInvitesByPeer[peerId]?.artworkUrl
+        var parsedArtwork: String? = nil
+        if components.count >= 5, !components[4].isEmpty,
+           let data = Data(base64Encoded: components[4]),
+           let decodedArt = String(data: data, encoding: .utf8), !decodedArt.isEmpty {
+            parsedArtwork = decodedArt
+        }
+        
+        let existingArtwork = parsedArtwork ?? self.latestInvitesByPeer[peerId]?.artworkUrl
         let info = SGDoxListenTogetherSessionInfo(
             trackId: trackId,
             title: title,

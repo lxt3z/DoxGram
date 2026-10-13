@@ -405,7 +405,7 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
                     }
                     
                     
-                    let isDoxMediaMessage = messageText.contains("doxlisten:") || messageText.contains("doxwall:")
+                    let isDoxMediaMessage = messageText.contains("doxlisten:") || messageText.contains("doxwall:") || messageText.contains("music.apple.com")
                     let contentNodeType: AnyClass = isDoxMediaMessage ? ChatMessageDoxMediaBubbleContentNode.self : ChatMessageTextBubbleContentNode.self
                     
                     if isMediaInverted {
@@ -435,6 +435,9 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
         
         inner: for media in message.media {
             if let webpage = media as? TelegramMediaWebpage {
+                if isDoxMediaMessage {
+                    break inner
+                }
                 if case let .Loaded(content) = webpage.content {
                     if let story = content.story {
                         if let storyItem = message.associatedStories[story.storyId], !storyItem.data.isEmpty {
