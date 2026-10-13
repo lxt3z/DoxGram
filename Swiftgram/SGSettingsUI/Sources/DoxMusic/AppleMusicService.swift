@@ -38,6 +38,16 @@ public final class AppleMusicService: @unchecked Sendable {
         self.setupLibraryNotifications()
         self.checkCatalogSubscription()
     }
+    
+    #if canImport(MusicKit)
+    @available(iOS 15.0, *)
+    private static func isDolbyAtmosAvailable(for song: Song) -> Bool {
+        if #available(iOS 16.0, *) {
+            return song.audioVariants?.contains(.dolbyAtmos) ?? false
+        }
+        return false
+    }
+    #endif
 
     private func checkCatalogSubscription() {
         SKCloudServiceController().requestCapabilities { [weak self] capabilities, error in
@@ -193,7 +203,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                             source: .appleMusic,
                                             appleMusicId: song.id.rawValue,
                                             isLossless: true,
-                                            isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
+                                            isDolbyAtmos: Self.isDolbyAtmosAvailable(for: song),
                                             hasDynamicLyrics: true
                                         ))
                                     }
@@ -246,7 +256,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                     source: .appleMusic,
                                     appleMusicId: song.id.rawValue,
                                     isLossless: true,
-                                    isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
+                                    isDolbyAtmos: Self.isDolbyAtmosAvailable(for: song),
                                     hasDynamicLyrics: true
                                 ))
                             }
@@ -502,7 +512,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                     source: .appleMusic,
                                     appleMusicId: song.id.rawValue,
                                     isLossless: true,
-                                    isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
+                                    isDolbyAtmos: Self.isDolbyAtmosAvailable(for: song),
                                     hasDynamicLyrics: true
                                 )
                             }
@@ -530,7 +540,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                     source: .appleMusic,
                                     appleMusicId: song.id.rawValue,
                                     isLossless: true,
-                                    isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
+                                    isDolbyAtmos: Self.isDolbyAtmosAvailable(for: song),
                                     hasDynamicLyrics: true
                                 )
                             }
@@ -1022,7 +1032,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                 source: .appleMusic,
                                 appleMusicId: song.id.rawValue,
                                 isLossless: true,
-                                isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
+                                isDolbyAtmos: Self.isDolbyAtmosAvailable(for: song),
                                 hasDynamicLyrics: true
                             )
                         }
