@@ -204,10 +204,6 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
                let results = json["results"] as? [[String: Any]] {
                 let normTargetArtist = Self.normalizeForComparison(artist)
                 let normTargetTitle = Self.normalizeForComparison(title)
-                let targetArtistWords: [String] = normTargetArtist.split(separator: " ").compactMap { sub in
-                    let s = String(sub)
-                    return s.count > 2 ? s : nil
-                }
 
                 for item in results {
                     guard let previewUrl = item["previewUrl"] as? String, !previewUrl.isEmpty else { continue }

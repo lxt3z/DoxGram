@@ -9,6 +9,7 @@ import TelegramPresentationData
 import UndoUI
 import OverlayStatusController
 import AppBundle
+import SGSimpleSettings
 
 public final class SGDoxMusicPlayerController: ViewController, UIGestureRecognizerDelegate, UITableViewDataSource, UITableViewDelegate {
     private let context: AccountContext
@@ -163,9 +164,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         player.onDismiss = onDismiss
         if let mainWindow = context.sharedContext.mainWindow {
             mainWindow.present(player, on: .root)
-        } else {
-            player.navigationPresentation = .flatModal
-            context.sharedContext.mainWindow?.viewController?.present(player, animated: false)
         }
     }
     
@@ -829,7 +827,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
-        slider.value = SGDoxMusicManager.shared.avPlayer?.volume ?? 1.0
+        slider.value = SGDoxMusicManager.shared.volume
         slider.minimumTrackTintColor = UIColor(white: 1.0, alpha: 0.65)
         slider.maximumTrackTintColor = UIColor(white: 1.0, alpha: 0.20)
         slider.setThumbImage(self.generateVolumeThumb(), for: .normal)
@@ -1531,7 +1529,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     // MARK: - Actions & Volume
     @objc private func volumeChanged(_ slider: UISlider) {
-        SGDoxMusicManager.shared.avPlayer?.volume = slider.value
+        SGDoxMusicManager.shared.volume = slider.value
         self.volumeSlider.value = slider.value
         self.lyricsVolumeSlider.value = slider.value
     }
@@ -1628,11 +1626,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func presentPeerSelectionForListenTogether(track: SGDoxMusicTrack) {
-        let manager = SGDoxListenTogetherManager.shared
-        let session = manager.createSession(track: track)
-        let link = manager.generateShareLink(for: session)
-        
-        let shareController = UIActivityViewController(activityItems: [link], applicationActivities: nil)
+        let text = SGDoxListenTogetherManager.shared.generateInviteText(for: track, offset: SGDoxMusicManager.shared.currentTime)
+        let shareController = UIActivityViewController(activityItems: [text], applicationActivities: nil)
         shareController.popoverPresentationController?.sourceView = self.view
         shareController.popoverPresentationController?.sourceRect = CGRect(x: self.view.bounds.width * 0.5, y: self.view.bounds.height * 0.5, width: 1, height: 1)
         self.present(shareController, animated: true)

@@ -567,9 +567,23 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         timer.resume()
     }
     
-    private func stopTimeTracking() {
-        self.playbackTimer?.cancel()
-        self.playbackTimer = nil
+    public var volume: Float {
+        get {
+            return self.avPlayer?.volume ?? 1.0
+        }
+        set {
+            self.avPlayer?.volume = newValue
+        }
+    }
+    
+    public func shuffleQueue() {
+        self.queue.shuffle()
+        self.notifyStateChanged()
+    }
+    
+    public func clearQueue() {
+        self.queue.removeAll()
+        self.notifyStateChanged()
     }
     
     // MARK: - Playback
