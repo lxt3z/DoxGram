@@ -204,7 +204,10 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
                let results = json["results"] as? [[String: Any]] {
                 let normTargetArtist = Self.normalizeForComparison(artist)
                 let normTargetTitle = Self.normalizeForComparison(title)
-                let targetArtistWords = normTargetArtist.split(separator: " ").filter { $0.count > 2 }
+                let targetArtistWords: [String] = normTargetArtist.split(separator: " ").compactMap { sub in
+                    let s = String(sub)
+                    return s.count > 2 ? s : nil
+                }
 
                 for item in results {
                     guard let previewUrl = item["previewUrl"] as? String, !previewUrl.isEmpty else { continue }
@@ -213,12 +216,12 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
                     let normItemArtist = Self.normalizeForComparison(itemArtist)
                     let normItemTrack = Self.normalizeForComparison(itemTrack)
                     
-                    let artistMatches = normItemArtist.contains(normTargetArtist)
-                        || normTargetArtist.contains(normItemArtist)
-                        || targetArtistWords.contains(where: { normItemArtist.contains($0) })
+                    let artistMatches = (normItemArtist as NSString).range(of: normTargetArtist).location != NSNotFound
+                        || (normTargetArtist as NSString).range(of: normItemArtist).location != NSNotFound
+                        || targetArtistWords.contains(where: { (normItemArtist as NSString).range(of: $0).location != NSNotFound })
                         
-                    let titleMatches = normItemTrack.contains(normTargetTitle)
-                        || normTargetTitle.contains(normItemTrack)
+                    let titleMatches = (normItemTrack as NSString).range(of: normTargetTitle).location != NSNotFound
+                        || (normTargetTitle as NSString).range(of: normItemTrack).location != NSNotFound
                         
                     if artistMatches && titleMatches {
                         completion(previewUrl)

@@ -221,7 +221,7 @@ public final class AppleMusicService: @unchecked Sendable {
                                                 source: .appleMusic,
                                                 appleMusicId: song.id.rawValue,
                                                 isLossless: true,
-                                                isDolbyAtmos: song.audioVariants?.contains(.dolbyAtmos) ?? false,
+                                                isDolbyAtmos: false,
                                                 hasDynamicLyrics: true
                                             ))
                                         }
@@ -458,7 +458,6 @@ public final class AppleMusicService: @unchecked Sendable {
             let previewUrl = item["previewUrl"] as? String
             let durationMs = item["trackTimeMillis"] as? Double ?? 30000.0
             let duration = durationMs / 1000.0
-            let releaseDate = item["releaseDate"] as? String ?? ""
             let isDolbyAtmos = false
             
             return SGDoxMusicTrack(
