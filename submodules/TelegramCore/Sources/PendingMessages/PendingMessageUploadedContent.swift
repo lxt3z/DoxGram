@@ -138,6 +138,7 @@ func messageContentToUpload(accountPeerId: PeerId, network: Network, postbox: Po
     var autoclearMessageAttribute: AutoclearTimeoutMessageAttribute?
     var forwardInfo: ForwardSourceInfoAttribute?
     var explicitPartialReference: PartialMediaReference?
+    var forceReupload = forceReupload
     for attribute in attributes {
         if let attribute = attribute as? OutgoingChatContextResultMessageAttribute {
             if peerId.namespace != Namespaces.Peer.SecretChat {
@@ -154,6 +155,10 @@ func messageContentToUpload(accountPeerId: PeerId, network: Network, postbox: Po
         } else if let attribute = attribute as? ForwardSourceInfoAttribute {
             if peerId.namespace != Namespaces.Peer.SecretChat {
                 forwardInfo = attribute
+            }
+        } else if let attribute = attribute as? OutgoingContentInfoMessageAttribute {
+            if attribute.flags.contains(.forceReupload) {
+                forceReupload = true
             }
         }
     }
@@ -253,14 +258,14 @@ func mediaContentToUpload(accountPeerId: PeerId, network: Network, postbox: Post
         if peerId.namespace == Namespaces.Peer.SecretChat, let resource = largest.resource as? SecretFileMediaResource {
             return .single(.content(PendingMessageUploadedContentAndReuploadInfo(content: .secretMedia(.inputEncryptedFile(.init(id: resource.fileId, accessHash: resource.accessHash)), resource.decryptedSize, resource.key), reuploadInfo: nil, cacheReferenceKey: nil)))
         }
-        if peerId.namespace != Namespaces.Peer.SecretChat, let reference = image.reference, case let .cloud(id, accessHash, maybeFileReference) = reference, let fileReference = maybeFileReference {
+        if peerId.namespace != Namespaces.Peer.SecretChat, !forceReupload, let reference = image.reference, case let .cloud(id, accessHash, maybeFileReference) = reference, let fileReference = maybeFileReference {
             return .single(.content(PendingMessageUploadedContentAndReuploadInfo(content: .media(Api.InputMedia.inputMediaPhoto(.init(flags: 0, id: Api.InputPhoto.inputPhoto(.init(id: id, accessHash: accessHash, fileReference: Buffer(data: fileReference))), ttlSeconds: nil, video: nil)), text), reuploadInfo: nil, cacheReferenceKey: nil)))
         } else {
             return uploadedMediaImageContent(network: network, postbox: postbox, transformOutgoingMessageMedia: transformOutgoingMessageMedia, messageMediaPreuploadManager: messageMediaPreuploadManager, forceReupload: forceReupload, isGrouped: isGrouped, peerId: peerId, image: image, messageId: messageId, text: text, attributes: attributes, autoremoveMessageAttribute: autoremoveMessageAttribute, autoclearMessageAttribute: autoclearMessageAttribute, auxiliaryMethods: auxiliaryMethods)
         }
     } else if let file = media as? TelegramMediaFile {
         if let resource = file.resource as? CloudDocumentMediaResource {
-            if peerId.namespace == Namespaces.Peer.SecretChat {
+            if peerId.namespace == Namespaces.Peer.SecretChat || (forceReupload && !file.isSticker) {
                 for attribute in file.attributes {
                     if case let .Sticker(_, packReferenceValue, _) = attribute {
                         if let _ = packReferenceValue {

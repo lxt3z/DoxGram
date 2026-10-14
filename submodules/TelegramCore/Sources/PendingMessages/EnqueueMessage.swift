@@ -3,6 +3,7 @@ import Postbox
 import TelegramApi
 import SwiftSignalKit
 import Emoji
+import SGSimpleSettings
 
 public enum EnqueueMessageGrouping {
     case none
@@ -520,10 +521,33 @@ func opportunisticallyTransformMessageWithMedia(network: Network, postbox: Postb
     |> timeout(2.0, queue: Queue.concurrentDefaultQueue(), alternate: .single(nil))
 }
 
+private func isMessageRestrictedFromForwarding(transaction: Transaction, message: Message) -> Bool {
+    if message.id.namespace != Namespaces.Message.Cloud {
+        return true
+    }
+    if message.flags.contains(.CopyProtected) {
+        return true
+    }
+    if let peer = transaction.getPeer(message.id.peerId) {
+        if let channel = peer as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+            return true
+        }
+        if let group = peer as? TelegramGroup, group.flags.contains(.copyProtectionEnabled) {
+            return true
+        }
+    }
+    return false
+}
+
 private func forwardedMessageToBeReuploaded(transaction: Transaction, id: MessageId) -> Message? {
     if let message = transaction.getMessage(id) {
         if message.id.namespace != Namespaces.Message.Cloud {
             return message
+        } else if SGSimpleSettings.shared.bypassCopyProtection {
+            if isMessageRestrictedFromForwarding(transaction: transaction, message: message) {
+                return message
+            }
+            return nil
         } else {
             return nil
         }
@@ -731,15 +755,48 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                         updatedMessages.append((true, .forward(source: replyToMessageId.messageId, threadId: threadId, grouping: .none, attributes: attributes, correlationId: nil)))
                     }
                 }
-            case let .forward(sourceId, threadId, _, _, _):
+            case let .forward(sourceId, threadId, grouping, requestedAttributes, correlationId):
                 if let sourceMessage = forwardedMessageToBeReuploaded(transaction: transaction, id: sourceId) {
-                    var mediaReference: AnyMediaReference?
-                    if sourceMessage.id.peerId.namespace == Namespaces.Peer.SecretChat {
-                        if let media = sourceMessage.media.first {
-                            mediaReference = .standalone(media: media)
+                    let selectedMedia = sourceMessage.media.first(where: { $0 is TelegramMediaImage || $0 is TelegramMediaFile }) ?? sourceMessage.media.first
+                    let mediaReference = selectedMedia.flatMap(AnyMediaReference.standalone)
+                    
+                    var attributes: [MessageAttribute] = []
+                    attributes.append(contentsOf: filterMessageAttributesForOutgoingMessage(sourceMessage.attributes))
+                    for requestedAttr in requestedAttributes {
+                        if !attributes.contains(where: { type(of: $0) == type(of: requestedAttr) }) {
+                            attributes.append(requestedAttr)
                         }
                     }
-                    updatedMessages.append((transformedMedia, .message(text: sourceMessage.text, attributes: sourceMessage.attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])))
+                    
+                    let isProtected = isMessageRestrictedFromForwarding(transaction: transaction, message: sourceMessage)
+                    if isProtected && sourceMessage.id.namespace == Namespaces.Message.Cloud {
+                        var contentInfoFlags: OutgoingContentInfoFlags = [.forceReupload]
+                        if let existing = attributes.first(where: { $0 is OutgoingContentInfoMessageAttribute }) as? OutgoingContentInfoMessageAttribute {
+                            contentInfoFlags.formUnion(existing.flags)
+                            attributes.removeAll(where: { $0 is OutgoingContentInfoMessageAttribute })
+                        }
+                        attributes.append(OutgoingContentInfoMessageAttribute(flags: contentInfoFlags))
+                    }
+                    
+                    var hideCaptions = false
+                    for attribute in requestedAttributes {
+                        if let attribute = attribute as? ForwardOptionsMessageAttribute {
+                            hideCaptions = attribute.hideCaptions
+                            break
+                        }
+                    }
+                    
+                    var messageText = sourceMessage.text
+                    if hideCaptions && !sourceMessage.media.isEmpty {
+                        messageText = ""
+                    }
+                    
+                    var localGroupingKey: Int64?
+                    if grouping == .auto {
+                        localGroupingKey = sourceMessage.groupingKey
+                    }
+                    
+                    updatedMessages.append((transformedMedia, .message(text: messageText, attributes: attributes, inlineStickers: [:], mediaReference: mediaReference, threadId: threadId, replyToMessageId: threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }, replyToStoryId: nil, localGroupingKey: localGroupingKey, correlationId: correlationId, bubbleUpEmojiOrStickersets: [])))
                     continue outer
                 }
         }

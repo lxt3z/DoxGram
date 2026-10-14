@@ -13,6 +13,7 @@ public struct OutgoingContentInfoFlags: OptionSet {
     }
     
     public static let disableLinkPreviews = OutgoingContentInfoFlags(rawValue: 1 << 0)
+    public static let forceReupload = OutgoingContentInfoFlags(rawValue: 1 << 1)
 }
 
 public class OutgoingContentInfoMessageAttribute: MessageAttribute {

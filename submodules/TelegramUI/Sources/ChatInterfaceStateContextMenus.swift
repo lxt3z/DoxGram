@@ -1497,7 +1497,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        if resourceAvailable, (!message.containsSecretMedia || SGSimpleSettings.shared.keepViewOnceMedia || SGSimpleSettings.shared.bypassCopyProtection) && (!isCopyProtected || SGSimpleSettings.shared.bypassCopyProtection) {
+        if (resourceAvailable || SGSimpleSettings.shared.bypassCopyProtection), (!message.containsSecretMedia || SGSimpleSettings.shared.keepViewOnceMedia || SGSimpleSettings.shared.bypassCopyProtection) && (!isCopyProtected || SGSimpleSettings.shared.bypassCopyProtection) {
             var mediaReference: AnyMediaReference?
             var isVideo = false
             for media in message.effectiveMedia {
