@@ -107,6 +107,23 @@ public class SGSimpleSettings {
     public var currentPlayingTrackArtist: String = ""
     public var currentPlayingTrackArtworkUrl: String = ""
     
+    public var doxProfileTrackId: String {
+        get { return UserDefaults.standard.string(forKey: "dox_profile_track_id") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "dox_profile_track_id") }
+    }
+    public var doxProfileTrackTitle: String {
+        get { return UserDefaults.standard.string(forKey: "dox_profile_track_title") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "dox_profile_track_title") }
+    }
+    public var doxProfileTrackArtist: String {
+        get { return UserDefaults.standard.string(forKey: "dox_profile_track_artist") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "dox_profile_track_artist") }
+    }
+    public var doxProfileTrackArtworkUrl: String? {
+        get { return UserDefaults.standard.string(forKey: "dox_profile_track_artwork_url") }
+        set { UserDefaults.standard.set(newValue, forKey: "dox_profile_track_artwork_url") }
+    }
+    
     public enum Keys: String, CaseIterable {
         case hidePhoneInSettings
         case showTabNames
