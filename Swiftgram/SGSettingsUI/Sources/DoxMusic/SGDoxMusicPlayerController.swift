@@ -161,7 +161,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     // MARK: - Static Presentation Helper
     public static func present(context: AccountContext, onDismissBegin: (() -> Void)? = nil, onDismiss: (() -> Void)? = nil) {
-        if let current = currentPresentedPlayer {
+        if currentPresentedPlayer != nil {
             return
         }
         
