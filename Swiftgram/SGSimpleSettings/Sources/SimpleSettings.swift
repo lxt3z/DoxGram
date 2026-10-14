@@ -251,6 +251,7 @@ public class SGSimpleSettings {
         case autoDownloadChannels
         case doxCheckForUpdates
         case doxLastDismissedVersion
+        case doxLastDismissedTimestamp
         case doxLastUpdateCheckTimestamp
     }
     
@@ -449,6 +450,7 @@ public class SGSimpleSettings {
         Keys.autoDownloadChannels.rawValue: [Int64](),
         Keys.doxCheckForUpdates.rawValue: true,
         Keys.doxLastDismissedVersion.rawValue: "",
+        Keys.doxLastDismissedTimestamp.rawValue: 0.0,
         Keys.doxLastUpdateCheckTimestamp.rawValue: 0.0
     ]
     
@@ -868,6 +870,9 @@ public class SGSimpleSettings {
 
     @UserDefault(key: Keys.doxLastDismissedVersion.rawValue)
     public var doxLastDismissedVersion: String
+
+    @UserDefault(key: Keys.doxLastDismissedTimestamp.rawValue)
+    public var doxLastDismissedTimestamp: Double
 
     @UserDefault(key: Keys.doxLastUpdateCheckTimestamp.rawValue)
     public var doxLastUpdateCheckTimestamp: Double

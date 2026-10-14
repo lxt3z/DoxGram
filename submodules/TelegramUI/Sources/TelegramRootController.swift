@@ -92,6 +92,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     
     private var applicationInFocusDisposable: Disposable?
     private var storyUploadEventsDisposable: Disposable?
+    private var foregroundUpdateObserver: Any?
     
     override public var minimizedContainer: MinimizedContainer? {
         didSet {
@@ -173,6 +174,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.applicationInFocusDisposable?.dispose()
         self.storyUploadEventsDisposable?.dispose()
         self.viewControllersDisposable?.dispose()
+        if let observer = self.foregroundUpdateObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     public func getContactsController() -> ViewController? {
@@ -312,9 +316,17 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         
         self.pushViewController(tabBarController, animated: false)
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             guard let self = self else { return }
             SGDoxUpdateChecker.shared.checkOnLaunchIfNeeded(context: self.context)
+        }
+        
+        self.foregroundUpdateObserver = NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self = self else { return }
+                SGDoxUpdateChecker.shared.checkOnLaunchIfNeeded(context: self.context)
+            }
         }
     }
         

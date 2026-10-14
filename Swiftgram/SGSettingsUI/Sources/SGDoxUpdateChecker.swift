@@ -65,8 +65,8 @@ public final class SGDoxUpdateChecker: @unchecked Sendable {
         
         let now = Date().timeIntervalSince1970
         let lastCheck = SGSimpleSettings.shared.doxLastUpdateCheckTimestamp
-        // Check at most once every 4 hours automatically
-        if now - lastCheck < 4 * 3600 {
+        // Check at most once every 30 minutes automatically
+        if now - lastCheck < 1800 {
             return
         }
         
@@ -75,9 +75,13 @@ public final class SGDoxUpdateChecker: @unchecked Sendable {
             switch result {
             case let .success(release):
                 if let release = release {
-                    // Check if user already dismissed this specific version
+                    let now = Date().timeIntervalSince1970
+                    // Check if user already dismissed this specific version within the last 24 hours
                     if SGSimpleSettings.shared.doxLastDismissedVersion == release.tagName {
-                        return
+                        let dismissedTime = SGSimpleSettings.shared.doxLastDismissedTimestamp
+                        if now - dismissedTime < 24 * 3600 {
+                            return
+                        }
                     }
                     DispatchQueue.main.async {
                         self.presentUpdateModal(context: context, release: release)
@@ -116,10 +120,7 @@ public final class SGDoxUpdateChecker: @unchecked Sendable {
     }
     
     private func presentUpdateModal(context: AccountContext, release: SGDoxReleaseInfo) {
-        let modal = SGDoxUpdateModalController(context: context, releaseInfo: release)
-        if let mainWindow = context.sharedContext.mainWindow {
-            mainWindow.present(modal, on: .root)
-        }
+        SGDoxUpdateModalController.present(context: context, releaseInfo: release)
     }
     
     private func performCheck(isManual: Bool, completion: @escaping (Result<SGDoxReleaseInfo?, Error>) -> Void) {
@@ -152,7 +153,9 @@ public final class SGDoxUpdateChecker: @unchecked Sendable {
             self.isChecking = false
             self.lock.unlock()
             
-            SGSimpleSettings.shared.doxLastUpdateCheckTimestamp = Date().timeIntervalSince1970
+            if !isManual {
+                SGSimpleSettings.shared.doxLastUpdateCheckTimestamp = Date().timeIntervalSince1970
+            }
             
             if let error = error {
                 completion(.failure(error))
@@ -260,8 +263,8 @@ public final class SGDoxUpdateChecker: @unchecked Sendable {
         let remoteSemver = self.extractSemanticVersion(from: releaseName) ?? self.extractSemanticVersion(from: tagName)
         let currentSemver = self.extractSemanticVersion(from: self.currentAppVersion) ?? self.currentAppVersion.split(separator: ".").compactMap { Int($0) }
 
-        // 1. If both have build numbers and they are valid (> 0):
-        if let rBuild = remoteBuild, rBuild > 0, currentBuild > 0 {
+        // 1. If remote has a valid build number (> 0):
+        if let rBuild = remoteBuild, rBuild > 0 {
             // If semver is also present in both, check if remote semver is distinctly older or newer
             if let rSem = remoteSemver, !currentSemver.isEmpty {
                 let cmp = self.compareSemver(rSem, currentSemver)

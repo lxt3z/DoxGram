@@ -4,11 +4,37 @@ import Display
 import AccountContext
 import TelegramPresentationData
 import SGSimpleSettings
+import SwiftSignalKit
 
-public final class SGDoxUpdateModalController: ViewController {
+public final class SGDoxUpdateModalController: ViewController, UIGestureRecognizerDelegate {
     private let context: AccountContext
     private let releaseInfo: SGDoxReleaseInfo
     private var presentationData: PresentationData
+    
+    private static weak var currentPresentedModal: SGDoxUpdateModalController?
+    
+    // MARK: - Static Presentation Helper
+    public static func present(context: AccountContext, releaseInfo: SGDoxReleaseInfo) {
+        if currentPresentedModal != nil {
+            return
+        }
+        
+        let modal = SGDoxUpdateModalController(context: context, releaseInfo: releaseInfo)
+        currentPresentedModal = modal
+        
+        if let mainWindow = context.sharedContext.mainWindow {
+            if let rootNav = mainWindow.viewController as? NavigationController {
+                for c in rootNav.viewControllers {
+                    if let stale = c as? SGDoxUpdateModalController {
+                        rootNav.filterController(stale, animated: false)
+                    }
+                }
+                rootNav.pushViewController(modal)
+            } else if let vc = mainWindow.viewController as? ViewController {
+                vc.push(modal)
+            }
+        }
+    }
     
     // MARK: - UI Elements
     private let dimmingView = UIView()
@@ -43,13 +69,19 @@ public final class SGDoxUpdateModalController: ViewController {
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
         self.navigationPresentation = .flatModal
-        self.flatReceivesModalTransition = true
+        self.flatReceivesModalTransition = false
         self.statusBar.statusBarStyle = .White
         self.ready.set(.single(true))
     }
     
     required init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        if SGDoxUpdateModalController.currentPresentedModal === self {
+            SGDoxUpdateModalController.currentPresentedModal = nil
+        }
     }
     
     public override func loadDisplayNode() {
@@ -65,22 +97,20 @@ public final class SGDoxUpdateModalController: ViewController {
         
         // Pan gesture to dismiss
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
+        panGesture.delegate = self
         self.cardContainer.addGestureRecognizer(panGesture)
         
-        // Initial state offscreen
-        self.dimmingView.alpha = 0.0
-        let screenHeight = UIScreen.main.bounds.height
-        self.cardContainer.transform = CGAffineTransform(translationX: 0, y: screenHeight > 0 ? screenHeight : 800)
+        self.dimmingView.alpha = 1.0
+        self.cardContainer.transform = .identity
     }
     
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         if !self.hasAnimatedIn {
             self.hasAnimatedIn = true
-            UIView.animate(withDuration: 0.38, delay: 0, usingSpringWithDamping: 0.84, initialSpringVelocity: 0.4, options: [.curveEaseOut, .allowUserInteraction], animations: {
-                self.dimmingView.alpha = 1.0
-                self.cardContainer.transform = .identity
-            }, completion: nil)
+            let screenHeight = self.view.bounds.height > 0 ? self.view.bounds.height : UIScreen.main.bounds.height
+            self.cardContainer.layer.animatePosition(from: CGPoint(x: 0.0, y: screenHeight), to: CGPoint(), duration: 0.35, timingFunction: kCAMediaTimingFunctionSpring, additive: true)
+            self.dimmingView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
         }
     }
     
@@ -275,6 +305,7 @@ public final class SGDoxUpdateModalController: ViewController {
     
     @objc private func downloadPressed() {
         SGSimpleSettings.shared.doxLastDismissedVersion = self.releaseInfo.tagName
+        SGSimpleSettings.shared.doxLastDismissedTimestamp = Date().timeIntervalSince1970
         if let targetUrl = self.releaseInfo.downloadUrl ?? URL(string: self.releaseInfo.htmlUrl) {
             UIApplication.shared.open(targetUrl, options: [:], completionHandler: nil)
         }
@@ -283,16 +314,33 @@ public final class SGDoxUpdateModalController: ViewController {
     
     @objc private func laterPressed() {
         SGSimpleSettings.shared.doxLastDismissedVersion = self.releaseInfo.tagName
+        SGSimpleSettings.shared.doxLastDismissedTimestamp = Date().timeIntervalSince1970
         self.dismissAnimated()
     }
     
     private func dismissAnimated() {
-        let screenHeight = UIScreen.main.bounds.height
-        UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseIn], animations: {
+        let screenHeight = self.view.bounds.height > 0 ? self.view.bounds.height : UIScreen.main.bounds.height
+        UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseIn], animations: {
             self.dimmingView.alpha = 0.0
-            self.cardContainer.transform = CGAffineTransform(translationX: 0, y: screenHeight > 0 ? screenHeight : 800)
+            self.cardContainer.transform = CGAffineTransform(translationX: 0, y: screenHeight)
         }) { [weak self] _ in
-            self?.dismiss()
+            guard let self = self else { return }
+            self.finishDismiss()
+        }
+    }
+    
+    private func finishDismiss() {
+        if SGDoxUpdateModalController.currentPresentedModal === self {
+            SGDoxUpdateModalController.currentPresentedModal = nil
+        }
+        if let navigationController = self.navigationController as? NavigationController {
+            navigationController.filterController(self, animated: false)
+        } else if let rootNav = self.context.sharedContext.mainWindow?.viewController as? NavigationController {
+            rootNav.filterController(self, animated: false)
+        } else if let presenting = self.presentingViewController {
+            presenting.dismiss(animated: false, completion: nil)
+        } else {
+            self.dismiss()
         }
     }
     
@@ -308,8 +356,8 @@ public final class SGDoxUpdateModalController: ViewController {
                 self.dimmingView.alpha = 1.0 - (progress * 0.6)
             }
         case .ended, .cancelled:
-            if translation.y > 120.0 || velocity.y > 700.0 {
-                self.laterPressed()
+            if translation.y > 100.0 || velocity.y > 600.0 {
+                self.dismissAnimated()
             } else {
                 UIView.animate(withDuration: 0.32, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.curveEaseOut], animations: {
                     self.cardContainer.transform = .identity
@@ -319,5 +367,12 @@ public final class SGDoxUpdateModalController: ViewController {
         default:
             break
         }
+    }
+    
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if let v = touch.view, v.isDescendant(of: self.changelogScroll) {
+            return false
+        }
+        return true
     }
 }
