@@ -157,13 +157,35 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var isDismissing = false
     private var hasAnimatedIn = false
     
+    private static weak var currentPresentedPlayer: SGDoxMusicPlayerController?
+    
     // MARK: - Static Presentation Helper
     public static func present(context: AccountContext, onDismissBegin: (() -> Void)? = nil, onDismiss: (() -> Void)? = nil) {
+        if let current = currentPresentedPlayer {
+            return
+        }
+        
         let player = SGDoxMusicPlayerController(context: context)
+        currentPresentedPlayer = player
         player.onDismissBegin = onDismissBegin
-        player.onDismiss = onDismiss
+        player.onDismiss = {
+            if currentPresentedPlayer === player {
+                currentPresentedPlayer = nil
+            }
+            onDismiss?()
+        }
+        
         if let mainWindow = context.sharedContext.mainWindow {
-            mainWindow.present(player, on: .root)
+            if let rootNav = mainWindow.viewController as? NavigationController {
+                for c in rootNav.viewControllers {
+                    if let stalePlayer = c as? SGDoxMusicPlayerController {
+                        rootNav.filterController(stalePlayer, animated: false)
+                    }
+                }
+                rootNav.pushViewController(player)
+            } else if let vc = mainWindow.viewController as? ViewController {
+                vc.push(player)
+            }
         }
     }
     
@@ -172,7 +194,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
         self.navigationPresentation = .flatModal
-        self.flatReceivesModalTransition = true
+        self.flatReceivesModalTransition = false
         self.statusBar.statusBarStyle = .White
         self.ready.set(.single(true))
     }
@@ -182,6 +204,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     deinit {
+        if SGDoxMusicPlayerController.currentPresentedPlayer === self {
+            SGDoxMusicPlayerController.currentPresentedPlayer = nil
+        }
         self.detachListeners()
     }
     
@@ -207,11 +232,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.darkDimOverlay.alpha = 1.0
         self.backgroundBlurView.alpha = 1.0
         
-        // Initial offscreen state for smooth spring presentation
-        let screenHeight = UIScreen.main.bounds.height
-        let offscreenOffset = screenHeight > 0 ? screenHeight : 900.0
-        self.view.transform = CGAffineTransform(translationX: 0, y: offscreenOffset)
-        
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
         panGesture.delegate = self
         self.view.addGestureRecognizer(panGesture)
@@ -228,9 +248,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         super.viewDidAppear(animated)
         if !self.hasAnimatedIn {
             self.hasAnimatedIn = true
-            UIView.animate(withDuration: 0.38, delay: 0, usingSpringWithDamping: 0.86, initialSpringVelocity: 0.4, options: [.curveEaseOut, .allowUserInteraction], animations: {
-                self.view.transform = .identity
-            }, completion: nil)
+            let screenHeight = self.view.bounds.height > 0 ? self.view.bounds.height : UIScreen.main.bounds.height
+            self.displayNode.layer.animateBoundsOriginYAdditive(from: -screenHeight, to: 0.0, duration: 0.35, timingFunction: kCAMediaTimingFunctionSpring)
+            self.darkDimOverlay.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
+            self.backgroundBlurView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
         }
     }
     
@@ -406,30 +427,40 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.detachListeners()
         self.triggerDismissBeginIfNeeded()
         
+        let finish = { [weak self] in
+            guard let self = self else { return }
+            self.finishDismiss(completion: completion)
+        }
+        
         if flag {
+            let height = self.view.bounds.height > 0 ? self.view.bounds.height : UIScreen.main.bounds.height
             UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseIn], animations: {
-                self.view.transform = CGAffineTransform(translationX: 0, y: self.view.bounds.height)
+                self.view.transform = CGAffineTransform(translationX: 0, y: height)
                 self.darkDimOverlay.alpha = 0.0
                 self.backgroundBlurView.alpha = 0.0
-            }) { [weak self] _ in
-                guard let self = self else { return }
-                self.finishDismiss(completion: completion)
+            }) { _ in
+                finish()
             }
         } else {
-            self.finishDismiss(completion: completion)
+            finish()
         }
     }
     
     private func finishDismiss(completion: (() -> Void)? = nil) {
-        self.onDismiss?()
+        if SGDoxMusicPlayerController.currentPresentedPlayer === self {
+            SGDoxMusicPlayerController.currentPresentedPlayer = nil
+        }
         if let navigationController = self.navigationController as? NavigationController {
             navigationController.filterController(self, animated: false)
-            completion?()
+        } else if let rootNav = self.context.sharedContext.mainWindow?.viewController as? NavigationController {
+            rootNav.filterController(self, animated: false)
         } else if let presenting = self.presentingViewController {
-            presenting.dismiss(animated: false, completion: completion)
+            presenting.dismiss(animated: false, completion: nil)
         } else {
-            super.dismiss(animated: false, completion: completion)
+            super.dismiss(animated: false, completion: nil)
         }
+        self.onDismiss?()
+        completion?()
     }
     
     // MARK: - View Setup
@@ -1827,6 +1858,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.videoEndObserver = nil
         }
         self.videoPlayer?.pause()
+        self.videoPlayer?.replaceCurrentItem(with: nil)
         self.videoPlayer = nil
         self.videoPlayerLayer?.removeFromSuperlayer()
         self.videoPlayerLayer = nil
