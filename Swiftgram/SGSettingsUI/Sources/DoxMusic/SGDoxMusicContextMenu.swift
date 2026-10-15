@@ -18,6 +18,37 @@ public struct SGDoxMusicMenuItem {
     }
 }
 
+private final class SGDoxMenuButton: UIButton {
+    var onTap: (() -> Void)?
+    var enablesHighlight: Bool = true
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        self.addTarget(self, action: #selector(self.pressed), for: .touchUpInside)
+        self.addTarget(self, action: #selector(self.touchDown), for: [.touchDown, .touchDragEnter])
+        self.addTarget(self, action: #selector(self.touchUp), for: [.touchDragExit, .touchCancel, .touchUpInside, .touchUpOutside])
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    @objc private func pressed() {
+        self.backgroundColor = .clear
+        self.onTap?()
+    }
+    
+    @objc private func touchDown() {
+        if self.enablesHighlight {
+            self.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
+        }
+    }
+    
+    @objc private func touchUp() {
+        self.backgroundColor = .clear
+    }
+}
+
 public final class SGDoxMusicContextMenu: UIView {
     private let dimmingView = UIView()
     private let cardView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
@@ -25,11 +56,9 @@ public final class SGDoxMusicContextMenu: UIView {
     
     // Top capsule buttons (Favorite | Share)
     private let topCapsuleView = UIView()
-    private let favoriteButton = UIButton(type: .system)
-    private let shareButton = UIButton(type: .system)
+    private let favoriteButton = SGDoxMenuButton(type: .custom)
+    private let shareButton = SGDoxMenuButton(type: .custom)
     private let capsuleDivider = UIView()
-    
-    private var onDismiss: (() -> Void)?
     
     public static func show(
         in parentView: UIView,
@@ -99,10 +128,11 @@ public final class SGDoxMusicContextMenu: UIView {
         self.favoriteButton.setTitleColor(.white, for: .normal)
         self.favoriteButton.tintColor = isFavorite ? UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : .white
         self.favoriteButton.titleLabel?.font = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
-        self.favoriteButton.addAction(UIAction { [weak self] _ in
+        self.favoriteButton.enablesHighlight = true
+        self.favoriteButton.onTap = { [weak self] in
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             self?.dismissAnimated(completion: onToggleFavorite)
-        }, for: .touchUpInside)
+        }
         
         let shareConfig = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         let shareImg = UIImage(systemName: "square.and.arrow.up", withConfiguration: shareConfig)
@@ -111,10 +141,11 @@ public final class SGDoxMusicContextMenu: UIView {
         self.shareButton.setTitleColor(.white, for: .normal)
         self.shareButton.tintColor = .white
         self.shareButton.titleLabel?.font = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
-        self.shareButton.addAction(UIAction { [weak self] _ in
+        self.shareButton.enablesHighlight = true
+        self.shareButton.onTap = { [weak self] in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             self?.dismissAnimated(completion: onShare)
-        }, for: .touchUpInside)
+        }
         
         self.capsuleDivider.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
         
@@ -204,7 +235,7 @@ public final class SGDoxMusicContextMenu: UIView {
     }
     
     private func createRow(for item: SGDoxMusicMenuItem) -> UIView {
-        let button = UIButton(type: .custom)
+        let button = SGDoxMenuButton(type: .custom)
         button.translatesAutoresizingMaskIntoConstraints = false
         let rowHeight: CGFloat = (item.subtitle != nil) ? 52.0 : 44.0
         button.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
@@ -261,20 +292,11 @@ public final class SGDoxMusicContextMenu: UIView {
             ])
         }
         
-        // Touch highlight
-        button.addAction(UIAction { [weak button] _ in
-            button?.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
-        }, for: [.touchDown, .touchDragEnter])
-        
-        button.addAction(UIAction { [weak button] _ in
-            button?.backgroundColor = .clear
-        }, for: [.touchDragExit, .touchCancel])
-        
-        button.addAction(UIAction { [weak self, weak button] _ in
-            button?.backgroundColor = .clear
+        button.enablesHighlight = true
+        button.onTap = { [weak self] in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             self?.dismissAnimated(completion: item.action)
-        }, for: .touchUpInside)
+        }
         
         return button
     }

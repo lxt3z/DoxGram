@@ -1056,9 +1056,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.lyricsFavoriteButton.tintColor = starColor
         
         // Shuffle & Repeat states
-        self.shuffleButton.tintColor = manager.isShuffled ? .white : UIColor(white: 1.0, alpha: 0.45)
+        self.shuffleButton.tintColor = manager.isShuffleEnabled ? .white : UIColor(white: 1.0, alpha: 0.45)
         switch manager.repeatMode {
-        case .none:
+        case .off:
             self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)), for: .normal)
             self.repeatButton.tintColor = UIColor(white: 1.0, alpha: 0.45)
         case .all:
@@ -1083,7 +1083,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func reloadQueueData() {
-        self.cachedQueue = SGDoxMusicManager.shared.currentQueue
+        self.cachedQueue = SGDoxMusicManager.shared.queue
         self.queueCountLabel.text = "\(self.cachedQueue.count) треков"
         self.queueTableView.reloadData()
     }
@@ -1186,7 +1186,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         case .queue: activeContainer = self.queueContainerView
         }
         
-        let hiddenContainers = [self.nowPlayingContainerView, self.lyricsContainerView, self.queueContainerView].filter { $0 !== activeContainer }
+        let allContainers: [UIView] = [self.nowPlayingContainerView, self.lyricsContainerView, self.queueContainerView]
+        let hiddenContainers: [UIView] = allContainers.filter { !($0 === activeContainer) }
         
         activeContainer.isHidden = false
         activeContainer.alpha = 0.0
