@@ -262,24 +262,40 @@ public final class SGDoxLyricsService: @unchecked Sendable {
         var result: [SGDoxLyricsLine] = []
         let rawLines = lrc.components(separatedBy: .newlines)
         
-        // Regex pattern: \[(\d+):(\d+(?:\.\d+)?)\](.*)
+        let tagRegex = try? NSRegularExpression(pattern: #"\[(\d+):(\d+(?:\.\d+)?)\]"#)
+        let wordSyncRegex = try? NSRegularExpression(pattern: #"<\d+:\d+(?:\.\d+)?>"#)
+        
         for line in rawLines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard trimmed.hasPrefix("[") else { continue }
             
-            guard let closingBracketIndex = trimmed.firstIndex(of: Character("]")) else { continue }
-            let timeString = String(trimmed[trimmed.index(after: trimmed.startIndex)..<closingBracketIndex])
-            let text = String(trimmed[trimmed.index(after: closingBracketIndex)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            var timestamps: [Double] = []
+            let nsLine = trimmed as NSString
+            let matches = tagRegex?.matches(in: trimmed, range: NSRange(location: 0, length: nsLine.length)) ?? []
             
-            // Skip metadata tags like [ar:Linkin Park], [ti:Numb]
-            if timeString.contains(":") {
-                let parts = timeString.components(separatedBy: ":")
-                if parts.count == 2, let mins = Double(parts[0]), let secs = Double(parts[1]) {
-                    let totalSeconds = mins * 60.0 + secs
-                    if !text.isEmpty {
-                        result.append(SGDoxLyricsLine(timestamp: totalSeconds, text: text))
+            for match in matches {
+                if match.numberOfRanges >= 3 {
+                    let minStr = nsLine.substring(with: match.range(at: 1))
+                    let secStr = nsLine.substring(with: match.range(at: 2))
+                    if let mins = Double(minStr), let secs = Double(secStr) {
+                        timestamps.append(mins * 60.0 + secs)
                     }
                 }
+            }
+            
+            guard !timestamps.isEmpty else { continue }
+            
+            var text = tagRegex?.stringByReplacingMatches(in: trimmed, range: NSRange(location: 0, length: nsLine.length), withTemplate: "") ?? trimmed
+            if let wRegex = wordSyncRegex {
+                let nsText = text as NSString
+                text = wRegex.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: nsText.length), withTemplate: "")
+            }
+            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            guard !text.isEmpty else { continue }
+            
+            for ts in timestamps {
+                result.append(SGDoxLyricsLine(timestamp: ts, text: text))
             }
         }
         
