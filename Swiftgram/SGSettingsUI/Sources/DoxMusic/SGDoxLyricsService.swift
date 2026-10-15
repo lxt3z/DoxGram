@@ -223,16 +223,19 @@ public final class SGDoxLyricsService: @unchecked Sendable {
                     return self.titleMatches(candidateName: name, targetTitle: track.title)
                 }
                 
-                let firstMatch = matches.first(where: {
-                    let synced = $0["syncedLyrics"] as? String
-                    let plain = $0["plainLyrics"] as? String
-                    return (synced != nil && !synced!.isEmpty) || (plain != nil && !plain!.isEmpty)
-                }) ?? matches.first
+                let candidates = matches.isEmpty ? results : matches
+                let sorted = candidates.sorted { a, b in
+                    let lenA = (a["syncedLyrics"] as? String)?.count ?? ((a["plainLyrics"] as? String)?.count ?? 0)
+                    let lenB = (b["syncedLyrics"] as? String)?.count ?? ((b["plainLyrics"] as? String)?.count ?? 0)
+                    return lenA > lenB
+                }
                 
-                if let match = firstMatch, let lyrics = self.parseLyricsJson(match, trackId: track.id) {
-                    self.saveLyricsToDisk(lyrics)
-                    self.dispatchMain(lyrics: lyrics, completion: completion)
-                    return
+                for candidate in sorted {
+                    if let lyrics = self.parseLyricsJson(candidate, trackId: track.id), !lyrics.lines.isEmpty || !(lyrics.plainLyrics?.isEmpty ?? true) {
+                        self.saveLyricsToDisk(lyrics)
+                        self.dispatchMain(lyrics: lyrics, completion: completion)
+                        return
+                    }
                 }
             }
             

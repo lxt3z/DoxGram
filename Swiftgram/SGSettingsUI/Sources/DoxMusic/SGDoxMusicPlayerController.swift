@@ -168,12 +168,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
     }
     
+    private var hasAnimatedIn = false
+    private var panGesture: UIPanGestureRecognizer?
+    
     public init(context: AccountContext) {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         super.init(navigationBarPresentationData: nil)
         self.navigationPresentation = .flatModal
-        self.flatReceivesModalTransition = true
+        self.flatReceivesModalTransition = false
         self.statusBar.statusBarStyle = .White
         self.ready.set(.single(true))
     }
@@ -196,7 +199,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = .clear
+        self.view.backgroundColor = UIColor(red: 0.07, green: 0.08, blue: 0.11, alpha: 1.0)
+        
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(self.handlePanGesture(_:)))
+        pan.delegate = self
+        self.view.addGestureRecognizer(pan)
+        self.panGesture = pan
         
         self.setupViews()
         self.updateContent()
@@ -210,6 +218,17 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         self.darkDimOverlay.alpha = 1.0
         self.backgroundBlurView.alpha = 1.0
+    }
+    
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if !self.hasAnimatedIn {
+            self.hasAnimatedIn = true
+            let screenHeight = self.view.bounds.height > 0 ? self.view.bounds.height : UIScreen.main.bounds.height
+            self.displayNode.layer.animateBoundsOriginYAdditive(from: -screenHeight, to: 0.0, duration: 0.35, timingFunction: kCAMediaTimingFunctionSpring)
+            self.darkDimOverlay.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
+            self.backgroundBlurView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
+        }
     }
     
     public override func viewWillAppear(_ animated: Bool) {
@@ -303,14 +322,28 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         // System Volume Listener
-        self.volumeSlider.value = AVAudioSession.sharedInstance().outputVolume
+        self.volumeSlider.value = self.currentActualVolume()
         self.volumeObservation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.new]) { [weak self] _, change in
             DispatchQueue.main.async {
-                if let newVol = change.newValue {
-                    self?.volumeSlider.value = newVol
+                guard let self = self else { return }
+                if let newVol = change.newValue, newVol.isFinite && !newVol.isNaN {
+                    self.volumeSlider.value = newVol
+                } else {
+                    self.volumeSlider.value = self.currentActualVolume()
                 }
             }
         }
+    }
+    
+    private func currentActualVolume() -> Float {
+        if let systemSlider = self.hiddenVolumeView.subviews.first(where: { $0 is UISlider }) as? UISlider {
+            return systemSlider.value
+        }
+        let outVol = AVAudioSession.sharedInstance().outputVolume
+        if outVol.isFinite && !outVol.isNaN && outVol >= 0.0 {
+            return outVol
+        }
+        return 0.5
     }
     
     private func detachListeners() {
@@ -370,9 +403,56 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         } else if let presenting = self.presentingViewController {
             presenting.dismiss(animated: false, completion: nil)
         } else {
-            self.dismiss()
+            super.dismiss(animated: false, completion: nil)
         }
+        self.onDismiss?()
         completion?()
+    }
+    
+    // MARK: - Gesture Handling
+    @objc private func handlePanGesture(_ recognizer: UIPanGestureRecognizer) {
+        let translation = recognizer.translation(in: self.view)
+        let velocity = recognizer.velocity(in: self.view)
+        
+        switch recognizer.state {
+        case .changed:
+            if translation.y > 0 {
+                self.view.transform = CGAffineTransform(translationX: 0, y: translation.y)
+                let maxDist = self.view.bounds.height > 0 ? self.view.bounds.height : 600.0
+                let progress = min(1.0, translation.y / maxDist)
+                self.darkDimOverlay.alpha = 1.0 - (progress * 0.7)
+            }
+        case .ended, .cancelled:
+            if translation.y > 150 || velocity.y > 600 {
+                self.dismiss(animated: true)
+            } else {
+                UIView.animate(withDuration: 0.32, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.curveEaseOut], animations: {
+                    self.view.transform = .identity
+                    self.darkDimOverlay.alpha = 1.0
+                })
+            }
+        default:
+            break
+        }
+    }
+    
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if let v = touch.view {
+            if v is UISlider || v is UIButton || v.isDescendant(of: self.bottomControlsContainer) {
+                return false
+            }
+            if self.currentMode == .lyrics && v.isDescendant(of: self.lyricsTableView) {
+                if self.lyricsTableView.contentOffset.y > 5.0 {
+                    return false
+                }
+            }
+            if self.currentMode == .queue && v.isDescendant(of: self.queueTableView) {
+                if self.queueTableView.contentOffset.y > 5.0 {
+                    return false
+                }
+            }
+        }
+        return true
     }
     
     // MARK: - Setup Views
@@ -707,7 +787,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
-        slider.value = AVAudioSession.sharedInstance().outputVolume
+        slider.value = self.currentActualVolume()
         slider.minimumTrackTintColor = UIColor(white: 1.0, alpha: 0.65)
         slider.maximumTrackTintColor = UIColor(white: 1.0, alpha: 0.20)
         slider.setThumbImage(self.generateVolumeThumb(), for: .normal)
@@ -785,10 +865,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.videoPlayerLayer?.frame = bounds
         
         let statusBarH = self.validLayout?.statusBarHeight ?? 0.0
-        let effectiveTop = max(safeArea.top, statusBarH, 48.0)
+        let topSafe = max(safeArea.top, statusBarH, 50.0)
+        let grabberY = max(topSafe - 34.0, 10.0)
+        self.grabberView.frame = CGRect(x: (bounds.width - 38.0) * 0.5, y: grabberY, width: 38.0, height: 5.0)
         
-        // Grabber Handle
-        self.grabberView.frame = CGRect(x: (bounds.width - 36.0) * 0.5, y: max(effectiveTop * 0.25, 8.0), width: 36.0, height: 5.0)
+        let effectiveTop = topSafe + 16.0
         
         // Shared Bottom Controls (Fixed at bottom of player)
         let bottomSafe = max(safeArea.bottom, 16.0)
@@ -800,7 +881,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Central Content Area between top safe area and bottom controls
         let contentY = effectiveTop + 4.0
-        let contentH = max(100.0, bottomControlsY - contentY - 6.0)
+        let contentH = max(100.0, bottomControlsY - contentY - 8.0)
         let contentFrame = CGRect(x: 0, y: contentY, width: bounds.width, height: contentH)
         
         self.nowPlayingContainerView.frame = contentFrame
@@ -1190,17 +1271,20 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let hiddenContainers: [UIView] = allContainers.filter { !($0 === activeContainer) }
         
         activeContainer.isHidden = false
-        activeContainer.alpha = 0.0
+        activeContainer.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
         
         // Fluid spring transition
-        UIView.animate(withDuration: 0.32, delay: 0, usingSpringWithDamping: 0.84, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.86, initialSpringVelocity: 0.4, options: [.allowUserInteraction, .beginFromCurrentState], animations: {
             activeContainer.alpha = 1.0
+            activeContainer.transform = .identity
             for c in hiddenContainers {
                 c.alpha = 0.0
+                c.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
             }
         }) { _ in
             for c in hiddenContainers {
                 c.isHidden = true
+                c.transform = .identity
             }
             if targetMode == .lyrics {
                 self.syncLyricsPosition(currentTime: SGDoxMusicManager.shared.currentTime, animated: false)
@@ -1649,11 +1733,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.videoPlayer?.play()
         }
         
-        UIView.animate(withDuration: 0.40) {
-            self.videoContainerView.alpha = 1.0
-            // Seamless animated cover canvas playing full screen
-            self.artworkContainerView.alpha = 0.0
-            self.artworkAmbientGlowView.alpha = 0.0
+        // Never flash a black box! Only show video when it begins decoding frames
+        self.videoContainerView.alpha = 0.0
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemNewAccessLogEntry, object: item, queue: .main) { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self = self, self.currentVideoClipUrl == urlString else { return }
+                UIView.animate(withDuration: 0.5) {
+                    self.videoContainerView.alpha = 1.0
+                }
+            }
         }
     }
     
@@ -1669,10 +1757,18 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.videoPlayerLayer = nil
         self.videoItem = nil
         self.currentVideoClipUrl = nil
-        self.videoContainerView.alpha = 0.0
         
-        self.artworkContainerView.alpha = 1.0
-        self.artworkAmbientGlowView.alpha = 1.0
+        if animated {
+            UIView.animate(withDuration: 0.3) {
+                self.videoContainerView.alpha = 0.0
+                self.artworkContainerView.alpha = 1.0
+                self.artworkAmbientGlowView.alpha = 1.0
+            }
+        } else {
+            self.videoContainerView.alpha = 0.0
+            self.artworkContainerView.alpha = 1.0
+            self.artworkAmbientGlowView.alpha = 1.0
+        }
     }
     
     // MARK: - UITableView DataSource & Delegate
@@ -1772,12 +1868,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     private func scheduleResumeLyricsAutoScroll() {
         self.userScrollTimer?.invalidate()
-        self.userScrollTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 3.5, repeats: false) { [weak self] _ in
+        self.userScrollTimer = Foundation.Timer.scheduledTimer(withTimeInterval: 8.0, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             self.isUserScrollingLyrics = false
             if self.activeLyricsIndex >= 0 && self.currentMode == .lyrics {
                 let targetIndexPath = IndexPath(row: self.activeLyricsIndex, section: 0)
-                self.lyricsTableView.scrollToRow(at: targetIndexPath, at: .middle, animated: true)
+                if targetIndexPath.row < (self.currentLyrics?.lines.count ?? 0) {
+                    self.lyricsTableView.scrollToRow(at: targetIndexPath, at: .middle, animated: true)
+                }
             }
         }
     }
@@ -1799,6 +1897,7 @@ private final class SGDoxLyricsCell: UITableViewCell {
     private var totalWeight: Double = 1.0
     private var currentLine: SGDoxLyricsLine?
     private var isCurrentActive: Bool = false
+    private var lastRenderedChars: Int = -1
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -1809,7 +1908,7 @@ private final class SGDoxLyricsCell: UITableViewCell {
         self.lineLabel.numberOfLines = 0
         self.lineLabel.lineBreakMode = .byWordWrapping
         self.lineLabel.textAlignment = .left
-        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.38)
+        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.35)
         self.contentView.addSubview(self.lineLabel)
     }
     
@@ -1821,18 +1920,19 @@ private final class SGDoxLyricsCell: UITableViewCell {
         let wasActive = self.isCurrentActive
         self.currentLine = line
         self.isCurrentActive = isActive
+        self.lastRenderedChars = -1
         self.prepareWords(from: line.text)
         
         if isActive {
             if !wasActive {
-                self.lineLabel.transform = CGAffineTransform(scaleX: 1.04, y: 1.04)
-                UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.65, initialSpringVelocity: 0.8, options: [.allowUserInteraction], animations: {
+                self.lineLabel.transform = CGAffineTransform(scaleX: 1.035, y: 1.035)
+                UIView.animate(withDuration: 0.38, delay: 0, usingSpringWithDamping: 0.68, initialSpringVelocity: 0.7, options: [.allowUserInteraction], animations: {
                     self.lineLabel.transform = .identity
                 })
             }
             self.lineLabel.layer.shadowColor = UIColor.white.cgColor
             self.lineLabel.layer.shadowRadius = 8.0
-            self.lineLabel.layer.shadowOpacity = 0.50
+            self.lineLabel.layer.shadowOpacity = 0.55
             self.lineLabel.layer.shadowOffset = .zero
             self.updateProgress(currentTime: currentTime, lineDuration: lineDuration)
         } else {
@@ -1840,7 +1940,7 @@ private final class SGDoxLyricsCell: UITableViewCell {
             self.lineLabel.transform = .identity
             self.lineLabel.attributedText = nil
             self.lineLabel.text = line.text
-            self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.38)
+            self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.35)
         }
         self.setNeedsLayout()
     }
@@ -1850,13 +1950,21 @@ private final class SGDoxLyricsCell: UITableViewCell {
         let nsText = text as NSString
         var currentWeight: Double = 0.0
         
-        let pattern = #"\S+"#
-        if let regex = try? NSRegularExpression(pattern: pattern) {
-            let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
-            for match in matches {
-                let wordStr = nsText.substring(with: match.range)
+        var idx = 0
+        let len = nsText.length
+        while idx < len {
+            while idx < len && CharacterSet.whitespacesAndNewlines.contains(UnicodeScalar(nsText.character(at: idx))!) {
+                idx += 1
+            }
+            let start = idx
+            while idx < len && !CharacterSet.whitespacesAndNewlines.contains(UnicodeScalar(nsText.character(at: idx))!) {
+                idx += 1
+            }
+            if idx > start {
+                let range = NSRange(location: start, length: idx - start)
+                let wordStr = nsText.substring(with: range)
                 let w = max(1.0, Double(wordStr.count))
-                self.words.append((text: wordStr, range: match.range, weight: w))
+                self.words.append((text: wordStr, range: range, weight: w))
                 currentWeight += w
             }
         }
@@ -1871,10 +1979,17 @@ private final class SGDoxLyricsCell: UITableViewCell {
         let duration = max(0.8, lineDuration)
         let progress = min(1.0, elapsed / duration)
         
+        let totalChars = text.count
+        let currentTargetChar = Int(Double(totalChars) * progress)
+        if currentTargetChar == self.lastRenderedChars && progress < 0.999 && progress > 0.001 {
+            return
+        }
+        self.lastRenderedChars = currentTargetChar
+        
         if elapsed <= 0.001 {
             self.lineLabel.attributedText = nil
             self.lineLabel.text = text
-            self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.38)
+            self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.35)
             return
         }
         
@@ -1885,10 +2000,9 @@ private final class SGDoxLyricsCell: UITableViewCell {
             return
         }
         
-        // Character-level smooth progressive reveal
         let attr = NSMutableAttributedString(string: text, attributes: [
             .font: SGDoxLyricsCell.font,
-            .foregroundColor: UIColor.white.withAlphaComponent(0.38)
+            .foregroundColor: UIColor.white.withAlphaComponent(0.35)
         ])
         
         var cumulativeWeight: Double = 0.0
@@ -1911,7 +2025,7 @@ private final class SGDoxLyricsCell: UITableViewCell {
                 }
                 if revealedChars < charCount {
                     let transitionRange = NSRange(location: item.range.location + revealedChars, length: 1)
-                    attr.addAttribute(.foregroundColor, value: UIColor.white.withAlphaComponent(0.72), range: transitionRange)
+                    attr.addAttribute(.foregroundColor, value: UIColor.white.withAlphaComponent(0.75), range: transitionRange)
                 }
             }
         }
@@ -1932,11 +2046,12 @@ private final class SGDoxLyricsCell: UITableViewCell {
         super.prepareForReuse()
         self.lineLabel.attributedText = nil
         self.lineLabel.text = nil
-        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.38)
+        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.35)
         self.lineLabel.layer.shadowOpacity = 0.0
         self.lineLabel.transform = .identity
         self.currentLine = nil
         self.isCurrentActive = false
+        self.lastRenderedChars = -1
     }
 }
 
