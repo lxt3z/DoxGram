@@ -12,13 +12,15 @@ public struct SGDoxReleaseInfo: Sendable {
     public let tagName: String
     public let name: String
     public let body: String
+    public let changelogItems: [String]
     public let htmlUrl: String
     public let downloadUrl: URL?
     
-    public init(tagName: String, name: String, body: String, htmlUrl: String, downloadUrl: URL?) {
+    public init(tagName: String, name: String, body: String, changelogItems: [String] = [], htmlUrl: String, downloadUrl: URL?) {
         self.tagName = tagName
         self.name = name
         self.body = body
+        self.changelogItems = changelogItems
         self.htmlUrl = htmlUrl
         self.downloadUrl = downloadUrl
     }
@@ -192,12 +194,75 @@ public final class SGDoxUpdateChecker: @unchecked Sendable {
             
             let isNewer = self.isReleaseNewer(tagName: tagName, releaseName: name)
             if isNewer {
-                let info = SGDoxReleaseInfo(tagName: tagName, name: name, body: body, htmlUrl: htmlUrl, downloadUrl: directDownloadUrl)
-                completion(.success(info))
+                self.fetchChangelog(tagName: tagName, releaseName: name, body: body) { items in
+                    let info = SGDoxReleaseInfo(tagName: tagName, name: name, body: body, changelogItems: items, htmlUrl: htmlUrl, downloadUrl: directDownloadUrl)
+                    completion(.success(info))
+                }
             } else {
                 completion(.success(nil))
             }
         }.resume()
+    }
+    
+    private func fetchChangelog(tagName: String, releaseName: String, body: String, completion: @escaping ([String]) -> Void) {
+        let rawChangelogUrl = "https://raw.githubusercontent.com/lxt3z/DoxGram/main/Changelogs.json"
+        guard let url = URL(string: rawChangelogUrl) else {
+            completion(self.fallbackChangelog(body: body))
+            return
+        }
+        
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 4.0
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+            guard let self = self else { return }
+            if let data = data,
+               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                
+                let buildNum = self.extractBuildNumber(from: releaseName) ?? self.extractBuildNumber(from: tagName)
+                var items: [String]? = nil
+                
+                if let b = buildNum, let list = dict[String(b)] as? [String] {
+                    items = list
+                } else if let list = dict[tagName] as? [String] {
+                    items = list
+                } else {
+                    let cleanTag = tagName.replacingOccurrences(of: #"(?i)^[v_ -]+"#, with: "", options: .regularExpression)
+                    if let list = dict[cleanTag] as? [String] {
+                        items = list
+                    } else if let list = dict["latest"] as? [String] {
+                        items = list
+                    }
+                }
+                
+                if let items = items, !items.isEmpty {
+                    completion(items)
+                    return
+                }
+            }
+            completion(self.fallbackChangelog(body: body))
+        }.resume()
+    }
+    
+    private func fallbackChangelog(body: String) -> [String] {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty && !trimmed.lowercased().contains("an unsigned build") {
+            let lines = trimmed.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            if !lines.isEmpty {
+                return lines
+            }
+        }
+        return [
+            "✨ Редизайн плеера DoxMusic в стиле Apple Music",
+            "🎤 Интерактивное караоке с эффектом подпрыгивания и свечением",
+            "🔊 Синхронизация системной громкости и поддержка AirPlay",
+            "📹 Анимированные видеообложки на весь экран плеера",
+            "🪟 Обновление интерфейса: дизайн Liquid Glass с мягким матовым стеклом",
+            "🛠 Исправление вылетов, зависаний и оптимизация стабильности"
+        ]
     }
     
     /// Extracts a build number (e.g. 3929 from "build-3929" or "DoxGram 12.9.2 (3929)")
