@@ -247,7 +247,7 @@ public final class SGDoxUpdateChecker: @unchecked Sendable {
     
     private func fallbackChangelog(body: String) -> [String] {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty && !trimmed.lowercased().contains("an unsigned build") {
+        if !trimmed.isEmpty && !trimmed.lowercased().contains("unsigned") {
             let lines = trimmed.components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }

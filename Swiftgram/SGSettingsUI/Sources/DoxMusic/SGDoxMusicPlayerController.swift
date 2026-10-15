@@ -436,20 +436,32 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
     }
     
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let pan = gestureRecognizer as? UIPanGestureRecognizer, pan == self.panGesture else { return true }
+        let velocity = pan.velocity(in: self.view)
+        if velocity.y <= 0 || abs(velocity.x) > velocity.y {
+            return false
+        }
+        if self.currentMode == .lyrics && self.lyricsTableView.contentOffset.y > 0 {
+            return false
+        }
+        if self.currentMode == .queue && self.queueTableView.contentOffset.y > 0 {
+            return false
+        }
+        return true
+    }
+    
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        if otherGestureRecognizer.view == self.lyricsTableView || otherGestureRecognizer.view == self.queueTableView {
+            return true
+        }
+        return false
+    }
+    
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         if let v = touch.view {
             if v is UISlider || v is UIButton || v.isDescendant(of: self.bottomControlsContainer) {
                 return false
-            }
-            if self.currentMode == .lyrics && v.isDescendant(of: self.lyricsTableView) {
-                if self.lyricsTableView.contentOffset.y > 5.0 {
-                    return false
-                }
-            }
-            if self.currentMode == .queue && v.isDescendant(of: self.queueTableView) {
-                if self.queueTableView.contentOffset.y > 5.0 {
-                    return false
-                }
             }
         }
         return true
@@ -881,14 +893,20 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.videoPlayerLayer?.frame = bounds
         
         let statusBarH = self.validLayout?.statusBarHeight ?? 0.0
-        let topSafe = max(safeArea.top, statusBarH, 50.0)
-        let grabberY = max(topSafe - 34.0, 10.0)
+        let winSafeTop: CGFloat = {
+            if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first {
+                return window.safeAreaInsets.top
+            }
+            return 0.0
+        }()
+        let topSafe = max(safeArea.top, self.view.safeAreaInsets.top, self.validLayout?.safeInsets.top ?? 0, statusBarH, winSafeTop, 52.0)
+        let grabberY = topSafe + 6.0
         self.grabberView.frame = CGRect(x: (bounds.width - 38.0) * 0.5, y: grabberY, width: 38.0, height: 5.0)
         
-        let effectiveTop = topSafe + 16.0
+        let effectiveTop = topSafe + 28.0
         
         // Shared Bottom Controls (Fixed at bottom of player)
-        let bottomSafe = max(safeArea.bottom, 16.0)
+        let bottomSafe = max(safeArea.bottom, self.view.safeAreaInsets.bottom, 16.0)
         let bottomControlsH: CGFloat = 224.0
         let bottomControlsY = bounds.height - bottomControlsH - bottomSafe
         let bottomControlsRect = CGRect(x: 0, y: bottomControlsY, width: bounds.width, height: bottomControlsH)
@@ -896,7 +914,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.layoutBottomControls(rect: self.bottomControlsContainer.bounds)
         
         // Central Content Area between top safe area and bottom controls
-        let contentY = effectiveTop + 4.0
+        let contentY = effectiveTop
         let contentH = max(100.0, bottomControlsY - contentY - 8.0)
         let contentFrame = CGRect(x: 0, y: contentY, width: bounds.width, height: contentH)
         
@@ -1372,7 +1390,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 c.isHidden = true
                 c.transform = .identity
             }
-            if targetMode == .lyrics {
+            if targetMode == .nowPlaying {
+                let isVideoActive = (self.currentVideoClipUrl != nil && self.videoContainerView.alpha > 0.5)
+                self.artworkContainerView.alpha = isVideoActive ? 0.0 : 1.0
+                self.artworkAmbientGlowView.alpha = isVideoActive ? 0.0 : 1.0
+            } else if targetMode == .lyrics {
                 self.syncLyricsPosition(currentTime: SGDoxMusicManager.shared.currentTime, animated: false)
                 self.updateLyricsMask()
             }
@@ -1548,7 +1570,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let isDown = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
         let isWave = SGDoxMusicManager.shared.isWaveEnabled
         
-        let items: [SGDoxMusicMenuItem] = [
+        var items: [SGDoxMusicMenuItem] = [
             SGDoxMusicMenuItem(iconName: "pin.fill", title: "Закрепить песню в профиле", action: { [weak self] in
                 self?.pinToProfilePressed()
             }),
@@ -1559,19 +1581,36 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             }),
             SGDoxMusicMenuItem(iconName: "person.2.fill", title: "Совместный эфир", action: { [weak self] in
                 self?.listenTogetherPressed()
-            }),
-            SGDoxMusicMenuItem(iconName: "mic.fill", title: "Перейти к артисту", subtitle: track.artist, action: { [weak self] in
-                self?.artistLabelTapped()
-            }),
-            SGDoxMusicMenuItem(
-                iconName: isDown ? "trash.fill" : "arrow.down.circle",
-                title: isDown ? "Удалить из офлайна" : "Скачать для офлайна",
-                isDestructive: isDown,
-                action: { [weak self] in
-                    self?.downloadPressed()
-                }
-            )
+            })
         ]
+        
+        if !track.album.isEmpty {
+            items.append(SGDoxMusicMenuItem(iconName: "music.note.list", title: "Перейти к альбому", subtitle: track.album, action: { [weak self] in
+                guard let self = self else { return }
+                let album = SGDoxAlbum(id: track.album, title: track.album, artist: track.artist, artworkUrl: track.artworkUrl)
+                let albumVc = SGDoxAlbumViewController(context: self.context, album: album)
+                if let topNav = self.context.sharedContext.mainWindow?.viewController as? NavigationController {
+                    topNav.pushViewController(albumVc)
+                }
+            }))
+        }
+        
+        items.append(SGDoxMusicMenuItem(iconName: "music.mic", title: "Перейти к артисту", subtitle: track.artist, action: { [weak self] in
+            self?.artistLabelTapped()
+        }))
+        
+        items.append(SGDoxMusicMenuItem(iconName: "info.circle", title: "Посмотреть авторство", subtitle: "\(track.source.rawValue) • \(track.isLossless ? "Lossless" : (track.isDolbyAtmos ? "Dolby Atmos" : "AAC 256k"))", action: { [weak self] in
+            self?.formatBadgePressed()
+        }))
+        
+        items.append(SGDoxMusicMenuItem(
+            iconName: isDown ? "trash.fill" : "arrow.down.circle",
+            title: isDown ? "Удалить загрузку" : "Скачать для офлайна",
+            isDestructive: isDown,
+            action: { [weak self] in
+                self?.downloadPressed()
+            }
+        ))
         
         let sourceBtn = (self.currentMode == .lyrics ? self.lyricsMoreButton : self.moreButton)
         SGDoxMusicContextMenu.show(
@@ -1824,12 +1863,20 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Never flash a black box! Only show video when it begins decoding frames
         self.videoContainerView.alpha = 0.0
-        NotificationCenter.default.addObserver(forName: .AVPlayerItemNewAccessLogEntry, object: item, queue: .main) { [weak self] _ in
-            DispatchQueue.main.async {
-                guard let self = self, self.currentVideoClipUrl == urlString else { return }
-                UIView.animate(withDuration: 0.5) {
-                    self.videoContainerView.alpha = 1.0
+        let revealVideo = { [weak self] in
+            guard let self = self, self.currentVideoClipUrl == urlString else { return }
+            UIView.animate(withDuration: 0.6, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState], animations: {
+                self.videoContainerView.alpha = 1.0
+                if self.currentMode == .nowPlaying {
+                    self.artworkContainerView.alpha = 0.0
+                    self.artworkAmbientGlowView.alpha = 0.0
                 }
+            })
+        }
+        
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemNewAccessLogEntry, object: item, queue: .main) { _ in
+            DispatchQueue.main.async {
+                revealVideo()
             }
         }
     }

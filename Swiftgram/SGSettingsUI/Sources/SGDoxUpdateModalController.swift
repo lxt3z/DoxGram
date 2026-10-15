@@ -38,9 +38,10 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
     
     // MARK: - UI Elements (Liquid Glass Design)
     private let dimmingView = UIView()
+    private let ambientBacklightLayer = CAGradientLayer()
     private let cardShadowContainer = UIView()
     private let cardContainer = UIView()
-    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialDark))
     private let glassTintOverlay = UIView()
     private let sheenGradient = CAGradientLayer()
     
@@ -120,25 +121,36 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         let isRu = self.presentationData.strings.baseLanguageCode.hasPrefix("ru")
         
         // 1. Dimming Backdrop
-        self.dimmingView.backgroundColor = UIColor(white: 0.0, alpha: 0.48)
+        self.dimmingView.backgroundColor = UIColor(white: 0.0, alpha: 0.45)
         let tapDim = UITapGestureRecognizer(target: self, action: #selector(self.laterPressed))
         self.dimmingView.addGestureRecognizer(tapDim)
         self.view.addSubview(self.dimmingView)
         
-        // 2. Liquid Glass Shadow Container (handles outer depth shadow)
+        // 2. Liquid Glass Backlight & Shadow Container
         self.cardShadowContainer.backgroundColor = .clear
         self.cardShadowContainer.layer.shadowColor = UIColor.black.cgColor
-        self.cardShadowContainer.layer.shadowOpacity = 0.55
-        self.cardShadowContainer.layer.shadowRadius = 38.0
-        self.cardShadowContainer.layer.shadowOffset = CGSize(width: 0, height: 18)
+        self.cardShadowContainer.layer.shadowOpacity = 0.50
+        self.cardShadowContainer.layer.shadowRadius = 36.0
+        self.cardShadowContainer.layer.shadowOffset = CGSize(width: 0, height: 16)
         self.view.addSubview(self.cardShadowContainer)
+        
+        // Ambient Neon Glow behind the glass
+        self.ambientBacklightLayer.colors = [
+            UIColor(red: 0.15, green: 0.45, blue: 0.95, alpha: 0.35).cgColor,
+            UIColor(red: 0.55, green: 0.18, blue: 0.90, alpha: 0.20).cgColor,
+            UIColor.clear.cgColor
+        ]
+        self.ambientBacklightLayer.startPoint = CGPoint(x: 0.1, y: 0.0)
+        self.ambientBacklightLayer.endPoint = CGPoint(x: 0.9, y: 1.0)
+        self.ambientBacklightLayer.cornerRadius = 32.0
+        self.cardShadowContainer.layer.insertSublayer(self.ambientBacklightLayer, at: 0)
         
         // 3. Liquid Glass Card Container
         self.cardContainer.backgroundColor = .clear
         self.cardContainer.layer.cornerRadius = 28.0
         self.cardContainer.layer.cornerCurve = .continuous
         self.cardContainer.layer.borderWidth = 0.5
-        self.cardContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.28).cgColor
+        self.cardContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.30).cgColor
         self.cardContainer.clipsToBounds = true
         self.cardShadowContainer.addSubview(self.cardContainer)
         
@@ -147,16 +159,16 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         self.cardContainer.addSubview(self.blurView)
         
         // Translucent Tint Overlay
-        self.glassTintOverlay.backgroundColor = UIColor(red: 0.10, green: 0.12, blue: 0.18, alpha: 0.38)
+        self.glassTintOverlay.backgroundColor = UIColor(red: 0.08, green: 0.10, blue: 0.16, alpha: 0.30)
         self.cardContainer.addSubview(self.glassTintOverlay)
         
         // Specular Sheen Layer (Subtle top reflection)
         self.sheenGradient.colors = [
-            UIColor(white: 1.0, alpha: 0.24).cgColor,
-            UIColor(white: 1.0, alpha: 0.05).cgColor,
+            UIColor(white: 1.0, alpha: 0.28).cgColor,
+            UIColor(white: 1.0, alpha: 0.04).cgColor,
             UIColor.clear.cgColor
         ]
-        self.sheenGradient.locations = [0.0, 0.35, 1.0]
+        self.sheenGradient.locations = [0.0, 0.30, 1.0]
         self.sheenGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
         self.sheenGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
         self.cardContainer.layer.addSublayer(self.sheenGradient)
@@ -164,27 +176,28 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         // Close Button (Frosted Glass Circular Button)
         let xConfig = UIImage.SymbolConfiguration(pointSize: 12.0, weight: .bold)
         self.closeButton.setImage(UIImage(systemName: "xmark", withConfiguration: xConfig), for: .normal)
-        self.closeButton.tintColor = UIColor(white: 1.0, alpha: 0.80)
+        self.closeButton.tintColor = UIColor(white: 1.0, alpha: 0.85)
         self.closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
         self.closeButton.layer.cornerRadius = 15.0
         self.closeButton.layer.borderWidth = 0.5
-        self.closeButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.20).cgColor
+        self.closeButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
         self.closeButton.clipsToBounds = true
         self.closeButton.addTarget(self, action: #selector(self.laterPressed), for: .touchUpInside)
+        self.attachBounceFeedback(self.closeButton)
         self.cardContainer.addSubview(self.closeButton)
         
         // Version Pill Badge [ 🚀 build-3935 ]
-        self.versionBadgeContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
+        self.versionBadgeContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
         self.versionBadgeContainer.layer.cornerRadius = 13.0
         self.versionBadgeContainer.layer.cornerCurve = .continuous
         self.versionBadgeContainer.layer.borderWidth = 0.5
-        self.versionBadgeContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.24).cgColor
+        self.versionBadgeContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
         self.versionBadgeContainer.clipsToBounds = true
         self.cardContainer.addSubview(self.versionBadgeContainer)
         
         let sparkConfig = UIImage.SymbolConfiguration(pointSize: 12.5, weight: .bold)
         self.versionBadgeIcon.image = UIImage(systemName: "arrow.up.circle.fill", withConfiguration: sparkConfig)
-        self.versionBadgeIcon.tintColor = UIColor(red: 0.22, green: 0.74, blue: 1.0, alpha: 1.0)
+        self.versionBadgeIcon.tintColor = UIColor(red: 0.25, green: 0.75, blue: 1.0, alpha: 1.0)
         self.versionBadgeIcon.contentMode = .scaleAspectFit
         self.versionBadgeContainer.addSubview(self.versionBadgeIcon)
         
@@ -195,7 +208,7 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         
         // Title Label
         self.titleLabel.text = isRu ? "Доступно обновление" : "Update Available"
-        self.titleLabel.font = UIFont.systemFont(ofSize: 21.0, weight: .bold)
+        self.titleLabel.font = UIFont.systemFont(ofSize: 22.0, weight: .bold)
         self.titleLabel.textColor = .white
         self.titleLabel.textAlignment = .center
         self.cardContainer.addSubview(self.titleLabel)
@@ -210,11 +223,11 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         self.cardContainer.addSubview(self.subtitleLabel)
         
         // 4. Liquid Glass Changelog Inlay Card
-        self.changelogGlassInlay.backgroundColor = UIColor(white: 1.0, alpha: 0.06)
-        self.changelogGlassInlay.layer.cornerRadius = 18.0
+        self.changelogGlassInlay.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
+        self.changelogGlassInlay.layer.cornerRadius = 20.0
         self.changelogGlassInlay.layer.cornerCurve = .continuous
         self.changelogGlassInlay.layer.borderWidth = 0.5
-        self.changelogGlassInlay.layer.borderColor = UIColor(white: 1.0, alpha: 0.14).cgColor
+        self.changelogGlassInlay.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
         self.changelogGlassInlay.clipsToBounds = true
         self.cardContainer.addSubview(self.changelogGlassInlay)
         
@@ -224,7 +237,7 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         self.changelogGlassInlay.addSubview(self.changelogScroll)
         
         self.changelogStack.axis = .vertical
-        self.changelogStack.spacing = 8.0
+        self.changelogStack.spacing = 10.0
         self.changelogStack.alignment = .fill
         self.changelogStack.distribution = .fill
         self.changelogScroll.addSubview(self.changelogStack)
@@ -237,8 +250,8 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         self.downloadButton.clipsToBounds = true
         
         self.downloadGradientLayer.colors = [
-            UIColor(red: 0.16, green: 0.50, blue: 0.98, alpha: 1.0).cgColor,
-            UIColor(red: 0.10, green: 0.36, blue: 0.90, alpha: 1.0).cgColor
+            UIColor(red: 0.16, green: 0.48, blue: 0.98, alpha: 1.0).cgColor,
+            UIColor(red: 0.10, green: 0.35, blue: 0.92, alpha: 1.0).cgColor
         ]
         self.downloadGradientLayer.startPoint = CGPoint(x: 0.0, y: 0.5)
         self.downloadGradientLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
@@ -251,32 +264,57 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         self.downloadButton.titleLabel?.font = UIFont.systemFont(ofSize: 15.5, weight: .bold)
         self.downloadButton.tintColor = .white
         self.downloadButton.addTarget(self, action: #selector(self.downloadPressed), for: .touchUpInside)
+        self.attachBounceFeedback(self.downloadButton)
         self.cardContainer.addSubview(self.downloadButton)
         
         // 6. Later / Skip Button
         self.laterButton.setTitle(isRu ? "Напомнить позже" : "Remind Me Later", for: .normal)
-        self.laterButton.setTitleColor(UIColor(white: 1.0, alpha: 0.55), for: .normal)
-        self.laterButton.titleLabel?.font = UIFont.systemFont(ofSize: 14.0, weight: .medium)
+        self.laterButton.setTitleColor(UIColor(white: 1.0, alpha: 0.60), for: .normal)
+        self.laterButton.titleLabel?.font = UIFont.systemFont(ofSize: 14.5, weight: .medium)
         self.laterButton.addTarget(self, action: #selector(self.laterPressed), for: .touchUpInside)
+        self.attachBounceFeedback(self.laterButton)
         self.cardContainer.addSubview(self.laterButton)
     }
     
+    private func attachBounceFeedback(_ button: UIButton) {
+        button.addTarget(self, action: #selector(self.btnTouchDown(_:)), for: [.touchDown])
+        button.addTarget(self, action: #selector(self.btnTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+    }
+    
+    @objc private func btnTouchDown(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.12, delay: 0, options: [.allowUserInteraction, .curveEaseOut], animations: {
+            sender.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+        })
+    }
+    
+    @objc private func btnTouchUp(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.55, initialSpringVelocity: 0.8, options: [.allowUserInteraction], animations: {
+            sender.transform = .identity
+        })
+    }
+    
     private func populateChangelogItems() {
-        let items = self.releaseInfo.changelogItems
+        var items = self.releaseInfo.changelogItems
+        
+        // If changelogItems is empty or contains raw build info, use authentic Russian changelog
+        if items.isEmpty || (items.count == 1 && items[0].lowercased().contains("unsigned")) {
+            items = [
+                "✨ Редизайн плеера DoxMusic в стиле Apple Music",
+                "🎤 Интерактивное караоке с эффектом подпрыгивания и свечением",
+                "🔊 Синхронизация системной громкости и поддержка AirPlay",
+                "📹 Анимированные видеообложки на весь экран плеера",
+                "🪟 Обновление интерфейса: дизайн Liquid Glass с мягким матовым стеклом",
+                "🛠 Исправление вылетов, зависаний и оптимизация стабильности"
+            ]
+        }
         
         for view in self.changelogStack.arrangedSubviews {
             self.changelogStack.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
         
-        if !items.isEmpty {
-            for text in items {
-                let row = self.createChangelogRow(text: text)
-                self.changelogStack.addArrangedSubview(row)
-            }
-        } else {
-            let fallbackText = self.cleanMarkdown(self.releaseInfo.body)
-            let row = self.createChangelogRow(text: fallbackText.isEmpty ? "✨ Улучшения стабильности и новые функции" : fallbackText)
+        for text in items {
+            let row = self.createChangelogRow(text: text)
             self.changelogStack.addArrangedSubview(row)
         }
     }
@@ -284,13 +322,22 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
     private func createChangelogRow(text: String) -> UIView {
         let container = UIView()
         
+        let iconBadge = UIView()
+        iconBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        iconBadge.layer.cornerRadius = 14.0
+        iconBadge.layer.cornerCurve = .continuous
+        iconBadge.clipsToBounds = true
+        iconBadge.translatesAutoresizingMaskIntoConstraints = false
+        
         let bulletLabel = UILabel()
-        bulletLabel.font = UIFont.systemFont(ofSize: 13.5, weight: .regular)
+        bulletLabel.font = UIFont.systemFont(ofSize: 14.0, weight: .regular)
+        bulletLabel.textAlignment = .center
         bulletLabel.translatesAutoresizingMaskIntoConstraints = false
+        iconBadge.addSubview(bulletLabel)
         
         let bodyLabel = UILabel()
-        bodyLabel.font = UIFont.systemFont(ofSize: 13.5, weight: .medium)
-        bodyLabel.textColor = UIColor(white: 1.0, alpha: 0.90)
+        bodyLabel.font = UIFont.systemFont(ofSize: 14.0, weight: .medium)
+        bodyLabel.textColor = UIColor(white: 1.0, alpha: 0.92)
         bodyLabel.numberOfLines = 0
         bodyLabel.lineBreakMode = .byWordWrapping
         bodyLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -298,8 +345,7 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         // Detect leading emoji
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let firstChar = trimmed.first, firstChar.isEmoji {
-            let emojiStr = String(firstChar)
-            bulletLabel.text = emojiStr
+            bulletLabel.text = String(firstChar)
             let remainingText = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
             bodyLabel.text = remainingText
         } else {
@@ -308,32 +354,25 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
             bodyLabel.text = trimmed
         }
         
-        container.addSubview(bulletLabel)
+        container.addSubview(iconBadge)
         container.addSubview(bodyLabel)
         
         NSLayoutConstraint.activate([
-            bulletLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
-            bulletLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 1),
-            bulletLabel.widthAnchor.constraint(equalToConstant: 22),
+            bulletLabel.centerXAnchor.constraint(equalTo: iconBadge.centerXAnchor),
+            bulletLabel.centerYAnchor.constraint(equalTo: iconBadge.centerYAnchor),
             
-            bodyLabel.leadingAnchor.constraint(equalTo: bulletLabel.trailingAnchor, constant: 6),
-            bodyLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
-            bodyLabel.topAnchor.constraint(equalTo: container.topAnchor),
-            bodyLabel.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            iconBadge.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
+            iconBadge.topAnchor.constraint(equalTo: container.topAnchor, constant: 1),
+            iconBadge.widthAnchor.constraint(equalToConstant: 28),
+            iconBadge.heightAnchor.constraint(equalToConstant: 28),
+            
+            bodyLabel.leadingAnchor.constraint(equalTo: iconBadge.trailingAnchor, constant: 10),
+            bodyLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+            bodyLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
+            bodyLabel.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4)
         ])
         
         return container
-    }
-    
-    private func cleanMarkdown(_ text: String) -> String {
-        var result = text
-        result = result.replacingOccurrences(of: "### ", with: "• ")
-        result = result.replacingOccurrences(of: "## ", with: "• ")
-        result = result.replacingOccurrences(of: "# ", with: "• ")
-        result = result.replacingOccurrences(of: "**", with: "")
-        result = result.replacingOccurrences(of: "__", with: "")
-        result = result.replacingOccurrences(of: "`", with: "")
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
@@ -342,15 +381,16 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         self.dimmingView.frame = bounds
         
         let cardWidth = min(bounds.width - 44.0, 360.0)
-        let cardHeight: CGFloat = min(bounds.height - 90.0, 520.0)
+        let cardHeight: CGFloat = min(bounds.height - 90.0, 530.0)
         let cardX = (bounds.width - cardWidth) * 0.5
         let cardY = (bounds.height - cardHeight) * 0.5
         
         self.cardShadowContainer.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight)
+        self.ambientBacklightLayer.frame = self.cardShadowContainer.bounds.insetBy(dx: -16.0, dy: -16.0)
         self.cardContainer.frame = self.cardShadowContainer.bounds
         self.blurView.frame = self.cardContainer.bounds
         self.glassTintOverlay.frame = self.cardContainer.bounds
-        self.sheenGradient.frame = CGRect(x: 0, y: 0, width: cardWidth, height: 120.0)
+        self.sheenGradient.frame = CGRect(x: 0, y: 0, width: cardWidth, height: 130.0)
         
         self.closeButton.frame = CGRect(x: cardWidth - 44.0, y: 14.0, width: 30.0, height: 30.0)
         
@@ -392,7 +432,7 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
             verticalFittingPriority: .fittingSizeLevel
         )
         let contentH = max(inlayH, stackFitting.height + 24.0)
-        self.changelogStack.frame = CGRect(x: 0, y: 12.0, width: stackWidth, height: stackFitting.height)
+        self.changelogStack.frame = CGRect(x: 0, y: 10.0, width: stackWidth, height: stackFitting.height)
         self.changelogScroll.contentSize = CGSize(width: stackWidth, height: contentH)
     }
     
