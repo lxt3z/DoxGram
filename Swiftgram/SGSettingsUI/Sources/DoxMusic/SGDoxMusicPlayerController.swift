@@ -555,12 +555,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.favoriteButton.setImage(UIImage(systemName: "star", withConfiguration: starConfig), for: .normal)
         self.favoriteButton.tintColor = .white
         self.favoriteButton.addTarget(self, action: #selector(self.favoritePressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.favoriteButton)
         self.infoContainerView.addSubview(self.favoriteButton)
         
         let moreConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
         self.moreButton.setImage(UIImage(systemName: "ellipsis", withConfiguration: moreConfig), for: .normal)
         self.moreButton.tintColor = .white
         self.moreButton.addTarget(self, action: #selector(self.morePressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.moreButton)
         self.infoContainerView.addSubview(self.moreButton)
     }
     
@@ -590,6 +592,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Format Badge Pill (Lossless / Dolby Atmos)
         self.setupFormatBadge(self.formatBadgeButton)
+        self.attachButtonBounceFeedback(self.formatBadgeButton)
         self.bottomControlsContainer.addSubview(self.formatBadgeButton)
         
         // Transport Controls Row: Shuffle | Prev | Play/Pause | Next | Repeat
@@ -597,28 +600,33 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.shuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: subConfig), for: .normal)
         self.shuffleButton.tintColor = UIColor(white: 1.0, alpha: 0.60)
         self.shuffleButton.addTarget(self, action: #selector(self.shufflePressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.shuffleButton)
         self.controlsContainerView.addSubview(self.shuffleButton)
         
         let skipConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
         self.previousButton.setImage(UIImage(systemName: "backward.fill", withConfiguration: skipConfig), for: .normal)
         self.previousButton.tintColor = .white
         self.previousButton.addTarget(self, action: #selector(self.previousPressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.previousButton)
         self.controlsContainerView.addSubview(self.previousButton)
         
         let playConfig = UIImage.SymbolConfiguration(pointSize: 42, weight: .bold)
         self.playPauseButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playConfig), for: .normal)
         self.playPauseButton.tintColor = .white
         self.playPauseButton.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.playPauseButton)
         self.controlsContainerView.addSubview(self.playPauseButton)
         
         self.nextButton.setImage(UIImage(systemName: "forward.fill", withConfiguration: skipConfig), for: .normal)
         self.nextButton.tintColor = .white
         self.nextButton.addTarget(self, action: #selector(self.nextPressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.nextButton)
         self.controlsContainerView.addSubview(self.nextButton)
         
         self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: subConfig), for: .normal)
         self.repeatButton.tintColor = UIColor(white: 1.0, alpha: 0.60)
         self.repeatButton.addTarget(self, action: #selector(self.repeatPressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.repeatButton)
         self.controlsContainerView.addSubview(self.repeatButton)
         
         self.bottomControlsContainer.addSubview(self.controlsContainerView)
@@ -664,12 +672,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.lyricsFavoriteButton.setImage(UIImage(systemName: "star", withConfiguration: starConfig), for: .normal)
         self.lyricsFavoriteButton.tintColor = .white
         self.lyricsFavoriteButton.addTarget(self, action: #selector(self.favoritePressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.lyricsFavoriteButton)
         self.lyricsHeaderView.addSubview(self.lyricsFavoriteButton)
         
         let moreConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
         self.lyricsMoreButton.setImage(UIImage(systemName: "ellipsis", withConfiguration: moreConfig), for: .normal)
         self.lyricsMoreButton.tintColor = .white
         self.lyricsMoreButton.addTarget(self, action: #selector(self.morePressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.lyricsMoreButton)
         self.lyricsHeaderView.addSubview(self.lyricsMoreButton)
         
         // Static Lyrics Table Container (Holds mask so mask doesn't scroll with table offset)
@@ -717,6 +727,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.lyricsSingButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
         self.lyricsSingButton.clipsToBounds = true
         self.lyricsSingButton.addTarget(self, action: #selector(self.singButtonPressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.lyricsSingButton)
         self.lyricsContainerView.addSubview(self.lyricsSingButton)
     }
     
@@ -740,6 +751,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.queueShuffleButton.layer.cornerRadius = 15
         self.queueShuffleButton.clipsToBounds = true
         self.queueShuffleButton.addTarget(self, action: #selector(self.queueShufflePressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.queueShuffleButton)
         self.queueHeaderView.addSubview(self.queueShuffleButton)
         
         let clearConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
@@ -749,6 +761,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.queueClearButton.layer.cornerRadius = 15
         self.queueClearButton.clipsToBounds = true
         self.queueClearButton.addTarget(self, action: #selector(self.queueClearPressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(self.queueClearButton)
         self.queueHeaderView.addSubview(self.queueClearButton)
         
         self.queueTableView.backgroundColor = .clear
@@ -809,6 +822,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         lyricsBtn.layer.cornerCurve = .continuous
         lyricsBtn.clipsToBounds = true
         lyricsBtn.addTarget(self, action: #selector(self.lyricsSegmentPressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(lyricsBtn)
         container.addSubview(lyricsBtn)
         
         let airplayConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
@@ -818,6 +832,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         airplayBtn.layer.cornerCurve = .continuous
         airplayBtn.clipsToBounds = true
         airplayBtn.addTarget(self, action: #selector(self.airplayPressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(airplayBtn)
         container.addSubview(airplayBtn)
         
         let queueConfig = UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)
@@ -827,6 +842,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         queueBtn.layer.cornerCurve = .continuous
         queueBtn.clipsToBounds = true
         queueBtn.addTarget(self, action: #selector(self.queueSegmentPressed), for: .touchUpInside)
+        self.attachButtonBounceFeedback(queueBtn)
         container.addSubview(queueBtn)
     }
     
@@ -1120,10 +1136,27 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.formatBadgeButton.setImage(iconImg, for: .normal)
         self.formatBadgeButton.setTitle(badgeTitle, for: .normal)
         
-        // Play / Pause Icons
-        let playIconName = manager.isPlaying ? "pause.fill" : "play.fill"
+        // Play / Pause Icons & Dynamic Spring Artwork Deflate/Expand
+        let isPlaying = manager.isPlaying
+        let playIconName = isPlaying ? "pause.fill" : "play.fill"
         let playCfg = UIImage.SymbolConfiguration(pointSize: 42, weight: .bold)
         self.playPauseButton.setImage(UIImage(systemName: playIconName, withConfiguration: playCfg), for: .normal)
+        
+        UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.72, initialSpringVelocity: 0.6, options: [.allowUserInteraction, .beginFromCurrentState], animations: {
+            if isPlaying {
+                self.artworkContainerView.transform = .identity
+                self.artworkContainerView.layer.shadowRadius = 24.0
+                self.artworkContainerView.layer.shadowOpacity = 0.42
+                self.artworkAmbientGlowView.transform = .identity
+                self.artworkAmbientGlowView.alpha = 1.0
+            } else {
+                self.artworkContainerView.transform = CGAffineTransform(scaleX: 0.82, y: 0.82)
+                self.artworkContainerView.layer.shadowRadius = 12.0
+                self.artworkContainerView.layer.shadowOpacity = 0.22
+                self.artworkAmbientGlowView.transform = CGAffineTransform(scaleX: 0.82, y: 0.82)
+                self.artworkAmbientGlowView.alpha = 0.35
+            }
+        })
         
         // Star Favorite Icons
         let isFav = manager.isFavorite(track: track)
@@ -1136,8 +1169,18 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.lyricsFavoriteButton.setImage(starImg, for: .normal)
         self.lyricsFavoriteButton.tintColor = starColor
         
-        // Shuffle & Repeat states
-        self.shuffleButton.tintColor = manager.isShuffleEnabled ? .white : UIColor(white: 1.0, alpha: 0.45)
+        // Shuffle & Repeat states with capsule background
+        let isShuffle = manager.isShuffleEnabled
+        self.shuffleButton.backgroundColor = isShuffle ? UIColor(white: 1.0, alpha: 0.16) : .clear
+        self.shuffleButton.tintColor = isShuffle ? .white : UIColor(white: 1.0, alpha: 0.45)
+        self.shuffleButton.layer.cornerRadius = 8.0
+        self.shuffleButton.clipsToBounds = true
+        
+        let isRepeat = (manager.repeatMode != .off)
+        self.repeatButton.backgroundColor = isRepeat ? UIColor(white: 1.0, alpha: 0.16) : .clear
+        self.repeatButton.layer.cornerRadius = 8.0
+        self.repeatButton.clipsToBounds = true
+        
         switch manager.repeatMode {
         case .off:
             self.repeatButton.setImage(UIImage(systemName: "repeat", withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)), for: .normal)
@@ -1154,6 +1197,24 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.updateBottomBarActiveState()
     }
     
+    // MARK: - Button Bounce Feedback
+    private func attachButtonBounceFeedback(_ button: UIButton) {
+        button.addTarget(self, action: #selector(self.buttonTouchDownScale(_:)), for: [.touchDown])
+        button.addTarget(self, action: #selector(self.buttonTouchUpScale(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+    }
+    
+    @objc private func buttonTouchDownScale(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.12, delay: 0, options: [.allowUserInteraction, .curveEaseOut], animations: {
+            sender.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
+        })
+    }
+    
+    @objc private func buttonTouchUpScale(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.55, initialSpringVelocity: 0.8, options: [.allowUserInteraction], animations: {
+            sender.transform = .identity
+        })
+    }
+    
     private func updateBottomBarActiveState() {
         let activeBg = UIColor(white: 1.0, alpha: 0.22)
         self.bottomLyricsButton.backgroundColor = (self.currentMode == .lyrics) ? activeBg : .clear
@@ -1165,23 +1226,48 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     private func reloadQueueData() {
         self.cachedQueue = SGDoxMusicManager.shared.queue
-        self.queueCountLabel.text = "\(self.cachedQueue.count) треков"
+        let count = self.cachedQueue.count
+        let countStr: String
+        let mod10 = count % 10
+        let mod100 = count % 100
+        if mod10 == 1 && mod100 != 11 {
+            countStr = "\(count) трек"
+        } else if mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) {
+            countStr = "\(count) трека"
+        } else {
+            countStr = "\(count) треков"
+        }
+        self.queueCountLabel.text = countStr
         self.queueTableView.reloadData()
     }
     
     private func updateAmbientColor(from image: UIImage) {
         let colors = self.extractDominantColors(from: image)
-        UIView.animate(withDuration: 0.6) {
-            self.ambientGradientLayer.colors = [
-                colors.top.withAlphaComponent(0.85).cgColor,
-                colors.bottom.withAlphaComponent(0.95).cgColor
-            ]
-            self.artworkGlowGradientLayer.colors = [
-                colors.top.withAlphaComponent(0.55).cgColor,
-                colors.top.withAlphaComponent(0.15).cgColor,
-                UIColor.clear.cgColor
-            ]
-        }
+        let newBgColors = [
+            colors.top.withAlphaComponent(0.85).cgColor,
+            colors.bottom.withAlphaComponent(0.95).cgColor
+        ]
+        let newGlowColors = [
+            colors.top.withAlphaComponent(0.55).cgColor,
+            colors.top.withAlphaComponent(0.15).cgColor,
+            UIColor.clear.cgColor
+        ]
+        
+        let bgAnim = CABasicAnimation(keyPath: "colors")
+        bgAnim.fromValue = self.ambientGradientLayer.colors
+        bgAnim.toValue = newBgColors
+        bgAnim.duration = 0.8
+        bgAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        self.ambientGradientLayer.add(bgAnim, forKey: "colorsTransition")
+        self.ambientGradientLayer.colors = newBgColors
+        
+        let glowAnim = CABasicAnimation(keyPath: "colors")
+        glowAnim.fromValue = self.artworkGlowGradientLayer.colors
+        glowAnim.toValue = newGlowColors
+        glowAnim.duration = 0.8
+        glowAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        self.artworkGlowGradientLayer.add(glowAnim, forKey: "colorsTransition")
+        self.artworkGlowGradientLayer.colors = newGlowColors
     }
     
     private func extractDominantColors(from image: UIImage) -> (top: UIColor, bottom: UIColor) {
@@ -1665,10 +1751,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     @objc private func sliderTouchBegan() {
         self.isDraggingSlider = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         self.progressSlider.setThumbImage(self.generateSliderThumb(size: 13.0), for: .normal)
-        UIView.animate(withDuration: 0.15) {
-            self.progressSlider.transform = CGAffineTransform(scaleX: 1.0, y: 1.25)
-        }
+        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+            self.currentTimeLabel.transform = CGAffineTransform(scaleX: 1.08, y: 1.08)
+            self.remainingTimeLabel.transform = CGAffineTransform(scaleX: 1.08, y: 1.08)
+        })
     }
     
     @objc private func sliderValueChanged() {
@@ -1684,9 +1772,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     @objc private func sliderTouchEnded() {
         self.isDraggingSlider = false
         self.progressSlider.setThumbImage(self.generateSliderThumb(size: 7.0), for: .normal)
-        UIView.animate(withDuration: 0.15) {
-            self.progressSlider.transform = .identity
-        }
+        UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+            self.currentTimeLabel.transform = .identity
+            self.remainingTimeLabel.transform = .identity
+        })
         let duration = SGDoxMusicManager.shared.duration > 0 ? SGDoxMusicManager.shared.duration : 30.0
         let val = self.progressSlider.value
         let target = Double(val) * duration
@@ -2120,6 +2209,13 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         self.currentTrackId = track.id
         self.titleLabel.text = track.title
         self.artistLabel.text = track.artist
+        
+        let isCurrent = (SGDoxMusicManager.shared.currentTrack?.id == track.id)
+        if isCurrent {
+            self.titleLabel.textColor = UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0)
+        } else {
+            self.titleLabel.textColor = .white
+        }
         
         self.dolbyBadge.isHidden = !track.isDolbyAtmos
         self.losslessBadge.isHidden = !track.isLossless
