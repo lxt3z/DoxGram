@@ -38,7 +38,6 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
     
     // MARK: - UI Elements (Liquid Glass Design)
     private let dimmingView = UIView()
-    private let ambientBacklightLayer = CAGradientLayer()
     private let cardShadowContainer = UIView()
     private let cardContainer = UIView()
     private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialDark))
@@ -57,12 +56,15 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
     
     // Liquid Glass Changelog Inlay
     private let changelogGlassInlay = UIView()
+    private let changelogBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let changelogScroll = UIScrollView()
     private let changelogStack = UIStackView()
     
-    // Action Buttons
+    // Action Buttons (True Liquid Glass Pill)
     private let downloadButton = UIButton(type: .custom)
-    private let downloadGradientLayer = CAGradientLayer()
+    private let downloadBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialLight))
+    private let downloadTintView = UIView()
+    private let downloadSheenLayer = CAGradientLayer()
     private let laterButton = UIButton(type: .custom)
     
     private var hasAnimatedIn = false
@@ -121,36 +123,25 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         let isRu = self.presentationData.strings.baseLanguageCode.hasPrefix("ru")
         
         // 1. Dimming Backdrop
-        self.dimmingView.backgroundColor = UIColor(white: 0.0, alpha: 0.45)
+        self.dimmingView.backgroundColor = UIColor(white: 0.0, alpha: 0.50)
         let tapDim = UITapGestureRecognizer(target: self, action: #selector(self.laterPressed))
         self.dimmingView.addGestureRecognizer(tapDim)
         self.view.addSubview(self.dimmingView)
         
-        // 2. Liquid Glass Backlight & Shadow Container
+        // 2. Liquid Glass Shadow Container (Soft, deep iOS Apple-grade shadow without neon glare)
         self.cardShadowContainer.backgroundColor = .clear
         self.cardShadowContainer.layer.shadowColor = UIColor.black.cgColor
-        self.cardShadowContainer.layer.shadowOpacity = 0.50
-        self.cardShadowContainer.layer.shadowRadius = 36.0
-        self.cardShadowContainer.layer.shadowOffset = CGSize(width: 0, height: 16)
+        self.cardShadowContainer.layer.shadowOpacity = 0.40
+        self.cardShadowContainer.layer.shadowRadius = 30.0
+        self.cardShadowContainer.layer.shadowOffset = CGSize(width: 0, height: 14)
         self.view.addSubview(self.cardShadowContainer)
-        
-        // Ambient Neon Glow behind the glass
-        self.ambientBacklightLayer.colors = [
-            UIColor(red: 0.15, green: 0.45, blue: 0.95, alpha: 0.35).cgColor,
-            UIColor(red: 0.55, green: 0.18, blue: 0.90, alpha: 0.20).cgColor,
-            UIColor.clear.cgColor
-        ]
-        self.ambientBacklightLayer.startPoint = CGPoint(x: 0.1, y: 0.0)
-        self.ambientBacklightLayer.endPoint = CGPoint(x: 0.9, y: 1.0)
-        self.ambientBacklightLayer.cornerRadius = 32.0
-        self.cardShadowContainer.layer.insertSublayer(self.ambientBacklightLayer, at: 0)
         
         // 3. Liquid Glass Card Container
         self.cardContainer.backgroundColor = .clear
         self.cardContainer.layer.cornerRadius = 28.0
         self.cardContainer.layer.cornerCurve = .continuous
         self.cardContainer.layer.borderWidth = 0.5
-        self.cardContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.30).cgColor
+        self.cardContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
         self.cardContainer.clipsToBounds = true
         self.cardShadowContainer.addSubview(self.cardContainer)
         
@@ -158,52 +149,52 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         self.blurView.clipsToBounds = true
         self.cardContainer.addSubview(self.blurView)
         
-        // Translucent Tint Overlay
-        self.glassTintOverlay.backgroundColor = UIColor(red: 0.08, green: 0.10, blue: 0.16, alpha: 0.30)
+        // Translucent Soft Dark Tint Overlay (allows background chats to blur through gracefully)
+        self.glassTintOverlay.backgroundColor = UIColor(white: 0.10, alpha: 0.45)
         self.cardContainer.addSubview(self.glassTintOverlay)
         
-        // Specular Sheen Layer (Subtle top reflection)
+        // Specular Sheen Layer (Subtle, elegant top light reflection)
         self.sheenGradient.colors = [
-            UIColor(white: 1.0, alpha: 0.28).cgColor,
-            UIColor(white: 1.0, alpha: 0.04).cgColor,
+            UIColor(white: 1.0, alpha: 0.18).cgColor,
+            UIColor(white: 1.0, alpha: 0.03).cgColor,
             UIColor.clear.cgColor
         ]
-        self.sheenGradient.locations = [0.0, 0.30, 1.0]
+        self.sheenGradient.locations = [0.0, 0.35, 1.0]
         self.sheenGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
         self.sheenGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
         self.cardContainer.layer.addSublayer(self.sheenGradient)
         
         // Close Button (Frosted Glass Circular Button)
-        let xConfig = UIImage.SymbolConfiguration(pointSize: 12.0, weight: .bold)
+        let xConfig = UIImage.SymbolConfiguration(pointSize: 11.5, weight: .bold)
         self.closeButton.setImage(UIImage(systemName: "xmark", withConfiguration: xConfig), for: .normal)
-        self.closeButton.tintColor = UIColor(white: 1.0, alpha: 0.85)
-        self.closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.closeButton.tintColor = UIColor(white: 1.0, alpha: 0.75)
+        self.closeButton.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
         self.closeButton.layer.cornerRadius = 15.0
         self.closeButton.layer.borderWidth = 0.5
-        self.closeButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
+        self.closeButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
         self.closeButton.clipsToBounds = true
         self.closeButton.addTarget(self, action: #selector(self.laterPressed), for: .touchUpInside)
         self.attachBounceFeedback(self.closeButton)
         self.cardContainer.addSubview(self.closeButton)
         
-        // Version Pill Badge [ 🚀 build-3935 ]
-        self.versionBadgeContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        // Version Pill Badge [ 🚀 build-3941 ]
+        self.versionBadgeContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
         self.versionBadgeContainer.layer.cornerRadius = 13.0
         self.versionBadgeContainer.layer.cornerCurve = .continuous
         self.versionBadgeContainer.layer.borderWidth = 0.5
-        self.versionBadgeContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.25).cgColor
+        self.versionBadgeContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.16).cgColor
         self.versionBadgeContainer.clipsToBounds = true
         self.cardContainer.addSubview(self.versionBadgeContainer)
         
-        let sparkConfig = UIImage.SymbolConfiguration(pointSize: 12.5, weight: .bold)
+        let sparkConfig = UIImage.SymbolConfiguration(pointSize: 12.0, weight: .semibold)
         self.versionBadgeIcon.image = UIImage(systemName: "arrow.up.circle.fill", withConfiguration: sparkConfig)
-        self.versionBadgeIcon.tintColor = UIColor(red: 0.25, green: 0.75, blue: 1.0, alpha: 1.0)
+        self.versionBadgeIcon.tintColor = UIColor(white: 1.0, alpha: 0.85)
         self.versionBadgeIcon.contentMode = .scaleAspectFit
         self.versionBadgeContainer.addSubview(self.versionBadgeIcon)
         
         self.versionBadgeLabel.text = self.releaseInfo.tagName
-        self.versionBadgeLabel.font = UIFont.systemFont(ofSize: 12.0, weight: .bold)
-        self.versionBadgeLabel.textColor = .white
+        self.versionBadgeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 12.0, weight: .semibold)
+        self.versionBadgeLabel.textColor = UIColor(white: 1.0, alpha: 0.95)
         self.versionBadgeContainer.addSubview(self.versionBadgeLabel)
         
         // Title Label
@@ -222,14 +213,17 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         self.subtitleLabel.lineBreakMode = .byTruncatingTail
         self.cardContainer.addSubview(self.subtitleLabel)
         
-        // 4. Liquid Glass Changelog Inlay Card
-        self.changelogGlassInlay.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
+        // 4. Liquid Glass Changelog Inlay Card (Frosted Glass Inset)
+        self.changelogGlassInlay.backgroundColor = UIColor(white: 1.0, alpha: 0.05)
         self.changelogGlassInlay.layer.cornerRadius = 20.0
         self.changelogGlassInlay.layer.cornerCurve = .continuous
         self.changelogGlassInlay.layer.borderWidth = 0.5
-        self.changelogGlassInlay.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
+        self.changelogGlassInlay.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
         self.changelogGlassInlay.clipsToBounds = true
         self.cardContainer.addSubview(self.changelogGlassInlay)
+        
+        self.changelogBlurView.clipsToBounds = true
+        self.changelogGlassInlay.addSubview(self.changelogBlurView)
         
         self.changelogScroll.indicatorStyle = .white
         self.changelogScroll.alwaysBounceVertical = false
@@ -244,24 +238,35 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         
         self.populateChangelogItems()
         
-        // 5. Download Button (Liquid Vibrant Blue Glass Pill)
+        // 5. Download Button (True Liquid Glass Pill)
         self.downloadButton.layer.cornerRadius = 24.0
         self.downloadButton.layer.cornerCurve = .continuous
+        self.downloadButton.layer.borderWidth = 0.5
+        self.downloadButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.24).cgColor
         self.downloadButton.clipsToBounds = true
         
-        self.downloadGradientLayer.colors = [
-            UIColor(red: 0.16, green: 0.48, blue: 0.98, alpha: 1.0).cgColor,
-            UIColor(red: 0.10, green: 0.35, blue: 0.92, alpha: 1.0).cgColor
-        ]
-        self.downloadGradientLayer.startPoint = CGPoint(x: 0.0, y: 0.5)
-        self.downloadGradientLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
-        self.downloadButton.layer.insertSublayer(self.downloadGradientLayer, at: 0)
+        self.downloadBlurView.isUserInteractionEnabled = false
+        self.downloadBlurView.clipsToBounds = true
+        self.downloadButton.addSubview(self.downloadBlurView)
         
-        let dlIconConfig = UIImage.SymbolConfiguration(pointSize: 15.0, weight: .bold)
+        self.downloadTintView.isUserInteractionEnabled = false
+        let accentColor = self.presentationData.theme.list.itemAccentColor
+        self.downloadTintView.backgroundColor = accentColor.withAlphaComponent(0.24)
+        self.downloadButton.addSubview(self.downloadTintView)
+        
+        self.downloadSheenLayer.colors = [
+            UIColor(white: 1.0, alpha: 0.24).cgColor,
+            UIColor(white: 1.0, alpha: 0.04).cgColor
+        ]
+        self.downloadSheenLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+        self.downloadSheenLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
+        self.downloadButton.layer.addSublayer(self.downloadSheenLayer)
+        
+        let dlIconConfig = UIImage.SymbolConfiguration(pointSize: 15.0, weight: .semibold)
         self.downloadButton.setImage(UIImage(systemName: "arrow.down.circle.fill", withConfiguration: dlIconConfig), for: .normal)
         self.downloadButton.setTitle(isRu ? "  Скачать обновление" : "  Download Update", for: .normal)
         self.downloadButton.setTitleColor(.white, for: .normal)
-        self.downloadButton.titleLabel?.font = UIFont.systemFont(ofSize: 15.5, weight: .bold)
+        self.downloadButton.titleLabel?.font = UIFont.systemFont(ofSize: 15.5, weight: .semibold)
         self.downloadButton.tintColor = .white
         self.downloadButton.addTarget(self, action: #selector(self.downloadPressed), for: .touchUpInside)
         self.attachBounceFeedback(self.downloadButton)
@@ -270,7 +275,7 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         // 6. Later / Skip Button
         self.laterButton.setTitle(isRu ? "Напомнить позже" : "Remind Me Later", for: .normal)
         self.laterButton.setTitleColor(UIColor(white: 1.0, alpha: 0.60), for: .normal)
-        self.laterButton.titleLabel?.font = UIFont.systemFont(ofSize: 14.5, weight: .medium)
+        self.laterButton.titleLabel?.font = UIFont.systemFont(ofSize: 14.5, weight: .regular)
         self.laterButton.addTarget(self, action: #selector(self.laterPressed), for: .touchUpInside)
         self.attachBounceFeedback(self.laterButton)
         self.cardContainer.addSubview(self.laterButton)
@@ -282,13 +287,23 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
     }
     
     @objc private func btnTouchDown(_ sender: UIButton) {
+        if sender === self.downloadButton {
+            let accentColor = self.presentationData.theme.list.itemAccentColor
+            self.downloadTintView.backgroundColor = accentColor.withAlphaComponent(0.38)
+        }
         UIView.animate(withDuration: 0.12, delay: 0, options: [.allowUserInteraction, .curveEaseOut], animations: {
-            sender.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+            sender.transform = CGAffineTransform(scaleX: 0.94, y: 0.94)
         })
     }
     
     @objc private func btnTouchUp(_ sender: UIButton) {
-        UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.55, initialSpringVelocity: 0.8, options: [.allowUserInteraction], animations: {
+        if sender === self.downloadButton {
+            let accentColor = self.presentationData.theme.list.itemAccentColor
+            UIView.animate(withDuration: 0.25) {
+                self.downloadTintView.backgroundColor = accentColor.withAlphaComponent(0.24)
+            }
+        }
+        UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.65, initialSpringVelocity: 0.8, options: [.allowUserInteraction], animations: {
             sender.transform = .identity
         })
     }
@@ -323,9 +338,11 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         let container = UIView()
         
         let iconBadge = UIView()
-        iconBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        iconBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
         iconBadge.layer.cornerRadius = 14.0
         iconBadge.layer.cornerCurve = .continuous
+        iconBadge.layer.borderWidth = 0.5
+        iconBadge.layer.borderColor = UIColor(white: 1.0, alpha: 0.10).cgColor
         iconBadge.clipsToBounds = true
         iconBadge.translatesAutoresizingMaskIntoConstraints = false
         
@@ -336,7 +353,7 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         iconBadge.addSubview(bulletLabel)
         
         let bodyLabel = UILabel()
-        bodyLabel.font = UIFont.systemFont(ofSize: 14.0, weight: .medium)
+        bodyLabel.font = UIFont.systemFont(ofSize: 13.5, weight: .regular)
         bodyLabel.textColor = UIColor(white: 1.0, alpha: 0.92)
         bodyLabel.numberOfLines = 0
         bodyLabel.lineBreakMode = .byWordWrapping
@@ -350,7 +367,7 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
             bodyLabel.text = remainingText
         } else {
             bulletLabel.text = "•"
-            bulletLabel.textColor = UIColor(red: 0.35, green: 0.75, blue: 1.0, alpha: 1.0)
+            bulletLabel.textColor = UIColor(white: 1.0, alpha: 0.75)
             bodyLabel.text = trimmed
         }
         
@@ -386,7 +403,6 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         let cardY = (bounds.height - cardHeight) * 0.5
         
         self.cardShadowContainer.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight)
-        self.ambientBacklightLayer.frame = self.cardShadowContainer.bounds.insetBy(dx: -16.0, dy: -16.0)
         self.cardContainer.frame = self.cardShadowContainer.bounds
         self.blurView.frame = self.cardContainer.bounds
         self.glassTintOverlay.frame = self.cardContainer.bounds
@@ -415,13 +431,15 @@ public final class SGDoxUpdateModalController: ViewController, UIGestureRecogniz
         
         let dlBtnY = laterY - dlBtnH - 8.0
         self.downloadButton.frame = CGRect(x: 24.0, y: dlBtnY, width: cardWidth - 48.0, height: dlBtnH)
-        self.downloadGradientLayer.frame = self.downloadButton.bounds
+        self.downloadBlurView.frame = self.downloadButton.bounds
+        self.downloadTintView.frame = self.downloadButton.bounds
+        self.downloadSheenLayer.frame = CGRect(x: 0, y: 0, width: cardWidth - 48.0, height: dlBtnH * 0.5)
         
         // Changelog Inlay Card
         let inlayY: CGFloat = 114.0
         let inlayH = max(60.0, dlBtnY - inlayY - 14.0)
         self.changelogGlassInlay.frame = CGRect(x: 20.0, y: inlayY, width: cardWidth - 40.0, height: inlayH)
-        
+        self.changelogBlurView.frame = self.changelogGlassInlay.bounds
         self.changelogScroll.frame = self.changelogGlassInlay.bounds
         
         // Layout changelog stack
