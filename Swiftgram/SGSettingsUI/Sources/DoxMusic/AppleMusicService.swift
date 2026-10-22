@@ -1221,6 +1221,7 @@ public final class AppleMusicService: @unchecked Sendable {
                             self.isPreparing = false
                             player.currentPlaybackTime = 0.0
                             player.play()
+                            player.currentPlaybackRate = SGDoxMusicManager.shared.playbackEffect.rate
                             self.isUsingSystemPlayer = true
                             completion(true)
                         } else {
@@ -1247,6 +1248,7 @@ public final class AppleMusicService: @unchecked Sendable {
                         if error == nil {
                             self.isPreparing = false
                             player.play()
+                            player.currentPlaybackRate = SGDoxMusicManager.shared.playbackEffect.rate
                             player.currentPlaybackTime = 0.0
                             self.isUsingSystemPlayer = true
                             completion(true)
@@ -1393,6 +1395,8 @@ public final class AppleMusicService: @unchecked Sendable {
         self.avPlayer = nil
         
         let playerItem = AVPlayerItem(url: url)
+        let effect = SGDoxMusicManager.shared.playbackEffect
+        playerItem.audioTimePitchAlgorithm = effect.pitchAlgorithm
         let player = AVPlayer(playerItem: playerItem)
         player.automaticallyWaitsToMinimizeStalling = true
         self.avPlayer = player
@@ -1403,6 +1407,7 @@ public final class AppleMusicService: @unchecked Sendable {
         self.isPreparing = false
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
+        player.rate = effect.rate
         DispatchQueue.main.async {
             guard self.activePlayGeneration == generation else {
                 player.pause()
@@ -1461,20 +1466,44 @@ public final class AppleMusicService: @unchecked Sendable {
     }
     
     public func resume() {
+        let effect = SGDoxMusicManager.shared.playbackEffect
         if self.isUsingSystemPlayer {
             self.player.play()
+            self.player.currentPlaybackRate = effect.rate
         } else {
             self.avPlayer?.play()
+            self.avPlayer?.rate = effect.rate
         }
     }
     
     public func seek(to seconds: Double) {
         self.lastSeekTime = seconds
         self.lastSeekTimestamp = CACurrentMediaTime()
+        let effect = SGDoxMusicManager.shared.playbackEffect
         if self.isUsingSystemPlayer {
             self.player.currentPlaybackTime = seconds
+            if self.player.playbackState == .playing {
+                self.player.currentPlaybackRate = effect.rate
+            }
         } else {
             self.avPlayer?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+            if (self.avPlayer?.rate ?? 0) > 0 {
+                self.avPlayer?.rate = effect.rate
+            }
+        }
+    }
+    
+    public func applyPlaybackEffect(_ effect: SGDoxPlaybackEffect, isPlaying: Bool) {
+        if self.isUsingSystemPlayer {
+            if isPlaying {
+                self.player.currentPlaybackRate = effect.rate
+            }
+        }
+        if let p = self.avPlayer {
+            p.currentItem?.audioTimePitchAlgorithm = effect.pitchAlgorithm
+            if isPlaying {
+                p.rate = effect.rate
+            }
         }
     }
     

@@ -72,6 +72,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let currentTimeLabel = UILabel()
     private let remainingTimeLabel = UILabel()
     private let formatBadgeButton = UIButton(type: .system)
+    private let effectBadgeButton = UIButton(type: .system)
     
     // Transport Controls
     private let controlsContainerView = UIView()
@@ -421,6 +422,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 let maxDist = self.view.bounds.height > 0 ? self.view.bounds.height : 600.0
                 let progress = min(1.0, translation.y / maxDist)
                 self.darkDimOverlay.alpha = 1.0 - (progress * 0.7)
+            } else {
+                let rubberBand = -pow(CGFloat(-translation.y), 0.72)
+                self.view.transform = CGAffineTransform(translationX: 0, y: rubberBand)
             }
         case .ended, .cancelled:
             if translation.y > 150 || velocity.y > 600 {
@@ -606,6 +610,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.setupFormatBadge(self.formatBadgeButton)
         self.attachButtonBounceFeedback(self.formatBadgeButton)
         self.bottomControlsContainer.addSubview(self.formatBadgeButton)
+        
+        // Playback Effect Pill (1.0x / Slowed / Nightcore)
+        self.setupEffectBadge(self.effectBadgeButton)
+        self.attachButtonBounceFeedback(self.effectBadgeButton)
+        self.bottomControlsContainer.addSubview(self.effectBadgeButton)
         
         // Transport Controls Row: Shuffle | Prev | Play/Pause | Next | Repeat
         let subConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
@@ -803,6 +812,21 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         button.addTarget(self, action: #selector(self.formatBadgePressed), for: .touchUpInside)
     }
     
+    private func setupEffectBadge(_ button: UIButton) {
+        let iconConfig = UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        button.setImage(UIImage(systemName: "gauge.medium", withConfiguration: iconConfig), for: .normal)
+        button.setTitle(" 1.0x", for: .normal)
+        button.setTitleColor(UIColor(white: 1.0, alpha: 0.85), for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 10.5, weight: .bold)
+        button.tintColor = UIColor(white: 1.0, alpha: 0.85)
+        button.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        button.layer.cornerRadius = 10
+        button.layer.cornerCurve = .continuous
+        button.clipsToBounds = true
+        button.contentEdgeInsets = UIEdgeInsets(top: 2, left: 7, bottom: 2, right: 7)
+        button.addTarget(self, action: #selector(self.effectBadgePressed), for: .touchUpInside)
+    }
+    
     private func setupVolumeRow(container: UIView, minIcon: UIImageView, slider: UISlider, maxIcon: UIImageView) {
         let minConfig = UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
         minIcon.image = UIImage(systemName: "speaker.fill", withConfiguration: minConfig)
@@ -931,20 +955,27 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         guard rect.width > 0 && rect.height > 0 else { return }
         
         // 1. Scrubber & Time labels
-        self.progressSlider.frame = CGRect(x: 28.0, y: 0.0, width: rect.width - 56.0, height: 26.0)
+        self.progressSlider.frame = CGRect(x: 28.0, y: 0.0, width: rect.width - 56.0, height: 24.0)
         
-        let labelY: CGFloat = 24.0
-        let labelW: CGFloat = 60.0
-        let labelH: CGFloat = 16.0
+        let labelY: CGFloat = 28.0
+        let labelW: CGFloat = 54.0
+        let labelH: CGFloat = 15.0
         self.currentTimeLabel.frame = CGRect(x: 28.0, y: labelY, width: labelW, height: labelH)
         self.remainingTimeLabel.frame = CGRect(x: rect.width - 28.0 - labelW, y: labelY, width: labelW, height: labelH)
         
-        let badgeW: CGFloat = 94.0
         let badgeH: CGFloat = 20.0
-        self.formatBadgeButton.frame = CGRect(x: (rect.width - badgeW) * 0.5, y: labelY - 2.0, width: badgeW, height: badgeH)
+        let badgeY: CGFloat = labelY - 2.5
+        let badgeGap: CGFloat = 6.0
+        let formatBadgeW: CGFloat = 86.0
+        let effectBadgeW: CGFloat = 82.0
+        let totalBadgesW = formatBadgeW + badgeGap + effectBadgeW
+        let badgesStartX = (rect.width - totalBadgesW) * 0.5
+        
+        self.formatBadgeButton.frame = CGRect(x: badgesStartX, y: badgeY, width: formatBadgeW, height: badgeH)
+        self.effectBadgeButton.frame = CGRect(x: badgesStartX + formatBadgeW + badgeGap, y: badgeY, width: effectBadgeW, height: badgeH)
         
         // 2. Transport Controls Row
-        let transY: CGFloat = 46.0
+        let transY: CGFloat = 56.0
         let transH: CGFloat = 56.0
         self.controlsContainerView.frame = CGRect(x: 24.0, y: transY, width: rect.width - 48.0, height: transH)
         let cW = self.controlsContainerView.bounds.width
@@ -963,7 +994,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.repeatButton.frame = CGRect(x: cW - subSize - 10.0, y: (transH - subSize) * 0.5, width: subSize, height: subSize)
         
         // 3. Volume Row
-        let volY: CGFloat = 114.0
+        let volY: CGFloat = 120.0
         let volH: CGFloat = 28.0
         self.volumeContainerView.frame = CGRect(x: 32.0, y: volY, width: rect.width - 64.0, height: volH)
         let vW = self.volumeContainerView.bounds.width
@@ -972,7 +1003,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.volumeSlider.frame = CGRect(x: 24, y: 0, width: vW - 48, height: volH)
         
         // 4. Bottom Bar (Lyrics | AirPlay | Queue)
-        let barY: CGFloat = 158.0
+        let barY: CGFloat = 164.0
         let barH: CGFloat = 44.0
         self.bottomBarContainer.frame = CGRect(x: 32.0, y: barY, width: rect.width - 64.0, height: barH)
         let bW = self.bottomBarContainer.bounds.width
@@ -1153,6 +1184,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let iconImg = UIImage(systemName: badgeIcon, withConfiguration: waveConfig)
         self.formatBadgeButton.setImage(iconImg, for: .normal)
         self.formatBadgeButton.setTitle(badgeTitle, for: .normal)
+        
+        // Playback Effect Badge
+        let effect = manager.playbackEffect
+        let effCfg = UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        self.effectBadgeButton.setImage(UIImage(systemName: effect.icon, withConfiguration: effCfg), for: .normal)
+        self.effectBadgeButton.setTitle(" \(effect.shortTitle)", for: .normal)
+        self.effectBadgeButton.tintColor = effect.badgeColor
+        self.effectBadgeButton.setTitleColor(effect.badgeColor, for: .normal)
+        self.effectBadgeButton.backgroundColor = effect.badgeBackgroundColor
         
         // Play / Pause Icons & Dynamic Spring Artwork Deflate/Expand
         let isPlaying = manager.isPlaying
@@ -1562,6 +1602,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.present(alert, animated: true)
     }
     
+    @objc private func effectBadgePressed() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        SGDoxPlaybackEffectSheet.show(in: self.view) { [weak self] in
+            self?.updateContent()
+        }
+    }
+    
     @objc private func morePressed() {
         guard let track = SGDoxMusicManager.shared.currentTrack else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1569,10 +1616,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let isFav = SGDoxMusicManager.shared.isFavorite(track: track)
         let isDown = SGDoxMusicOfflineManager.shared.isDownloaded(trackId: track.id)
         let isWave = SGDoxMusicManager.shared.isWaveEnabled
+        let currentEffect = SGDoxMusicManager.shared.playbackEffect
         
         var items: [SGDoxMusicMenuItem] = [
             SGDoxMusicMenuItem(iconName: "pin.fill", title: "Закрепить песню в профиле", action: { [weak self] in
                 self?.pinToProfilePressed()
+            }),
+            SGDoxMusicMenuItem(iconName: currentEffect.icon, title: "Скорость и эффекты", subtitle: currentEffect.title, action: { [weak self] in
+                self?.effectBadgePressed()
             }),
             SGDoxMusicMenuItem(iconName: isWave ? "waveform.badge.minus" : "waveform.badge.plus", title: isWave ? "Выключить Волну" : "Включить Волну", action: { [weak self] in
                 SGDoxMusicManager.shared.isWaveEnabled.toggle()
@@ -1792,7 +1843,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.isDraggingSlider = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         self.progressSlider.setThumbImage(self.generateSliderThumb(size: 13.0), for: .normal)
-        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+        UIView.animate(withDuration: 0.28, delay: 0, usingSpringWithDamping: 0.82, initialSpringVelocity: 0.6, options: [.allowUserInteraction], animations: {
+            if self.currentMode == .nowPlaying {
+                let baseScale: CGFloat = SGDoxMusicManager.shared.isPlaying ? 1.0 : 0.82
+                self.artworkContainerView.transform = CGAffineTransform(scaleX: baseScale * 0.94, y: baseScale * 0.94)
+            }
             self.currentTimeLabel.transform = CGAffineTransform(scaleX: 1.08, y: 1.08)
             self.remainingTimeLabel.transform = CGAffineTransform(scaleX: 1.08, y: 1.08)
         })
@@ -1811,7 +1866,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     @objc private func sliderTouchEnded() {
         self.isDraggingSlider = false
         self.progressSlider.setThumbImage(self.generateSliderThumb(size: 7.0), for: .normal)
-        UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+        let isPlaying = SGDoxMusicManager.shared.isPlaying
+        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.72, initialSpringVelocity: 0.6, options: [.allowUserInteraction], animations: {
+            if self.currentMode == .nowPlaying {
+                self.artworkContainerView.transform = isPlaying ? .identity : CGAffineTransform(scaleX: 0.82, y: 0.82)
+            }
             self.currentTimeLabel.transform = .identity
             self.remainingTimeLabel.transform = .identity
         })

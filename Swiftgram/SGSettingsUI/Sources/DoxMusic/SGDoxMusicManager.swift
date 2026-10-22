@@ -156,6 +156,29 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.isShuffleEnabled.toggle()
     }
     
+    public var playbackEffect: SGDoxPlaybackEffect {
+        get {
+            let raw = UserDefaults.standard.string(forKey: "dox_music_playback_effect") ?? ""
+            return SGDoxPlaybackEffect(rawValue: raw) ?? .normal
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "dox_music_playback_effect")
+            self.applyCurrentPlaybackEffect()
+            self.notifyStateChanged()
+        }
+    }
+    
+    public func applyCurrentPlaybackEffect() {
+        let effect = self.playbackEffect
+        if let p = self.avPlayer {
+            p.currentItem?.audioTimePitchAlgorithm = effect.pitchAlgorithm
+            if self.isPlaying {
+                p.rate = effect.rate
+            }
+        }
+        AppleMusicService.shared.applyPlaybackEffect(effect, isPlaying: self.isPlaying)
+    }
+    
     public var isAutoplayEnabled: Bool {
         get {
             if UserDefaults.standard.object(forKey: "dox_music_autoplay_enabled") == nil {
@@ -537,7 +560,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                     self.playbackStartTimestamp = CACurrentMediaTime()
                     current = 0.0
                 } else {
-                    let elapsed = CACurrentMediaTime() - self.playbackStartTimestamp
+                    let elapsed = (CACurrentMediaTime() - self.playbackStartTimestamp) * Double(self.playbackEffect.rate)
                     current = self.playbackStartOffset + elapsed
                 }
             }
@@ -642,6 +665,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 guard let self = self, self.activePlayGeneration == generation, self.currentTrack?.id == track.id else { return }
                 self.isPlaying = success
                 if success {
+                    self.applyCurrentPlaybackEffect()
                     self.startTimeTracking()
                 } else {
                     self.stopTimeTracking()
@@ -670,6 +694,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
         
         let playerItem = AVPlayerItem(url: url)
+        playerItem.audioTimePitchAlgorithm = self.playbackEffect.pitchAlgorithm
         let player = AVPlayer(playerItem: playerItem)
         self.avPlayer = player
         
@@ -683,6 +708,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
+        player.rate = self.playbackEffect.rate
         self.isPlaying = true
         self.startTimeTracking()
         self.notifyStateChanged()
@@ -699,6 +725,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
         
         let playerItem = AVPlayerItem(url: url)
+        playerItem.audioTimePitchAlgorithm = self.playbackEffect.pitchAlgorithm
         let player = AVPlayer(playerItem: playerItem)
         self.avPlayer = player
         
@@ -706,6 +733,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         
         player.seek(to: .zero)
         player.play()
+        player.rate = self.playbackEffect.rate
         self.isPlaying = true
         self.startTimeTracking()
         self.notifyStateChanged()
@@ -779,6 +807,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 self.playbackStartOffset = self.currentTime
                 self.hasSyncedAudioStart = false
                 self.avPlayer?.play()
+                self.avPlayer?.rate = self.playbackEffect.rate
                 self.startTimeTracking()
                 self.savePersistedState()
                 self.notifyStateChanged()
@@ -807,6 +836,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
                 SpotifyService.shared.resume()
             case .telegram:
                 self.avPlayer?.play()
+                self.avPlayer?.rate = self.playbackEffect.rate
             }
             self.startTimeTracking()
             self.savePersistedState()
@@ -889,6 +919,9 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.playbackStartOffset = clampedSeconds
         self.hasSyncedAudioStart = true
         self.avPlayer?.seek(to: CMTime(seconds: clampedSeconds, preferredTimescale: 600))
+        if self.isPlaying {
+            self.avPlayer?.rate = self.playbackEffect.rate
+        }
         AppleMusicService.shared.seek(to: clampedSeconds)
         if self.isPlaying {
             DiscordRPCService.shared.forceResync(track: self.currentTrack, isPlaying: self.isPlaying, currentTime: clampedSeconds, duration: self.duration)
