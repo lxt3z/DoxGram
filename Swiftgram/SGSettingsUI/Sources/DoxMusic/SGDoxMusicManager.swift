@@ -595,6 +595,35 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.playbackTimer = nil
     }
     
+    public var preciseCurrentTime: Double {
+        if let track = self.currentTrack {
+            switch track.source {
+            case .appleMusic:
+                let t = AppleMusicService.shared.currentPlaybackTime
+                if t.isFinite && !t.isNaN && t >= 0 {
+                    return t
+                }
+            case .spotify:
+                break
+            case .telegram:
+                if let p = self.avPlayer {
+                    let t = p.currentTime().seconds
+                    if t.isFinite && !t.isNaN && t >= 0 {
+                        return t
+                    }
+                }
+            }
+        }
+        if self.isPlaying && self.playbackStartTimestamp > 0 {
+            let elapsed = (CACurrentMediaTime() - self.playbackStartTimestamp) * Double(self.playbackEffect.rate)
+            let calculated = self.playbackStartOffset + elapsed
+            if calculated.isFinite && !calculated.isNaN && calculated >= 0 {
+                return calculated
+            }
+        }
+        return self.currentTime
+    }
+    
     public var volume: Float {
         get {
             return self.avPlayer?.volume ?? 1.0

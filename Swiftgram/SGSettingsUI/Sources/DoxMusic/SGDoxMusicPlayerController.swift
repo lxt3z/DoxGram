@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import AVFoundation
 import MediaPlayer
+import CoreText
 import Display
 import SwiftSignalKit
 import TelegramCore
@@ -115,6 +116,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var isUserScrollingLyrics = false
     private var userScrollTimer: Foundation.Timer?
     private var lyricsHeightCache: [Int: CGFloat] = [:]
+    private var lyricsDisplayLink: CADisplayLink?
     
     // MARK: - Queue Center UI
     private let queueHeaderView = UIView()
@@ -348,6 +350,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func detachListeners() {
+        self.stopLyricsDisplayLink()
         self.userScrollTimer?.invalidate()
         self.userScrollTimer = nil
         self.volumeObservation?.invalidate()
@@ -361,6 +364,30 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             SGDoxMusicManager.shared.removeTimeListener(token)
             self.timeToken = nil
         }
+    }
+    
+    private func startLyricsDisplayLink() {
+        guard self.lyricsDisplayLink == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(self.lyricsDisplayLinkTick))
+        if #available(iOS 15.0, *) {
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+        }
+        link.add(to: .main, forMode: .common)
+        self.lyricsDisplayLink = link
+    }
+    
+    private func stopLyricsDisplayLink() {
+        self.lyricsDisplayLink?.invalidate()
+        self.lyricsDisplayLink = nil
+    }
+    
+    @objc private func lyricsDisplayLinkTick() {
+        guard self.currentMode == .lyrics, SGDoxMusicManager.shared.isPlaying else {
+            self.stopLyricsDisplayLink()
+            return
+        }
+        let current = SGDoxMusicManager.shared.preciseCurrentTime
+        self.syncLyricsPosition(currentTime: current, animated: true)
     }
     
     // MARK: - Dismissal
@@ -1200,6 +1227,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let playCfg = UIImage.SymbolConfiguration(pointSize: 42, weight: .bold)
         self.playPauseButton.setImage(UIImage(systemName: playIconName, withConfiguration: playCfg), for: .normal)
         
+        if self.currentMode == .lyrics {
+            if isPlaying {
+                self.startLyricsDisplayLink()
+            } else {
+                self.stopLyricsDisplayLink()
+            }
+        }
+        
         UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.72, initialSpringVelocity: 0.6, options: [.allowUserInteraction, .beginFromCurrentState], animations: {
             if isPlaying {
                 self.artworkContainerView.transform = .identity
@@ -1400,8 +1435,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         if targetMode == .lyrics {
             self.loadLyricsIfNeeded()
-        } else if targetMode == .queue {
-            self.reloadQueueData()
+            if SGDoxMusicManager.shared.isPlaying {
+                self.startLyricsDisplayLink()
+            }
+        } else {
+            self.stopLyricsDisplayLink()
+            if targetMode == .queue {
+                self.reloadQueueData()
+            }
         }
         
         let activeContainer: UIView
@@ -1537,10 +1578,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 indexPathsToReload.append(IndexPath(row: newIndex, section: 0))
             }
             
+            let tableW = self.lyricsTableView.bounds.width > 0 ? self.lyricsTableView.bounds.width : UIScreen.main.bounds.width
+            let width = max(100.0, tableW - 56.0)
             for indexPath in indexPathsToReload {
                 if let cell = self.lyricsTableView.cellForRow(at: indexPath) as? SGDoxLyricsCell {
                     let line = lyrics.lines[indexPath.row]
-                    cell.configure(line: line, isActive: indexPath.row == newIndex, currentTime: currentTime, lineDuration: lineDuration)
+                    let nextTimestamp = (indexPath.row + 1 < lyrics.lines.count) ? lyrics.lines[indexPath.row + 1].timestamp : (line.timestamp + 4.5)
+                    let lineDur = max(1.0, nextTimestamp - line.timestamp)
+                    cell.configure(line: line, isActive: indexPath.row == newIndex, currentTime: currentTime, lineDuration: lineDur, availableWidth: width)
                 }
             }
             
@@ -1981,14 +2026,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             }
             guard let lyrics = self.currentLyrics, indexPath.row < lyrics.lines.count else { return 56.0 }
             let text = lyrics.lines[indexPath.row].text
-            let width = max(100.0, self.lyricsTableView.bounds.width - 56.0)
-            let rect = (text as NSString).boundingRect(
-                with: CGSize(width: width, height: .greatestFiniteMagnitude),
-                options: [.usesLineFragmentOrigin, .usesFontLeading],
-                attributes: [.font: SGDoxLyricsCell.font],
-                context: nil
-            )
-            let h = max(56.0, ceil(rect.height) + 28.0)
+            let tableW = self.lyricsTableView.bounds.width > 0 ? self.lyricsTableView.bounds.width : UIScreen.main.bounds.width
+            let width = max(100.0, tableW - 56.0)
+            let lines = splitTextIntoLines(text: text, font: SGDoxLyricsCell.font, width: width)
+            let lineHeight = ceil(SGDoxLyricsCell.font.lineHeight)
+            let lineSpacing: CGFloat = 4.0
+            let vInset: CGFloat = 24.0
+            let count = CGFloat(max(1, lines.count))
+            let h = max(56.0, lineHeight * count + lineSpacing * (count - 1.0) + vInset)
             self.lyricsHeightCache[indexPath.row] = h
             return h
         }
@@ -2010,7 +2055,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 let isActive = (indexPath.row == self.activeLyricsIndex)
                 let nextTimestamp = (indexPath.row + 1 < lyrics.lines.count) ? lyrics.lines[indexPath.row + 1].timestamp : (line.timestamp + 4.5)
                 let duration = max(1.0, nextTimestamp - line.timestamp)
-                cell.configure(line: line, isActive: isActive, currentTime: SGDoxMusicManager.shared.currentTime, lineDuration: duration)
+                let tableW = self.lyricsTableView.bounds.width > 0 ? self.lyricsTableView.bounds.width : UIScreen.main.bounds.width
+                let width = max(100.0, tableW - 56.0)
+                cell.configure(line: line, isActive: isActive, currentTime: SGDoxMusicManager.shared.preciseCurrentTime, lineDuration: duration, availableWidth: width)
             }
             return cell
         }
@@ -2084,169 +2131,259 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
 }
 
-// MARK: - SGDoxLyricsCell (Apple Music Karaoke Progressive Bounce & Glow)
-private final class SGDoxLyricsCell: UITableViewCell {
-    public static let font = UIFont.systemFont(ofSize: 26, weight: .bold)
-    private let lineLabel = UILabel()
-    private var words: [(text: String, range: NSRange, weight: Double)] = []
-    private var totalWeight: Double = 1.0
-    private var currentLine: SGDoxLyricsLine?
-    private var isCurrentActive: Bool = false
-    private var lastRenderedChars: Int = -1
+// MARK: - CoreText Line Splitter
+private func splitTextIntoLines(text: String, font: UIFont, width: CGFloat) -> [String] {
+    let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !cleanText.isEmpty else { return [] }
+    let attrStr = NSAttributedString(string: cleanText, attributes: [.font: font])
+    let typesetter = CTTypesetterCreateWithAttributedString(attrStr)
+    var lines: [String] = []
+    var start = 0
+    let length = attrStr.length
+    let maxW = Double(max(10.0, width))
     
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: style, reuseIdentifier: reuseIdentifier)
-        self.backgroundColor = .clear
-        self.selectionStyle = .none
+    while start < length {
+        let count = CTTypesetterSuggestLineBreak(typesetter, start, maxW)
+        if count <= 0 { break }
+        let range = NSRange(location: start, length: count)
+        let subStr = (cleanText as NSString).substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !subStr.isEmpty {
+            lines.append(subStr)
+        }
+        start += count
+    }
+    return lines.isEmpty ? [cleanText] : lines
+}
+
+// MARK: - SGDoxLyricsLineView (Continuous Liquid Gradient Sweep)
+private final class SGDoxLyricsLineView: UIView {
+    private let baseLabel = UILabel()
+    private let glowLabel = UILabel()
+    private let maskLayer = CAGradientLayer()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        self.clipsToBounds = false
         
-        self.lineLabel.font = SGDoxLyricsCell.font
-        self.lineLabel.numberOfLines = 0
-        self.lineLabel.lineBreakMode = .byWordWrapping
-        self.lineLabel.textAlignment = .left
-        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.35)
-        self.contentView.addSubview(self.lineLabel)
+        self.baseLabel.font = SGDoxLyricsCell.font
+        self.baseLabel.textColor = UIColor(white: 1.0, alpha: 0.32)
+        self.baseLabel.numberOfLines = 1
+        self.baseLabel.lineBreakMode = .byClipping
+        self.addSubview(self.baseLabel)
+        
+        self.glowLabel.font = SGDoxLyricsCell.font
+        self.glowLabel.textColor = .white
+        self.glowLabel.numberOfLines = 1
+        self.glowLabel.lineBreakMode = .byClipping
+        self.glowLabel.layer.shadowColor = UIColor.white.cgColor
+        self.glowLabel.layer.shadowRadius = 10.0
+        self.glowLabel.layer.shadowOpacity = 0.50
+        self.glowLabel.layer.shadowOffset = .zero
+        
+        self.maskLayer.startPoint = CGPoint(x: 0.0, y: 0.5)
+        self.maskLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
+        self.maskLayer.colors = [
+            UIColor.black.cgColor,
+            UIColor.black.cgColor,
+            UIColor.clear.cgColor,
+            UIColor.clear.cgColor
+        ]
+        self.maskLayer.locations = [0.0, 0.0, 0.0, 1.0]
+        self.glowLabel.layer.mask = self.maskLayer
+        self.addSubview(self.glowLabel)
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    func configure(line: SGDoxLyricsLine, isActive: Bool, currentTime: Double, lineDuration: Double) {
+    func setText(_ text: String) {
+        self.baseLabel.text = text
+        self.glowLabel.text = text
+    }
+    
+    func setProgress(_ progress: Double, isActive: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        
+        if !isActive {
+            self.glowLabel.isHidden = true
+            self.baseLabel.textColor = UIColor(white: 1.0, alpha: 0.32)
+            self.maskLayer.locations = [0.0, 0.0, 0.0, 1.0]
+            CATransaction.commit()
+            return
+        }
+        
+        self.glowLabel.isHidden = false
+        self.baseLabel.textColor = UIColor(white: 1.0, alpha: 0.32)
+        
+        let p = max(0.0, min(1.0, progress))
+        if p <= 0.0001 {
+            self.maskLayer.locations = [0.0, 0.0, 0.0, 1.0]
+        } else if p >= 0.9999 {
+            self.maskLayer.locations = [0.0, 1.0, 1.0, 1.0]
+        } else {
+            let w = max(1.0, self.bounds.width)
+            let feather = min(0.20, max(0.04, 28.0 / w))
+            let stop1 = max(0.0, p - feather * 0.5)
+            let stop2 = min(1.0, p + feather * 0.5)
+            self.maskLayer.locations = [0.0, NSNumber(value: Float(stop1)), NSNumber(value: Float(stop2)), 1.0]
+        }
+        CATransaction.commit()
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        self.baseLabel.frame = self.bounds
+        self.glowLabel.frame = self.bounds
+        self.maskLayer.frame = self.bounds
+    }
+}
+
+// MARK: - SGDoxLyricsCell (Apple Music Karaoke Progressive Fluid Text)
+private final class SGDoxLyricsCell: UITableViewCell {
+    public static let font = UIFont.systemFont(ofSize: 26, weight: .bold)
+    
+    private let containerView = UIView()
+    private var lineViews: [SGDoxLyricsLineView] = []
+    private var lineCharWeights: [Double] = []
+    private var totalWeight: Double = 1.0
+    
+    private var currentLine: SGDoxLyricsLine?
+    private var isCurrentActive: Bool = false
+    private var cachedText: String = ""
+    private var cachedWidth: CGFloat = 0.0
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+        self.clipsToBounds = false
+        self.contentView.clipsToBounds = false
+        
+        self.containerView.clipsToBounds = false
+        self.contentView.addSubview(self.containerView)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    func configure(line: SGDoxLyricsLine, isActive: Bool, currentTime: Double, lineDuration: Double, availableWidth: CGFloat) {
         let wasActive = self.isCurrentActive
         self.currentLine = line
         self.isCurrentActive = isActive
-        self.lastRenderedChars = -1
-        self.prepareWords(from: line.text)
+        
+        let targetWidth = max(100.0, availableWidth)
+        if self.cachedText != line.text || abs(self.cachedWidth - targetWidth) > 5.0 {
+            self.cachedText = line.text
+            self.cachedWidth = targetWidth
+            self.rebuildLines(text: line.text, width: targetWidth)
+        }
         
         if isActive {
             if !wasActive {
-                self.lineLabel.transform = CGAffineTransform(scaleX: 1.035, y: 1.035)
-                UIView.animate(withDuration: 0.38, delay: 0, usingSpringWithDamping: 0.68, initialSpringVelocity: 0.7, options: [.allowUserInteraction], animations: {
-                    self.lineLabel.transform = .identity
+                self.containerView.transform = CGAffineTransform(scaleX: 1.035, y: 1.035)
+                UIView.animate(withDuration: 0.38, delay: 0, usingSpringWithDamping: 0.70, initialSpringVelocity: 0.7, options: [.allowUserInteraction], animations: {
+                    self.containerView.transform = .identity
                 })
             }
-            self.lineLabel.layer.shadowColor = UIColor.white.cgColor
-            self.lineLabel.layer.shadowRadius = 8.0
-            self.lineLabel.layer.shadowOpacity = 0.55
-            self.lineLabel.layer.shadowOffset = .zero
             self.updateProgress(currentTime: currentTime, lineDuration: lineDuration)
         } else {
-            self.lineLabel.layer.shadowOpacity = 0.0
-            self.lineLabel.transform = .identity
-            self.lineLabel.attributedText = nil
-            self.lineLabel.text = line.text
-            self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.35)
+            self.containerView.transform = .identity
+            for lineView in self.lineViews {
+                lineView.setProgress(0.0, isActive: false)
+            }
         }
         self.setNeedsLayout()
     }
     
-    private func prepareWords(from text: String) {
-        self.words.removeAll(keepingCapacity: true)
-        let nsText = text as NSString
-        var currentWeight: Double = 0.0
+    private func rebuildLines(text: String, width: CGFloat) {
+        let lineStrings = splitTextIntoLines(text: text, font: SGDoxLyricsCell.font, width: width)
         
-        var idx = 0
-        let len = nsText.length
-        while idx < len {
-            while idx < len && CharacterSet.whitespacesAndNewlines.contains(UnicodeScalar(nsText.character(at: idx))!) {
-                idx += 1
-            }
-            let start = idx
-            while idx < len && !CharacterSet.whitespacesAndNewlines.contains(UnicodeScalar(nsText.character(at: idx))!) {
-                idx += 1
-            }
-            if idx > start {
-                let range = NSRange(location: start, length: idx - start)
-                let wordStr = nsText.substring(with: range)
-                let w = max(1.0, Double(wordStr.count))
-                self.words.append((text: wordStr, range: range, weight: w))
-                currentWeight += w
-            }
+        while self.lineViews.count < lineStrings.count {
+            let lv = SGDoxLyricsLineView()
+            self.containerView.addSubview(lv)
+            self.lineViews.append(lv)
         }
-        self.totalWeight = max(1.0, currentWeight)
+        for i in lineStrings.count..<self.lineViews.count {
+            self.lineViews[i].isHidden = true
+        }
+        
+        self.lineCharWeights.removeAll(keepingCapacity: true)
+        var sumWeight: Double = 0.0
+        for (i, str) in lineStrings.enumerated() {
+            let lv = self.lineViews[i]
+            lv.isHidden = false
+            lv.setText(str)
+            let w = max(1.0, Double(str.count))
+            self.lineCharWeights.append(w)
+            sumWeight += w
+        }
+        self.totalWeight = max(1.0, sumWeight)
     }
     
     func updateProgress(currentTime: Double, lineDuration: Double) {
         guard let line = self.currentLine, self.isCurrentActive else { return }
         
-        let text = line.text
         let elapsed = max(0.0, currentTime - line.timestamp)
         let duration = max(0.8, lineDuration)
-        let progress = min(1.0, elapsed / duration)
-        
-        let totalChars = text.count
-        let currentTargetChar = Int(Double(totalChars) * progress)
-        if currentTargetChar == self.lastRenderedChars && progress < 0.999 && progress > 0.001 {
-            return
-        }
-        self.lastRenderedChars = currentTargetChar
-        
-        if elapsed <= 0.001 {
-            self.lineLabel.attributedText = nil
-            self.lineLabel.text = text
-            self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.35)
-            return
-        }
-        
-        if progress >= 0.999 {
-            self.lineLabel.attributedText = nil
-            self.lineLabel.text = text
-            self.lineLabel.textColor = .white
-            return
-        }
-        
-        let attr = NSMutableAttributedString(string: text, attributes: [
-            .font: SGDoxLyricsCell.font,
-            .foregroundColor: UIColor.white.withAlphaComponent(0.35)
-        ])
+        let overallProgress = max(0.0, min(1.0, elapsed / duration))
         
         var cumulativeWeight: Double = 0.0
-        for item in self.words {
-            let wordStartFraction = cumulativeWeight / self.totalWeight
-            let wordWeightFraction = item.weight / self.totalWeight
-            cumulativeWeight += item.weight
-            let wordEndFraction = cumulativeWeight / self.totalWeight
+        let activeCount = self.lineCharWeights.count
+        for i in 0..<activeCount {
+            guard i < self.lineViews.count else { break }
+            let lineView = self.lineViews[i]
+            let lineWeight = self.lineCharWeights[i]
+            let startFrac = cumulativeWeight / self.totalWeight
+            let endFrac = (cumulativeWeight + lineWeight) / self.totalWeight
+            cumulativeWeight += lineWeight
             
-            if progress >= wordEndFraction {
-                attr.addAttribute(.foregroundColor, value: UIColor.white, range: item.range)
-            } else if progress > wordStartFraction {
-                let intraProgress = (progress - wordStartFraction) / max(0.0001, wordWeightFraction)
-                let charCount = item.range.length
-                let revealedChars = Int(Double(charCount) * intraProgress)
-                
-                if revealedChars > 0 {
-                    let whiteRange = NSRange(location: item.range.location, length: min(charCount, revealedChars))
-                    attr.addAttribute(.foregroundColor, value: UIColor.white, range: whiteRange)
-                }
-                if revealedChars < charCount {
-                    let transitionRange = NSRange(location: item.range.location + revealedChars, length: 1)
-                    attr.addAttribute(.foregroundColor, value: UIColor.white.withAlphaComponent(0.75), range: transitionRange)
-                }
+            let lineProgress: Double
+            if overallProgress >= endFrac {
+                lineProgress = 1.0
+            } else if overallProgress <= startFrac {
+                lineProgress = 0.0
+            } else {
+                lineProgress = (overallProgress - startFrac) / max(0.0001, endFrac - startFrac)
             }
+            lineView.setProgress(lineProgress, isActive: true)
         }
-        
-        self.lineLabel.attributedText = attr
     }
     
     override func layoutSubviews() {
         super.layoutSubviews()
+        self.containerView.frame = self.contentView.bounds
+        
         let hInset: CGFloat = 28.0
-        let vInset: CGFloat = 14.0
+        let vInset: CGFloat = 12.0
         let w = max(0, self.contentView.bounds.width - hInset * 2.0)
-        let textH = self.lineLabel.sizeThatFits(CGSize(width: w, height: .greatestFiniteMagnitude)).height
-        self.lineLabel.frame = CGRect(x: hInset, y: vInset, width: w, height: ceil(textH))
+        let lineHeight = ceil(SGDoxLyricsCell.font.lineHeight)
+        let lineSpacing: CGFloat = 4.0
+        
+        var y: CGFloat = vInset
+        let activeCount = self.lineCharWeights.count
+        for i in 0..<activeCount {
+            guard i < self.lineViews.count else { break }
+            let lv = self.lineViews[i]
+            lv.frame = CGRect(x: hInset, y: y, width: w, height: lineHeight)
+            y += lineHeight + lineSpacing
+        }
     }
     
     override func prepareForReuse() {
         super.prepareForReuse()
-        self.lineLabel.attributedText = nil
-        self.lineLabel.text = nil
-        self.lineLabel.textColor = UIColor.white.withAlphaComponent(0.35)
-        self.lineLabel.layer.shadowOpacity = 0.0
-        self.lineLabel.transform = .identity
+        self.containerView.transform = .identity
+        for lv in self.lineViews {
+            lv.setProgress(0.0, isActive: false)
+            lv.isHidden = true
+        }
+        self.lineCharWeights.removeAll()
         self.currentLine = nil
         self.isCurrentActive = false
-        self.lastRenderedChars = -1
+        self.cachedText = ""
+        self.cachedWidth = 0.0
     }
 }
 
