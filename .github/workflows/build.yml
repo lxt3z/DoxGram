@@ -20,8 +20,24 @@ jobs:
 
       - name: Set active Xcode path
         run: |
-          XCODE_VERSION=$(cat versions.json | python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj["xcode"]);')
-          sudo xcode-select -s /Applications/Xcode_$XCODE_VERSION.app/Contents/Developer
+          XCODE_VERSION=$(cat versions.json | python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj.get("xcode", ""));')
+          TARGET_PATH="/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          if [ -n "$XCODE_VERSION" ] && [ -d "$TARGET_PATH" ]; then
+            echo "Found target Xcode $XCODE_VERSION at $TARGET_PATH"
+            sudo xcode-select -s "$TARGET_PATH"
+          else
+            echo "Xcode $XCODE_VERSION not found at $TARGET_PATH. Available Xcode installations in /Applications:"
+            ls -d /Applications/Xcode* 2>/dev/null || true
+            LATEST_XCODE=$(find /Applications -maxdepth 1 -name 'Xcode*.app' 2>/dev/null | sort -V | tail -n 1)
+            if [ -n "$LATEST_XCODE" ] && [ -d "$LATEST_XCODE/Contents/Developer" ]; then
+              echo "Selecting available Xcode: $LATEST_XCODE"
+              sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+            else
+              echo "Using default system Xcode: $(xcode-select -p)"
+            fi
+          fi
+          echo "Active developer directory: $(xcode-select -p)"
+          xcodebuild -version || true
 
       - name: Create canonical source directory
         run: |
@@ -68,6 +84,7 @@ jobs:
             --bazelUserRoot="$BAZEL_USER_ROOT" \
             --cacheDir="$CACHE_DIR" \
             build \
+            --overrideXcodeVersion \
             --configurationPath="build-system/appstore-configuration.json" \
             --codesigningInformationPath=build-system/fake-codesigning \
             --configuration=release_arm64 \
