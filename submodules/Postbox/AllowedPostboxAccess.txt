@@ -210,8 +210,10 @@ submodules/TelegramUI/Sources/Chat/ChatMessageActionOptions.swift
 submodules/TelegramUI/Sources/ChatController.swift
 submodules/TelegramUI/Sources/ChatControllerContentData.swift
 submodules/TelegramUI/Sources/ChatControllerNode.swift
+submodules/TelegramUI/Sources/ChatControllerOpenAttachmentMenu.swift
 submodules/TelegramUI/Sources/ChatControllerOpenMessageShareMenu.swift
 submodules/TelegramUI/Sources/ChatHistoryListNode.swift
+submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift
 submodules/TelegramUI/Sources/ChatPinnedMessageTitlePanelNode.swift
 submodules/TelegramUI/Sources/CreateGroupController.swift
 submodules/TelegramUI/Sources/CreatePeerAvatarSetup.swift
@@ -244,3 +246,4 @@ submodules/TranslateUI/Sources/ChatTranslation.swift
 submodules/UndoUI/Sources/UndoOverlayControllerNode.swift
 submodules/WallpaperBackgroundNode/Sources/WallpaperBackgroundNode.swift
 submodules/WallpaperResources/Sources/WallpaperResources.swift
+submodules/WatchBridge/Sources/WatchRequestHandlers.swift
