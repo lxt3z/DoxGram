@@ -650,6 +650,8 @@ private func dataAndStorageControllerEntries(context: AccountContext, state: Dat
                 proxyValue = presentationData.strings.ChatSettings_ConnectionType_UseSocks5
             case .mtp:
                 proxyValue = presentationData.strings.SocksProxySetup_ProxyTelegram
+            case .web:
+                proxyValue = presentationData.strings.SocksProxySetup_ProxyWeb
         }
     } else {
         proxyValue = presentationData.strings.GroupInfo_SharedMediaNone
@@ -687,8 +689,8 @@ public func dataAndStorageController(context: AccountContext, focusOnItemTag: Da
         var storage: Int64
     }
     let usageSignal: Signal<UsageData, NoError> = combineLatest(
-        context.account.postbox.mediaBox.storageBox.totalSize(),
-        context.account.postbox.mediaBox.cacheStorageBox.totalSize(),
+        context.engine.resources.storageTotalSize(),
+        context.engine.resources.cacheStorageTotalSize(),
         accountNetworkUsageStats(account: context.account, reset: [])
     )
     |> map { disk1, disk2, networkStats -> UsageData in
@@ -881,7 +883,7 @@ public func dataAndStorageController(context: AccountContext, focusOnItemTag: Da
         let controller = intentsSettingsController(context: context)
         pushControllerImpl?(controller)
     }, toggleSensitiveContent: { value in
-        let update = {
+        let update = { [contentSettingsConfiguration] in
             let _ = (contentSettingsConfiguration.get()
             |> take(1)
             |> deliverOnMainQueue).start(next: { [weak contentSettingsConfiguration] settings in

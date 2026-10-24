@@ -42,6 +42,7 @@ apple_resource_bundle(
     resources = [
         ":CameraMetalResources",
     ],
+    visibility = ["//visibility:public"],
 )
 
 swift_library(
@@ -58,14 +59,7 @@ swift_library(
     ],
     deps = sgDeps + [
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
-        "//submodules/AsyncDisplayKit:AsyncDisplayKit",
-        "//submodules/Display:Display",
-        "//submodules/ImageBlur:ImageBlur",
-        "//submodules/TelegramCore:TelegramCore",
         "//submodules/Utils/DeviceModel",
-        "//submodules/rlottie:RLottieBinding",
-        "//submodules/AppBundle",
-        "//submodules/GZip",
     ],
     visibility = [
         "//visibility:public",

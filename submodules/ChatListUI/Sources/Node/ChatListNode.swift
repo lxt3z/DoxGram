@@ -2,6 +2,7 @@ import SGAPIToken
 import SGAPIWebSettings
 import SGSimpleSettings
 import Foundation
+import LottieSettings
 import UIKit
 import Display
 import AsyncDisplayKit
@@ -648,7 +649,12 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                     var isCommunity = false
                     if let peer = chatPeer, case let .channel(channel) = peer, channel.isForumOrMonoForum {
                         isForum = true
-                        if editing {
+                        // A forum can only be selected via one of its topics in pickers that forward
+                        // INTO a chat (isSelecting == false, e.g. forward/share). Pickers that merely
+                        // collect peer ids (isSelecting == true: privacy exceptions, folder include /
+                        // exclude, auto-delete, paid-message fees) need no topic, so the forum itself
+                        // stays selectable there.
+                        if editing && !isSelecting {
                             enabled = false
                         }
                     } else if isIncludedCommunityContainer(chatPeer, filter: filter) {
@@ -659,7 +665,7 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                     }
 
                     var selectable = editing
-                    if isForum || isCommunity {
+                    if (isForum && !isSelecting) || isCommunity {
                         selectable = false
                     }
 
@@ -685,7 +691,7 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                                     nodeInteraction.peerSelected(chatPeer, nil, threadId, nil, false)
                                 }
                             }
-                        }, disabledAction: ((isForum || isCommunity) && editing) && !peerEntry.requiresPremiumForMessaging ? nil : { _ in
+                        }, disabledAction: (((isForum && !isSelecting) || isCommunity) && editing) && !peerEntry.requiresPremiumForMessaging ? nil : { _ in
                             if let chatPeer = chatPeer {
                                 nodeInteraction.disabledPeerSelected(chatPeer, threadId, peerEntry.requiresPremiumForMessaging ? .premiumRequired : .generic)
                             }
@@ -798,7 +804,7 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
         case let .ArchiveIntro(presentationData):
             return ListViewInsertItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListArchiveInfoItem(theme: presentationData.theme, strings: presentationData.strings), directionHint: entry.directionHint)
         case let .EmptyIntro(presentationData):
-            return ListViewInsertItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListEmptyInfoItem(theme: presentationData.theme, strings: presentationData.strings), directionHint: entry.directionHint)
+            return ListViewInsertItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListEmptyInfoItem(theme: presentationData.theme, strings: presentationData.strings, lottieSettings: context.lottieRenderingSettings), directionHint: entry.directionHint)
         case let .SectionHeader(presentationData, displayHide):
             return ListViewInsertItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListSectionHeaderItem(theme: presentationData.theme, strings: presentationData.strings, hide: displayHide ? {
                 hideChatListContacts(context: context)
@@ -962,20 +968,26 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
                         }
 
                         var isForum = false
+                        var isCommunity = false
                         if let peer = chatPeer, case let .channel(channel) = peer, channel.isForumOrMonoForum {
                             isForum = true
-                            if editing {
+                            // A forum can only be selected via one of its topics in pickers that forward
+                            // INTO a chat (isSelecting == false, e.g. forward/share). Pickers that merely
+                            // collect peer ids (isSelecting == true: privacy exceptions, folder include /
+                            // exclude, auto-delete, paid-message fees) need no topic, so the forum itself
+                            // stays selectable there.
+                            if editing && !isSelecting {
                                 enabled = false
                             }
                         } else if isIncludedCommunityContainer(chatPeer, filter: filter) {
-                            isForum = true
+                            isCommunity = true
                             if editing {
                                 enabled = false
                             }
                         }
 
                         var selectable = editing
-                        if isForum {
+                        if (isForum && !isSelecting) || isCommunity {
                             selectable = false
                         }
 
@@ -1001,7 +1013,7 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
                                         nodeInteraction.peerSelected(chatPeer, nil, threadId, nil, false)
                                     }
                                 }
-                            }, disabledAction: (isForum && editing) && !peerEntry.requiresPremiumForMessaging ? nil : { _ in
+                            }, disabledAction: (((isForum && !isSelecting) || isCommunity) && editing) && !peerEntry.requiresPremiumForMessaging ? nil : { _ in
                                 if let chatPeer = chatPeer {
                                     nodeInteraction.disabledPeerSelected(chatPeer, threadId, peerEntry.requiresPremiumForMessaging ? .premiumRequired : .generic)
                                 }
@@ -1114,7 +1126,7 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
             case let .ArchiveIntro(presentationData):
                 return ListViewUpdateItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListArchiveInfoItem(theme: presentationData.theme, strings: presentationData.strings), directionHint: entry.directionHint)
             case let .EmptyIntro(presentationData):
-                return ListViewUpdateItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListEmptyInfoItem(theme: presentationData.theme, strings: presentationData.strings), directionHint: entry.directionHint)
+                return ListViewUpdateItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListEmptyInfoItem(theme: presentationData.theme, strings: presentationData.strings, lottieSettings: context.lottieRenderingSettings), directionHint: entry.directionHint)
             case let .SectionHeader(presentationData, displayHide):
                 return ListViewUpdateItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListSectionHeaderItem(theme: presentationData.theme, strings: presentationData.strings, hide: displayHide ? {
                     hideChatListContacts(context: context)
@@ -1439,7 +1451,8 @@ public final class ChatListNode: ListViewImpl {
 
         self.verticalScrollIndicatorColor = theme.list.scrollIndicatorColor
         self.verticalScrollIndicatorFollowsOverscroll = true
-
+        self.verticalScrollIndicatorRespectsSideInsets = true
+        
         self.keepMinimalScrollHeightWithTopInset = self.scrollHeightTopInset
 
         let nodeInteraction = ChatListNodeInteraction(context: context, animationCache: self.animationCache, animationRenderer: self.animationRenderer, activateSearch: { [weak self] in
@@ -2037,7 +2050,7 @@ public final class ChatListNode: ListViewImpl {
 
         let storageInfo: Signal<Double?, NoError>
         if !"".isEmpty, case .chatList(groupId: .root) = location, chatListFilter == nil {
-            let totalSizeSignal = combineLatest(context.account.postbox.mediaBox.storageBox.totalSize(), context.account.postbox.mediaBox.cacheStorageBox.totalSize())
+            let totalSizeSignal = combineLatest(context.engine.resources.storageTotalSize(), context.engine.resources.cacheStorageTotalSize())
             |> map { a, b -> Int64 in
                 return a + b
             }

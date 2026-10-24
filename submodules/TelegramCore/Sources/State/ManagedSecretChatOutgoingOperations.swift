@@ -1,6 +1,6 @@
 import Foundation
 import Postbox
-import TelegramApi
+internal import TelegramApi
 import SwiftSignalKit
 import MtProtoKit
 import SGSimpleSettings
@@ -827,7 +827,7 @@ private func decryptedEntities73(_ entities: [MessageTextEntity]?) -> [SecretApi
                 break
             case .Underline:
                 break
-            case .BankCard:
+            case .BankCard, .TonAddress:
                 break
             case .Spoiler:
                 break
@@ -882,7 +882,7 @@ private func decryptedEntities101(_ entities: [MessageTextEntity]?) -> [SecretAp
                 result.append(.messageEntityBlockquote(offset: Int32(entity.range.lowerBound), length: Int32(entity.range.count)))
             case .Underline:
                 result.append(.messageEntityUnderline(offset: Int32(entity.range.lowerBound), length: Int32(entity.range.count)))
-            case .BankCard:
+            case .BankCard, .TonAddress:
                 break
             case .Spoiler:
                 break
@@ -937,7 +937,7 @@ private func decryptedEntities144(_ entities: [MessageTextEntity]?) -> [SecretAp
                 result.append(.messageEntityBlockquote(offset: Int32(entity.range.lowerBound), length: Int32(entity.range.count)))
             case .Underline:
                 result.append(.messageEntityUnderline(offset: Int32(entity.range.lowerBound), length: Int32(entity.range.count)))
-            case .BankCard:
+            case .BankCard, .TonAddress:
                 break
             case .Spoiler:
                 result.append(.messageEntitySpoiler(offset: Int32(entity.range.lowerBound), length: Int32(entity.range.count)))

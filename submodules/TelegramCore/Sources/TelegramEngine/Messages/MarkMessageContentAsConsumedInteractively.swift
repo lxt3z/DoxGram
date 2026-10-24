@@ -1,6 +1,6 @@
 import Foundation
 import Postbox
-import TelegramApi
+internal import TelegramApi
 import SwiftSignalKit
 import SGSimpleSettings
 
@@ -210,7 +210,7 @@ func markMessageContentAsConsumedRemotely(transaction: Transaction, messageId: M
                                  
                     if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
                     } else {
-                        if !SGSimpleSettings.shared.keepViewOnceMedia && (attribute.timeout == viewOnceTimeout || timestamp >= countdownBeginTime + attribute.timeout) {
+                        if !SGSimpleSettings.shared.keepViewOnceMedia && (attribute.timeout == viewOnceTimeout || timestamp >= autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: attribute.timeout)) {
                             for i in 0 ..< updatedMedia.count {
                                 if let _ = updatedMedia[i] as? TelegramMediaImage {
                                     updatedMedia[i] = TelegramMediaExpiredContent(data: .image)
@@ -236,17 +236,15 @@ func markMessageContentAsConsumedRemotely(transaction: Transaction, messageId: M
                     } else {
                         if !SGSimpleSettings.shared.keepViewOnceMedia {
                             for i in 0 ..< updatedMedia.count {
-                                if attribute.timeout == viewOnceTimeout || timestamp >= countdownBeginTime + attribute.timeout {
+                                if attribute.timeout == viewOnceTimeout || timestamp >= autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: attribute.timeout) {
                                     if let _ = updatedMedia[i] as? TelegramMediaImage {
                                         updatedMedia[i] = TelegramMediaExpiredContent(data: .image)
-                                    } else if let file = updatedMedia[i] as? TelegramMediaFile {
-                                        if file.isInstantVideo {
-                                            updatedMedia[i] = TelegramMediaExpiredContent(data: .videoMessage)
-                                        } else if file.isVoice {
-                                            updatedMedia[i] = TelegramMediaExpiredContent(data: .voiceMessage)
-                                        } else {
-                                            updatedMedia[i] = TelegramMediaExpiredContent(data: .file)
-                                        }
+                                    } else if let _ = updatedMedia[i] as? TelegramMediaFile {
+                                        updatedMedia[i] = TelegramMediaExpiredContent(data: .file)
+                                    }
+                                }
+                            }
+                        }
                                     }
                                 }
                             }
