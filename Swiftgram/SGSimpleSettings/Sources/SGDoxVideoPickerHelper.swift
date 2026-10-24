@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import MobileCoreServices
+import UniformTypeIdentifiers
 
 public final class SGDoxVideoPickerHelper: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIDocumentPickerDelegate {
     public static let shared = SGDoxVideoPickerHelper()
@@ -31,8 +32,9 @@ public final class SGDoxVideoPickerHelper: NSObject, UIImagePickerControllerDele
     
     public func pickVideoFromFiles(presentation: (UIViewController) -> Void, completion: @escaping (URL?) -> Void) {
         self.onPicked = completion
-        let types = ["public.movie", "public.video", "com.apple.quicktime-movie", "public.mpeg-4"]
-        let picker = UIDocumentPickerViewController(documentTypes: types, in: .import)
+        let rawTypes = ["public.movie", "public.video", "com.apple.quicktime-movie", "public.mpeg-4"]
+        let contentTypes = rawTypes.map { UTType($0) ?? UTType(importedAs: $0) }
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: contentTypes, asCopy: true)
         picker.delegate = self
         picker.allowsMultipleSelection = false
         if UIDevice.current.userInterfaceIdiom == .pad {
