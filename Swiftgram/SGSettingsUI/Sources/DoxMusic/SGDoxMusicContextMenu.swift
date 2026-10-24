@@ -98,10 +98,11 @@ private final class SGDoxMenuTopButton: UIButton {
     
     override func layoutSubviews() {
         super.layoutSubviews()
-        let iconSize: CGFloat = 22.0
-        let iconY = max(4.0, (self.bounds.height - (iconSize + 4.0 + 15.0)) * 0.5)
+        let iconSize: CGFloat = 18.0
+        let iconY = max(4.0, (self.bounds.height - (iconSize + 2.0 + 14.0)) * 0.5)
         self.iconImageView.frame = CGRect(x: (self.bounds.width - iconSize) * 0.5, y: iconY, width: iconSize, height: iconSize)
-        self.label.frame = CGRect(x: 2.0, y: self.iconImageView.frame.maxY + 3.0, width: self.bounds.width - 4.0, height: 16.0)
+        self.label.frame = CGRect(x: 2.0, y: self.iconImageView.frame.maxY + 2.0, width: self.bounds.width - 4.0, height: 14.0)
+        self.label.font = UIFont.systemFont(ofSize: 11.0, weight: .semibold)
     }
 }
 
@@ -142,12 +143,12 @@ public final class SGDoxMusicContextMenu: UIView {
         self.addSubview(self.dimmingView)
         
         self.cardView.clipsToBounds = true
-        self.cardView.layer.cornerRadius = 24.0
+        self.cardView.layer.cornerRadius = 20.0
         self.cardView.layer.cornerCurve = .continuous
         self.cardView.layer.borderWidth = 0.5
         self.cardView.layer.borderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
         self.cardView.layer.shadowColor = UIColor.black.cgColor
-        self.cardView.layer.shadowOpacity = 0.50
+        self.cardView.layer.shadowOpacity = 0.45
         self.cardView.layer.shadowRadius = 30.0
         self.cardView.layer.shadowOffset = CGSize(width: 0, height: 14)
         self.addSubview(self.cardView)
@@ -175,13 +176,13 @@ public final class SGDoxMusicContextMenu: UIView {
     ) {
         // Setup top capsule
         self.topCapsuleView.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
-        self.topCapsuleView.layer.cornerRadius = 16.0
+        self.topCapsuleView.layer.cornerRadius = 13.0
         self.topCapsuleView.layer.cornerCurve = .continuous
         self.topCapsuleView.clipsToBounds = true
         self.topCapsuleView.translatesAutoresizingMaskIntoConstraints = false
-        self.topCapsuleView.heightAnchor.constraint(equalToConstant: 62.0).isActive = true
+        self.topCapsuleView.heightAnchor.constraint(equalToConstant: 48.0).isActive = true
         
-        let starConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
+        let starConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
         let starImg = UIImage(systemName: isFavorite ? "star.fill" : "star", withConfiguration: starConfig)
         let starColor = isFavorite ? UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : .white
         self.favoriteButton.update(icon: starImg, title: isFavorite ? "В избранном" : "Избранное", tintColor: starColor)
@@ -190,7 +191,7 @@ public final class SGDoxMusicContextMenu: UIView {
             self?.dismissAnimated(completion: onToggleFavorite)
         }
         
-        let shareConfig = UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)
+        let shareConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         let shareImg = UIImage(systemName: "square.and.arrow.up", withConfiguration: shareConfig)
         self.shareButton.update(icon: shareImg, title: "Поделиться", tintColor: .white)
         self.shareButton.onTap = { [weak self] in
@@ -205,7 +206,7 @@ public final class SGDoxMusicContextMenu: UIView {
         self.topCapsuleView.addSubview(self.capsuleDivider)
         
         let capsuleContainer = UIView()
-        capsuleContainer.layoutMargins = UIEdgeInsets(top: 10, left: 12, bottom: 8, right: 12)
+        capsuleContainer.layoutMargins = UIEdgeInsets(top: 8, left: 10, bottom: 6, right: 10)
         capsuleContainer.addSubview(self.topCapsuleView)
         
         self.topCapsuleView.translatesAutoresizingMaskIntoConstraints = false
@@ -214,7 +215,7 @@ public final class SGDoxMusicContextMenu: UIView {
             self.topCapsuleView.bottomAnchor.constraint(equalTo: capsuleContainer.layoutMarginsGuide.bottomAnchor),
             self.topCapsuleView.leadingAnchor.constraint(equalTo: capsuleContainer.layoutMarginsGuide.leadingAnchor),
             self.topCapsuleView.trailingAnchor.constraint(equalTo: capsuleContainer.layoutMarginsGuide.trailingAnchor),
-            self.topCapsuleView.heightAnchor.constraint(equalToConstant: 62.0)
+            self.topCapsuleView.heightAnchor.constraint(equalToConstant: 48.0)
         ])
         
         self.contentStack.addArrangedSubview(capsuleContainer)
@@ -242,7 +243,7 @@ public final class SGDoxMusicContextMenu: UIView {
                 rowDividerContainer.addSubview(rowDivider)
                 
                 NSLayoutConstraint.activate([
-                    rowDivider.leadingAnchor.constraint(equalTo: rowDividerContainer.leadingAnchor, constant: 52),
+                    rowDivider.leadingAnchor.constraint(equalTo: rowDividerContainer.leadingAnchor, constant: 46),
                     rowDivider.trailingAnchor.constraint(equalTo: rowDividerContainer.trailingAnchor),
                     rowDivider.topAnchor.constraint(equalTo: rowDividerContainer.topAnchor),
                     rowDivider.bottomAnchor.constraint(equalTo: rowDividerContainer.bottomAnchor)
@@ -253,7 +254,7 @@ public final class SGDoxMusicContextMenu: UIView {
         }
         
         // Layout card
-        let cardWidth: CGFloat = min(300.0, self.bounds.width - 40.0)
+        let cardWidth: CGFloat = min(280.0, self.bounds.width - 44.0)
         self.contentStack.frame = CGRect(x: 0, y: 0, width: cardWidth, height: 1000)
         let neededSize = self.contentStack.systemLayoutSizeFitting(
             CGSize(width: cardWidth, height: UIView.layoutFittingCompressedSize.height),
@@ -268,30 +269,30 @@ public final class SGDoxMusicContextMenu: UIView {
         // Position card near source button
         let buttonFrame = sourceButton.convert(sourceButton.bounds, to: self)
         var cardX = buttonFrame.maxX - cardWidth
-        if cardX < 20.0 { cardX = 20.0 }
-        if cardX + cardWidth > self.bounds.width - 20.0 {
-            cardX = self.bounds.width - cardWidth - 20.0
+        if cardX < 16.0 { cardX = 16.0 }
+        if cardX + cardWidth > self.bounds.width - 16.0 {
+            cardX = self.bounds.width - cardWidth - 16.0
         }
         
-        var cardY = buttonFrame.maxY + 8.0
-        if cardY + cardHeight > self.bounds.height - 30.0 {
-            cardY = max(50.0, buttonFrame.minY - cardHeight - 8.0)
+        var cardY = buttonFrame.maxY + 6.0
+        if cardY + cardHeight > self.bounds.height - 24.0 {
+            cardY = max(44.0, buttonFrame.minY - cardHeight - 6.0)
         }
         
         self.cardView.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight)
         
         // Layout top capsule buttons
-        let capW = cardWidth - 24.0
+        let capW = cardWidth - 20.0
         let halfW = floor((capW - 1.0) * 0.5)
-        self.favoriteButton.frame = CGRect(x: 0, y: 0, width: halfW, height: 62.0)
-        self.capsuleDivider.frame = CGRect(x: halfW, y: 10, width: 0.5, height: 42.0)
-        self.shareButton.frame = CGRect(x: halfW + 0.5, y: 0, width: capW - halfW - 0.5, height: 62.0)
+        self.favoriteButton.frame = CGRect(x: 0, y: 0, width: halfW, height: 48.0)
+        self.capsuleDivider.frame = CGRect(x: halfW, y: 8, width: 0.5, height: 32.0)
+        self.shareButton.frame = CGRect(x: halfW + 0.5, y: 0, width: capW - halfW - 0.5, height: 48.0)
         
         // Presentation animation
         self.cardView.alpha = 0.0
         self.cardView.transform = CGAffineTransform(scaleX: 0.88, y: 0.88).concatenating(CGAffineTransform(translationX: (buttonFrame.midX - self.cardView.center.x) * 0.2, y: -16))
         
-        UIView.animate(withDuration: 0.32, delay: 0, usingSpringWithDamping: 0.82, initialSpringVelocity: 0.6, options: [.allowUserInteraction], animations: {
+        UIView.animate(withDuration: 0.28, delay: 0, usingSpringWithDamping: 0.84, initialSpringVelocity: 0.6, options: [.allowUserInteraction], animations: {
             self.dimmingView.alpha = 1.0
             self.cardView.alpha = 1.0
             self.cardView.transform = .identity
@@ -301,14 +302,14 @@ public final class SGDoxMusicContextMenu: UIView {
     private func createRow(for item: SGDoxMusicMenuItem) -> UIView {
         let button = SGDoxMenuButton(type: .custom)
         button.translatesAutoresizingMaskIntoConstraints = false
-        let rowHeight: CGFloat = (item.subtitle != nil) ? 50.0 : 44.0
+        let rowHeight: CGFloat = (item.subtitle != nil) ? 44.0 : 38.0
         button.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
         
         let tintColor: UIColor = item.isDestructive ? UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : .white
         
         let iconView = UIImageView()
         iconView.contentMode = .scaleAspectFit
-        let iconConfig = UIImage.SymbolConfiguration(pointSize: 16.0, weight: .medium)
+        let iconConfig = UIImage.SymbolConfiguration(pointSize: 15.0, weight: .medium)
         iconView.image = UIImage(systemName: item.iconName, withConfiguration: iconConfig)
         iconView.tintColor = tintColor
         iconView.translatesAutoresizingMaskIntoConstraints = false
@@ -317,7 +318,7 @@ public final class SGDoxMusicContextMenu: UIView {
         let titleLabel = UILabel()
         titleLabel.text = item.title
         titleLabel.textColor = tintColor
-        titleLabel.font = UIFont.systemFont(ofSize: 14.5, weight: .medium)
+        titleLabel.font = UIFont.systemFont(ofSize: 13.5, weight: .medium)
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(titleLabel)
         
@@ -325,19 +326,19 @@ public final class SGDoxMusicContextMenu: UIView {
             let subLabel = UILabel()
             subLabel.text = sub
             subLabel.textColor = UIColor(white: 1.0, alpha: 0.50)
-            subLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .regular)
+            subLabel.font = UIFont.systemFont(ofSize: 11.0, weight: .regular)
             subLabel.translatesAutoresizingMaskIntoConstraints = false
             button.addSubview(subLabel)
             
             NSLayoutConstraint.activate([
-                iconView.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 16),
+                iconView.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 14),
                 iconView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-                iconView.widthAnchor.constraint(equalToConstant: 22),
-                iconView.heightAnchor.constraint(equalToConstant: 22),
+                iconView.widthAnchor.constraint(equalToConstant: 20),
+                iconView.heightAnchor.constraint(equalToConstant: 20),
                 
-                titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
-                titleLabel.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -16),
-                titleLabel.topAnchor.constraint(equalTo: button.topAnchor, constant: 7),
+                titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
+                titleLabel.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -14),
+                titleLabel.topAnchor.constraint(equalTo: button.topAnchor, constant: 5),
                 
                 subLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
                 subLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
@@ -345,13 +346,13 @@ public final class SGDoxMusicContextMenu: UIView {
             ])
         } else {
             NSLayoutConstraint.activate([
-                iconView.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 16),
+                iconView.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 14),
                 iconView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-                iconView.widthAnchor.constraint(equalToConstant: 22),
-                iconView.heightAnchor.constraint(equalToConstant: 22),
+                iconView.widthAnchor.constraint(equalToConstant: 20),
+                iconView.heightAnchor.constraint(equalToConstant: 20),
                 
-                titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
-                titleLabel.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -16),
+                titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
+                titleLabel.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -14),
                 titleLabel.centerYAnchor.constraint(equalTo: button.centerYAnchor)
             ])
         }

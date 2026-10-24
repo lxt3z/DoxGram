@@ -12,6 +12,8 @@ import ItemListPeerItem
 import DeviceAccess
 import TelegramStringFormatting
 import PeerNameColorItem
+import SGSimpleSettings
+import SGSettingsUI
 
 enum SettingsSection: Int, CaseIterable {
     case edit
@@ -534,6 +536,25 @@ func settingsEditingItems(data: PeerInfoScreenData?, state: PeerInfoState, conte
         interaction.editingOpenBusinessChatBots()
     }))
     items[.info]!.append(PeerInfoScreenCommentItem(id: ItemPeerChatAutomationHelp, text: presentationData.strings.Settings_ChatAutomationInfo))
+    
+    if !SGSimpleSettings.shared.doxProfileTrackTitle.isEmpty {
+        let trackTitle = SGSimpleSettings.shared.doxProfileTrackTitle
+        let trackArtist = SGSimpleSettings.shared.doxProfileTrackArtist
+        let label = presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Любимый трек" : "Favorite Track"
+        let desc = trackArtist.isEmpty ? trackTitle : "\(trackArtist) — \(trackTitle)"
+        items[.info]!.append(PeerInfoScreenDisclosureItem(
+            id: AnyHashable("sg_pinned_music_settings"),
+            label: .text(desc),
+            text: label,
+            icon: PresentationResourcesSettings.music,
+            action: {
+                SGDoxMusicManager.shared.playPinnedProfileTrack()
+                if let controller = interaction.getController() {
+                    SGDoxMusicPlayerController.present(context: context)
+                }
+            }
+        ))
+    }
     
     items[.account]!.append(PeerInfoScreenActionItem(id: ItemAddAccount, text: presentationData.strings.Settings_AddAnotherAccount, alignment: .center, action: {
         interaction.openSettings(.addAccount)

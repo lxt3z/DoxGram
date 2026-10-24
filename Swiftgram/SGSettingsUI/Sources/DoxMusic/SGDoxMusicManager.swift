@@ -645,6 +645,29 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
     
     // MARK: - Playback
     
+    public func playPinnedProfileTrack() {
+        let title = SGSimpleSettings.shared.doxProfileTrackTitle
+        let artist = SGSimpleSettings.shared.doxProfileTrackArtist
+        let trackId = SGSimpleSettings.shared.doxProfileTrackId
+        let artUrl = SGSimpleSettings.shared.doxProfileTrackArtworkUrl
+        guard !title.isEmpty else { return }
+        
+        if let current = self.currentTrack, current.id == trackId || (current.title == title && current.artist == artist) {
+            self.resume()
+            return
+        }
+        
+        let track = SGDoxMusicTrack(
+            id: trackId.isEmpty ? UUID().uuidString : trackId,
+            title: title,
+            artist: artist,
+            artworkUrl: artUrl,
+            source: .appleMusic,
+            appleMusicId: trackId.isEmpty ? nil : trackId
+        )
+        self.play(track: track)
+    }
+    
     public func play(track: SGDoxMusicTrack, queue: [SGDoxMusicTrack] = []) {
         self.stopTimeTracking()
         self.stopCurrentAudio()

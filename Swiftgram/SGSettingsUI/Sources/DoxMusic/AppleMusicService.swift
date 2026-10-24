@@ -32,6 +32,7 @@ public final class AppleMusicService: @unchecked Sendable {
     private var lastSeekTime: Double?
     private var lastSeekTimestamp: Double = 0.0
     private var activePlayGeneration: Int = 0
+    private let searchCache = NSCache<NSString, NSArray>()
 
     private init() {
         self.setupPlayerNotifications()
@@ -173,6 +174,12 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
+        let cacheKey = cleanQuery.lowercased() as NSString
+        if let cached = self.searchCache.object(forKey: cacheKey) as? [SGDoxMusicTrack], !cached.isEmpty {
+            completion(cached, nil)
+            return
+        }
+        
         // 1. If authorized with Apple Music, prioritize native MusicCatalogSearchRequest
         if self.isAuthorized {
             #if canImport(MusicKit)
@@ -295,6 +302,12 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
+        let cacheKey = cleanQuery.lowercased() as NSString
+        if let cached = self.searchCache.object(forKey: cacheKey) as? [SGDoxMusicTrack], !cached.isEmpty {
+            completion(cached, nil)
+            return
+        }
+        
         let deviceCountry: String
         if #available(iOS 16, *) {
             deviceCountry = Locale.current.region?.identifier ?? "RU"
@@ -302,20 +315,50 @@ public final class AppleMusicService: @unchecked Sendable {
             deviceCountry = Locale.current.regionCode ?? "RU"
         }
         
-        // Try device region first, followed by KZ (full Russian & CIS catalog without geo-blocks) and US
-        var countriesToTry: [String] = []
-        if !deviceCountry.isEmpty && deviceCountry != "KZ" {
-            countriesToTry.append(deviceCountry)
-        }
-        countriesToTry.append("KZ")
-        if !countriesToTry.contains("RU") {
-            countriesToTry.append("RU")
-        }
-        if !countriesToTry.contains("US") {
-            countriesToTry.append("US")
+        var primaryCountries = [deviceCountry, "KZ", "US"].filter { !$0.isEmpty }
+        var uniqueCountries: [String] = []
+        for c in primaryCountries {
+            if !uniqueCountries.contains(c) { uniqueCountries.append(c) }
         }
         
-        self.performMultiCountrySearch(term: encoded, cleanQuery: cleanQuery, countries: countriesToTry, index: 0, completion: completion)
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var allTracks: [SGDoxMusicTrack] = []
+        
+        // Query top 2 unique regions concurrently in parallel!
+        let concurrentCountries = Array(uniqueCountries.prefix(2))
+        for country in concurrentCountries {
+            group.enter()
+            self.performITunesSearch(term: encoded, cleanQuery: cleanQuery, country: country) { tracks, _ in
+                defer { group.leave() }
+                if !tracks.isEmpty {
+                    lock.lock()
+                    allTracks.append(contentsOf: tracks)
+                    lock.unlock()
+                }
+            }
+        }
+        
+        group.notify(queue: .main) { [weak self] in
+            guard let self = self else { return }
+            let deduplicated = AppleMusicService.deduplicateTracks(allTracks)
+            if !deduplicated.isEmpty {
+                self.searchCache.setObject(deduplicated as NSArray, forKey: cacheKey)
+                completion(deduplicated, nil)
+            } else {
+                let remaining = Array(uniqueCountries.dropFirst(2))
+                if !remaining.isEmpty {
+                    self.performMultiCountrySearch(term: encoded, cleanQuery: cleanQuery, countries: remaining, index: 0) { remTracks, err in
+                        if !remTracks.isEmpty {
+                            self.searchCache.setObject(remTracks as NSArray, forKey: cacheKey)
+                        }
+                        completion(remTracks, err)
+                    }
+                } else {
+                    completion([], "Ничего не найдено")
+                }
+            }
+        }
     }
     
     private func performMultiCountrySearch(term: String, cleanQuery: String, countries: [String], index: Int, completion: @escaping @Sendable ([SGDoxMusicTrack], String?) -> Void) {
@@ -347,7 +390,7 @@ public final class AppleMusicService: @unchecked Sendable {
         if let songUrl = URL(string: songUrlString) {
             group.enter()
             var req = URLRequest(url: songUrl)
-            req.timeoutInterval = 4.0
+            req.timeoutInterval = 3.0
             URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
                 defer { group.leave() }
                 guard let self = self, let data = data,

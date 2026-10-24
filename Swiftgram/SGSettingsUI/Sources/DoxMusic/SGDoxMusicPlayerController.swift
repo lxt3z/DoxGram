@@ -30,6 +30,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var videoItem: AVPlayerItem?
     private var currentVideoClipUrl: String?
     private var videoEndObserver: Any?
+    private var videoStatusObservation: NSKeyValueObservation?
+    private var videoReadyObservation: NSKeyValueObservation?
     private let videoDimOverlay = UIView()
     
     // Top Grabber
@@ -325,22 +327,47 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         // System Volume Listener
+        try? AVAudioSession.sharedInstance().setActive(true)
         self.volumeSlider.value = self.currentActualVolume()
-        self.volumeObservation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.new]) { [weak self] _, change in
+        self.volumeObservation?.invalidate()
+        self.volumeObservation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.initial, .new]) { [weak self] session, change in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if let newVol = change.newValue, newVol.isFinite && !newVol.isNaN {
+                let newVol = change.newValue ?? session.outputVolume
+                if newVol.isFinite && !newVol.isNaN {
                     self.volumeSlider.value = newVol
-                } else {
-                    self.volumeSlider.value = self.currentActualVolume()
                 }
             }
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(self.systemVolumeDidChangeNotification(_:)), name: Notification.Name("AVSystemController_SystemVolumeDidChangeNotification"), object: nil)
+    }
+    
+    @objc private func systemVolumeDidChangeNotification(_ notification: Notification) {
+        if let vol = notification.userInfo?["AVSystemController_AudioVolumeNotificationParameter"] as? Float {
+            self.volumeSlider.value = vol
+        } else {
+            self.volumeSlider.value = self.currentActualVolume()
+        }
+    }
+    
+    private func findSlider(in view: UIView) -> UISlider? {
+        if let slider = view as? UISlider {
+            return slider
+        }
+        for subview in view.subviews {
+            if let found = self.findSlider(in: subview) {
+                return found
+            }
+        }
+        return nil
     }
     
     private func currentActualVolume() -> Float {
-        if let systemSlider = self.hiddenVolumeView.subviews.first(where: { $0 is UISlider }) as? UISlider {
-            return systemSlider.value
+        if let systemSlider = self.findSlider(in: self.hiddenVolumeView) {
+            let val = systemSlider.value
+            if val.isFinite && !val.isNaN && val >= 0.0 {
+                return val
+            }
         }
         let outVol = AVAudioSession.sharedInstance().outputVolume
         if outVol.isFinite && !outVol.isNaN && outVol >= 0.0 {
@@ -355,6 +382,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.userScrollTimer = nil
         self.volumeObservation?.invalidate()
         self.volumeObservation = nil
+        NotificationCenter.default.removeObserver(self, name: Notification.Name("AVSystemController_SystemVolumeDidChangeNotification"), object: nil)
         self.teardownVideoPlayback(animated: false)
         if let token = self.stateToken {
             SGDoxMusicManager.shared.removeStateListener(token)
@@ -473,10 +501,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         if velocity.y <= 0 || abs(velocity.x) > velocity.y {
             return false
         }
-        if self.currentMode == .lyrics && self.lyricsTableView.contentOffset.y > 0 {
+        let loc = pan.location(in: self.view)
+        if loc.y <= 160.0 {
+            return true
+        }
+        if self.currentMode == .lyrics && self.lyricsTableView.contentOffset.y > 5.0 {
             return false
         }
-        if self.currentMode == .queue && self.queueTableView.contentOffset.y > 0 {
+        if self.currentMode == .queue && self.queueTableView.contentOffset.y > 5.0 {
             return false
         }
         return true
@@ -910,25 +942,21 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func generateSliderThumb(size: CGFloat) -> UIImage {
-        let s = CGSize(width: size, height: size)
+        let pad: CGFloat = 6.0
+        let total = size + pad * 2.0
+        let s = CGSize(width: total, height: total)
         UIGraphicsBeginImageContextWithOptions(s, false, 0.0)
         let ctx = UIGraphicsGetCurrentContext()
+        ctx?.setShadow(offset: CGSize(width: 0, height: 1.5), blur: 3.5, color: UIColor.black.withAlphaComponent(0.35).cgColor)
         ctx?.setFillColor(UIColor.white.cgColor)
-        ctx?.fillEllipse(in: CGRect(origin: .zero, size: s))
+        ctx?.fillEllipse(in: CGRect(x: pad, y: pad, width: size, height: size))
         let img = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
         UIGraphicsEndImageContext()
         return img
     }
     
     private func generateVolumeThumb() -> UIImage {
-        let size = CGSize(width: 12, height: 12)
-        UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
-        let ctx = UIGraphicsGetCurrentContext()
-        ctx?.setFillColor(UIColor.white.cgColor)
-        ctx?.fillEllipse(in: CGRect(origin: .zero, size: size))
-        let img = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
-        UIGraphicsEndImageContext()
-        return img
+        return self.generateSliderThumb(size: 13.0)
     }
     
     // MARK: - Layout Implementation
@@ -993,8 +1021,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let badgeH: CGFloat = 20.0
         let badgeY: CGFloat = labelY - 2.5
         let badgeGap: CGFloat = 6.0
-        let formatBadgeW: CGFloat = 86.0
-        let effectBadgeW: CGFloat = 82.0
+        let formatSize = self.formatBadgeButton.sizeThatFits(CGSize(width: 250, height: badgeH))
+        let formatBadgeW: CGFloat = max(94.0, ceil(formatSize.width) + 14.0)
+        let effectSize = self.effectBadgeButton.sizeThatFits(CGSize(width: 250, height: badgeH))
+        let effectBadgeW: CGFloat = max(80.0, ceil(effectSize.width) + 12.0)
         let totalBadgesW = formatBadgeW + badgeGap + effectBadgeW
         let badgesStartX = (rect.width - totalBadgesW) * 0.5
         
@@ -1104,7 +1134,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.lyricsTableContainer.frame = CGRect(x: 0, y: tableTop, width: bounds.width, height: tableH)
         self.lyricsTableView.frame = self.lyricsTableContainer.bounds
         self.lyricsPlainTextView.frame = CGRect(x: 24.0, y: 0, width: bounds.width - 48.0, height: tableH)
-        self.lyricsTableView.contentInset = UIEdgeInsets(top: 16.0, left: 0, bottom: tableH * 0.45, right: 0)
+        self.lyricsTableView.contentInset = UIEdgeInsets(top: tableH * 0.32, left: 0, bottom: tableH * 0.55, right: 0)
         
         self.lyricsLoadingIndicator.center = CGPoint(x: bounds.width * 0.5, y: tableTop + tableH * 0.35)
         self.lyricsStatusLabel.frame = CGRect(x: 32.0, y: tableTop + tableH * 0.30, width: bounds.width - 64.0, height: 60.0)
@@ -1590,8 +1620,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             }
             
             if !self.isUserScrollingLyrics && newIndex >= 0 && newIndex < lyrics.lines.count {
-                let targetIndexPath = IndexPath(row: newIndex, section: 0)
-                self.lyricsTableView.scrollToRow(at: targetIndexPath, at: .middle, animated: animated)
+                self.scrollLyricsToActiveLine(animated: animated)
             }
         } else if newIndex >= 0 && newIndex < lyrics.lines.count {
             let activeIndexPath = IndexPath(row: newIndex, section: 0)
@@ -1601,10 +1630,32 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
     }
     
+    private func scrollLyricsToActiveLine(animated: Bool) {
+        guard !self.isUserScrollingLyrics, self.activeLyricsIndex >= 0, let lyrics = self.currentLyrics, self.activeLyricsIndex < lyrics.lines.count else { return }
+        let targetIndexPath = IndexPath(row: self.activeLyricsIndex, section: 0)
+        let rect = self.lyricsTableView.rectForRow(at: targetIndexPath)
+        let tableH = self.lyricsTableView.bounds.height
+        if rect.height > 0 && tableH > 0 {
+            let targetY = rect.midY - (tableH * 0.32)
+            let minY = -self.lyricsTableView.contentInset.top
+            let maxY = max(minY, self.lyricsTableView.contentSize.height - tableH + self.lyricsTableView.contentInset.bottom)
+            let clampedY = max(minY, min(targetY, maxY))
+            if animated {
+                UIView.animate(withDuration: 0.38, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
+                    self.lyricsTableView.contentOffset = CGPoint(x: 0, y: clampedY)
+                })
+            } else {
+                self.lyricsTableView.contentOffset = CGPoint(x: 0, y: clampedY)
+            }
+        } else {
+            self.lyricsTableView.scrollToRow(at: targetIndexPath, at: .middle, animated: animated)
+        }
+    }
+    
     // MARK: - Actions & Volume
     @objc private func volumeChanged(_ slider: UISlider) {
         SGDoxMusicManager.shared.volume = slider.value
-        if let systemSlider = self.hiddenVolumeView.subviews.first(where: { $0 is UISlider }) as? UISlider {
+        if let systemSlider = self.findSlider(in: self.hiddenVolumeView) {
             systemSlider.value = slider.value
         }
     }
@@ -1695,8 +1746,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self?.artistLabelTapped()
         }))
         
-        items.append(SGDoxMusicMenuItem(iconName: "info.circle", title: "Посмотреть авторство", subtitle: "\(track.source.rawValue) • \(track.isLossless ? "Lossless" : (track.isDolbyAtmos ? "Dolby Atmos" : "AAC 256k"))", action: { [weak self] in
-            self?.formatBadgePressed()
+        items.append(SGDoxMusicMenuItem(iconName: "info.circle", title: "Посмотреть авторство", subtitle: track.artist, action: { [weak self] in
+            self?.showCreditsPressed()
         }))
         
         items.append(SGDoxMusicMenuItem(
@@ -1765,6 +1816,17 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.present(shareController, animated: true)
     }
     
+    private func showCreditsPressed() {
+        guard let track = SGDoxMusicManager.shared.currentTrack else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let formatStr = track.isLossless ? "Lossless Audio (ALAC)" : (track.isDolbyAtmos ? "Dolby Atmos Spatial Audio" : "AAC 256 kbps")
+        let albumStr = track.album.isEmpty ? "Сингл" : track.album
+        let message = "Исполнитель: \(track.artist)\nАльбом: \(albumStr)\nКачество: \(formatStr)\nИсточник: \(track.source.rawValue)"
+        let alert = UIAlertController(title: "Сведения о треке", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+        self.present(alert, animated: true)
+    }
+    
     private func pinToProfilePressed() {
         guard let track = SGDoxMusicManager.shared.currentTrack else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -1772,6 +1834,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         SGSimpleSettings.shared.doxProfileTrackTitle = track.title
         SGSimpleSettings.shared.doxProfileTrackArtist = track.artist
         SGSimpleSettings.shared.doxProfileTrackArtworkUrl = track.artworkUrl
+        
+        NotificationCenter.default.post(name: NSNotification.Name("SGDoxProfileTrackUpdated"), object: nil)
         
         let overlay = UndoOverlayController(presentationData: self.presentationData, content: .actionSucceeded(title: nil, text: "Трек закреплен в профиле", cancel: nil, destructive: false), elevatedLayout: false, action: { _ in return false })
         self.present(overlay, in: .window(.root))
@@ -1938,8 +2002,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         SGDoxVideoClipService.shared.applyQuality(to: item)
         self.videoItem = item
         
+        let containerBounds = self.videoContainerView.bounds.width > 0 ? self.videoContainerView.bounds : self.view.bounds
         if let player = self.videoPlayer {
             player.replaceCurrentItem(with: item)
+            self.videoPlayerLayer?.frame = containerBounds
         } else {
             let player = AVPlayer(playerItem: item)
             player.isMuted = true
@@ -1948,7 +2014,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             
             let layer = AVPlayerLayer(player: player)
             layer.videoGravity = .resizeAspectFill
-            layer.frame = self.videoContainerView.bounds
+            layer.frame = containerBounds
             self.videoContainerView.layer.insertSublayer(layer, at: 0)
             self.videoPlayerLayer = layer
         }
@@ -1965,27 +2031,50 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.videoPlayer?.play()
         }
         
-        // Never flash a black box! Only show video when it begins decoding frames
+        // Reveal video when frames are ready to display
         self.videoContainerView.alpha = 0.0
         let revealVideo = { [weak self] in
             guard let self = self, self.currentVideoClipUrl == urlString else { return }
-            UIView.animate(withDuration: 0.6, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState], animations: {
-                self.videoContainerView.alpha = 1.0
-                if self.currentMode == .nowPlaying {
-                    self.artworkContainerView.alpha = 0.0
-                    self.artworkAmbientGlowView.alpha = 0.0
-                }
-            })
+            if self.videoContainerView.alpha < 1.0 {
+                UIView.animate(withDuration: 0.6, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState], animations: {
+                    self.videoContainerView.alpha = 1.0
+                    if self.currentMode == .nowPlaying {
+                        self.artworkContainerView.alpha = 0.0
+                        self.artworkAmbientGlowView.alpha = 0.0
+                    }
+                })
+            }
         }
         
-        NotificationCenter.default.addObserver(forName: .AVPlayerItemNewAccessLogEntry, object: item, queue: .main) { _ in
-            DispatchQueue.main.async {
-                revealVideo()
+        self.videoStatusObservation?.invalidate()
+        self.videoStatusObservation = item.observe(\.status, options: [.initial, .new]) { item, _ in
+            if item.status == .readyToPlay {
+                DispatchQueue.main.async {
+                    revealVideo()
+                }
             }
+        }
+        
+        let pLayer = self.videoPlayerLayer
+        self.videoReadyObservation?.invalidate()
+        self.videoReadyObservation = pLayer?.observe(\.isReadyForDisplay, options: [.initial, .new]) { layer, _ in
+            if layer.isReadyForDisplay {
+                DispatchQueue.main.async {
+                    revealVideo()
+                }
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            revealVideo()
         }
     }
     
     private func teardownVideoPlayback(animated: Bool = false) {
+        self.videoStatusObservation?.invalidate()
+        self.videoStatusObservation = nil
+        self.videoReadyObservation?.invalidate()
+        self.videoReadyObservation = nil
         if let obs = self.videoEndObserver {
             NotificationCenter.default.removeObserver(obs)
             self.videoEndObserver = nil
@@ -2114,10 +2203,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             guard let self = self else { return }
             self.isUserScrollingLyrics = false
             if self.activeLyricsIndex >= 0 && self.currentMode == .lyrics {
-                let targetIndexPath = IndexPath(row: self.activeLyricsIndex, section: 0)
-                if targetIndexPath.row < (self.currentLyrics?.lines.count ?? 0) {
-                    self.lyricsTableView.scrollToRow(at: targetIndexPath, at: .middle, animated: true)
-                }
+                self.scrollLyricsToActiveLine(animated: true)
             }
         }
     }
@@ -2491,7 +2577,7 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
         
         var badgesW: CGFloat = 0.0
         if !self.dolbyBadge.isHidden { badgesW += 38.0 }
-        if !self.losslessBadge.isHidden { badgesW += 48.0 }
+        if !self.losslessBadge.isHidden { badgesW += 56.0 }
         
         let artistSize = self.artistLabel.sizeThatFits(CGSize(width: textW, height: 18))
         let availableArtistW = max(30.0, textW - badgesW)
@@ -2506,7 +2592,7 @@ private final class SGDoxPlayerQueueCell: UITableViewCell {
             badgeX += bW + 4.0
         }
         if !self.losslessBadge.isHidden {
-            let bW: CGFloat = 44.0
+            let bW: CGFloat = 52.0
             self.losslessBadge.frame = CGRect(x: badgeX, y: badgeY, width: bW, height: 12.5)
         }
     }
