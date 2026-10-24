@@ -245,10 +245,6 @@ func markMessageContentAsConsumedRemotely(transaction: Transaction, messageId: M
                                 }
                             }
                         }
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }

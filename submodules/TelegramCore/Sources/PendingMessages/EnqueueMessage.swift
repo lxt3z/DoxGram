@@ -960,13 +960,6 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                     let selectedMedia = sourceMessage.media.first(where: { $0 is TelegramMediaImage || $0 is TelegramMediaFile }) ?? sourceMessage.media.first
                     let mediaReference = selectedMedia.flatMap(AnyMediaReference.standalone)
                     
-                    var attributes: [MessageAttribute] = []
-                    attributes.append(contentsOf: filterMessageAttributesForOutgoingMessage(sourceMessage.attributes))
-                    for requestedAttr in requestedAttributes {
-                        if !attributes.contains(where: { type(of: $0) == type(of: requestedAttr) }) {
-                            attributes.append(requestedAttr)
-                        }
-                    }
                     var text = sourceMessage.text
                     var hidesCaption = false
                     if let media = mediaReference?.media, media is TelegramMediaImage || media is TelegramMediaFile, forwardAttributes.contains(where: { ($0 as? ForwardOptionsMessageAttribute)?.hideCaptions == true }) {

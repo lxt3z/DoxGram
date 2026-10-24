@@ -4848,18 +4848,6 @@ func replayFinalState(
                             )
                         }
                     }
-                    var updatedFlags = message.flags
-                    var updatedLocalTags = message.localTags
-                    var updatedAttributes = message.attributes
-                    if previousMessage.localTags.contains(.OutgoingLiveLocation) {
-                        updatedLocalTags.insert(.OutgoingLiveLocation)
-                    }
-                    if previousMessage.flags.contains(.Incoming) {
-                        updatedFlags.insert(.Incoming)
-                    } else {
-                        updatedFlags.remove(.Incoming)
-                    }
-                    
                     let peers: [PeerId:Peer] = previousMessage.peers.reduce([:], { current, value in
                         var current = current
                         current[value.0] = value.1
