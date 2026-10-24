@@ -86,8 +86,7 @@ swift_library(
         "//submodules/Utils/DarwinDirStat",
     ],
     visibility = [
-        ":clients",
-        ":test_clients",
+        "//visibility:public",
     ],
 )
 
