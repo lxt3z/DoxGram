@@ -294,7 +294,7 @@ genrule(
         echo "=== Checking FFmpeg build files ==="
         test -x "$$SOURCE_PATH/pkg-config" || { echo "ERROR: pkg-config not executable"; exit 1; }
         test -x "$$SOURCE_PATH/gas-preprocessor.pl" || { echo "ERROR: gas-preprocessor.pl not executable"; exit 1; }
-        test -x "$$SOURCE_PATH/ffmpeg-7.1.1/configure" || { echo "ERROR: configure not executable"; exit 1; }
+        test -x "$$SOURCE_PATH/ffmpeg-$$FFMPEG_VERSION/configure" || { echo "ERROR: configure not executable"; exit 1; }
         echo "All required FFmpeg scripts are executable."
 
         "$$SOURCE_PATH/build-ffmpeg-bazel.sh" "$$VARIANT" "$$BUILD_ARCH" "$$BUILD_DIR" "$$SOURCE_PATH" "$$FFMPEG_VERSION"
