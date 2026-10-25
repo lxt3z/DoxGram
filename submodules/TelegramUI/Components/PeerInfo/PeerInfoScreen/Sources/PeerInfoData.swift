@@ -1907,12 +1907,15 @@ func peerInfoScreenData(
                 personalChannel,
                 peerInfoFirstWelcomeMessageText(context: context, peerId: peerId)
             )
+            let personalChannelAndFirstWelcomeMessageTextAndFirstMessage = combineLatest(
+                personalChannelAndFirstWelcomeMessageText,
+                getFirstMessage(context: context, peerId: peerId)
+            )
             
             let forcedLinkedCommunityId = Atomic<EnginePeer.Id?>(value: nil)
             let didRefreshWelcomeMessages = Atomic<Bool>(value: false)
             
             return combineLatest(
-                getFirstMessage(context: context, peerId: peerId),
                 context.account.viewTracker.peerView(peerId, updateData: true),
                 peerInfoAvailableMediaPanes(context: context, peerId: peerId, chatLocation: chatLocation, isMyProfile: false, chatLocationContextHolder: chatLocationContextHolder, sharedMediaFromForumTopic: sharedMediaFromForumTopic),
                 context.engine.data.subscribe(TelegramEngine.EngineData.Item.NotificationSettings.Global()),
@@ -1931,9 +1934,18 @@ func peerInfoScreenData(
                 starsRevenueContextAndState,
                 revenueContextAndState,
                 profileGiftsContext.state,
-                personalChannelAndFirstWelcomeMessageText
+                personalChannelAndFirstWelcomeMessageTextAndFirstMessage
             )
-            |> mapToSignal { firstMessage, peerView, availablePanes, globalNotificationSettings, status, currentInvitationsContext, invitations, currentRequestsContext, requests, hasStories, accountIsPremium, recommendedChannels, hasSavedMessages, hasSavedMessagesChats, hasSavedMessageTags, isPremiumRequiredForStoryPosting, starsRevenueContextAndState, revenueContextAndState, profileGiftsState, personalChannelAffiliateProgram, verification, hasStoryArchive, userBoostStatus, pendingStory -> Signal<PeerInfoScreenData, NoError> in
+            |> mapToSignal { peerView, availablePanes, globalNotificationSettings, status, currentInvitationsContext, invitations, currentRequestsContext, requests, hasStories, accountIsPremium, recommendedChannels, hasSavedMessages, hasSavedMessagesChats, hasSavedMessageTags, isPremiumRequiredForStoryPosting, starsRevenueContextAndState, revenueContextAndState, profileGiftsState, personalChannelAndFirstWelcomeMessageTextAndFirstMessage -> Signal<PeerInfoScreenData, NoError> in
+                let (personalChannelAndFirstWelcomeMessageText, firstMessage) = personalChannelAndFirstWelcomeMessageTextAndFirstMessage
+                let (personalChannel, firstWelcomeMessageText) = personalChannelAndFirstWelcomeMessageText
+
+                if let channel = peerViewMainPeer(peerView) as? TelegramChannel, channel.hasPermission(.manageWelcomeMessages) {
+                    let wasRefreshed = didRefreshWelcomeMessages.swap(true)
+                    if !wasRefreshed {
+                        let _ = context.engine.messages.refreshWelcomeMessages(peerId: peerId).startStandalone()
+                    }
+                }
                 var availablePanes = availablePanes
                 if let hasStories {
                     if hasStories {
@@ -2306,6 +2318,17 @@ func peerInfoScreenData(
                 starsRevenueContextAndStateAndFirstWelcomeMessageText
             )
             |> mapToSignal { firstMessage, peerView, availablePanes, globalNotificationSettings, status, membersData, currentInvitationsContext, invitations, currentRequestsContext, requests, hasStories, threadData, preferencesView, accountIsPremium, hasSavedMessages, hasSavedMessagesChats, hasSavedMessageTags, isPremiumRequiredForStoryPosting, starsRevenueContextAndStateAndFirstWelcomeMessageText -> Signal<PeerInfoScreenData, NoError> in
+                let (starsRevenueContextAndState, firstWelcomeMessageText) = starsRevenueContextAndStateAndFirstWelcomeMessageText
+
+                if let group = peerViewMainPeer(peerView) as? TelegramGroup {
+                    if group.hasPermission(.manageWelcomeMessages) {
+                        let wasRefreshed = didRefreshWelcomeMessages.swap(true)
+                        if !wasRefreshed {
+                            let _ = context.engine.messages.refreshWelcomeMessages(peerId: groupId).startStandalone()
+                        }
+                    }
+                }
+
                 var discussionPeer: EnginePeer?
                 if case let .known(maybeLinkedDiscussionPeerId) = (peerView.cachedData as? CachedChannelData)?.linkedDiscussionPeerId, let linkedDiscussionPeerId = maybeLinkedDiscussionPeerId, let peer = peerView.peers[linkedDiscussionPeerId] {
                     discussionPeer = EnginePeer(peer)

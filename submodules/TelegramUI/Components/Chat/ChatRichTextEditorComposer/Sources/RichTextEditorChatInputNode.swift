@@ -1066,11 +1066,21 @@ public final class RichTextEditorChatInputNode: ASDisplayNode, ChatRichTextInput
     }
     //
     public var inputTintColor: UIColor? {
-        didSet {
-            self.editorView.tintColor = self.inputTintColor
+        get { return self.tintColor }
+        set { self.tintColor = newValue }
+    }
+    public func didChangeInputTintColor() {
+        self.tintColorDidChange()
+    }
+    public var inputCaretColor: UIColor {
+        get { return self.editorView.tintColor }
+        set {
+            if let inherited = self.editorView.superview?.tintColor, newValue == inherited {
+                self.editorView.tintColor = nil
+            } else {
+                self.editorView.tintColor = newValue
+            }
         }
     }
-    public func didChangeInputTintColor() { }
-    public var inputCaretColor: UIColor = .clear
     public var inputTheme: ChatInputTextView.Theme?
 }

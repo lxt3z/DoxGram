@@ -284,6 +284,45 @@ public final class InAppPurchaseManager: NSObject {
     
     private func requestProducts() {
         if ({ return true }()) { return } // MARK: Swiftgram
+        Queue.mainQueue().async { [weak self] in
+            guard let self, self.products.isEmpty, self.productRequest == nil, self.productRequestRetryTimer == nil else {
+                return
+            }
+            Logger.shared.log("InAppPurchaseManager", "Requesting products")
+            let productRequest = SKProductsRequest(productIdentifiers: Set(productIdentifiers))
+            productRequest.delegate = self
+            self.productRequest = productRequest
+
+            let timeoutTimer = SwiftSignalKit.Timer(timeout: 30.0, repeat: false, completion: { [weak self, weak productRequest] in
+                guard let self, let productRequest, self.productRequest === productRequest else {
+                    return
+                }
+                Logger.shared.log("InAppPurchaseManager", "Product request timed out")
+                self.productRequest = nil
+                self.productRequestTimeoutTimer = nil
+                productRequest.cancel()
+                self.scheduleProductRequestRetry()
+            }, queue: Queue.mainQueue())
+            self.productRequestTimeoutTimer = timeoutTimer
+            timeoutTimer.start()
+            productRequest.start()
+        }
+    }
+
+    private func scheduleProductRequestRetry() {
+        guard self.products.isEmpty, self.productRequest == nil, self.productRequestRetryTimer == nil else {
+            return
+        }
+        Logger.shared.log("InAppPurchaseManager", "Retrying product request in 10 seconds")
+        let retryTimer = SwiftSignalKit.Timer(timeout: 10.0, repeat: false, completion: { [weak self] in
+            guard let self else {
+                return
+            }
+            self.productRequestRetryTimer = nil
+            self.requestProducts()
+        }, queue: Queue.mainQueue())
+        self.productRequestRetryTimer = retryTimer
+        retryTimer.start()
     }
     
     public var availableProducts: Signal<[Product], NoError> {
@@ -318,16 +357,14 @@ public final class InAppPurchaseManager: NSObject {
             accountPeerId = "\(engine.account.id.int64)"
         }
         let purpose = PendingInAppPurchaseState.Purpose(appStorePurpose: purpose)
-        
-        let payment = SKMutablePayment(product: product.skProduct)
-        payment.applicationUsername = accountPeerId
-        payment.quantity = Int(quantity)
-        // SKPaymentQueue.default().add(payment) // MARK: Swiftgram
-        
-        let productIdentifier = payment.productIdentifier
-        let signal = Signal<PurchaseState, PurchaseError> { subscriber in
-            let disposable = MetaDisposable()
-            
+
+        return Signal { subscriber in
+            let disposables = DisposableSet()
+            let disposed = Atomic(value: false)
+            disposables.add(ActionDisposable {
+                let _ = disposed.swap(true)
+            })
+
             self.stateQueue.async {
                 guard !disposed.with({ $0 }) else {
                     return
@@ -481,7 +518,7 @@ public final class InAppPurchaseManager: NSObject {
                             payment.applicationUsername = accountPeerId
                             payment.quantity = Int(quantity)
                             Logger.shared.log("InAppPurchaseManager", "Buying: account \(accountPeerId), product \(productIdentifier), price \(product.price)")
-                            SKPaymentQueue.default().add(payment)
+                            // SKPaymentQueue.default().add(payment) // MARK: Swiftgram
                         }
                     }))
                 }
