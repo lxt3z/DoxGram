@@ -1057,7 +1057,7 @@ private enum DebugControllerEntry: ItemListNodeEntry {
                                     if let strongController = controller {
                                         strongController.dismiss()
 
-                                        for (name, path) in logs {
+                                        for (_, path) in logs {
                                             if let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe) {
                                                 let id = Int64.random(in: Int64.min ... Int64.max)
                                                 let fileResource = LocalFileMediaResource(fileId: id, size: Int64(data.count), isSecretRelated: false)
