@@ -841,7 +841,6 @@ final class AuthorizedApplicationContext {
                 if needControllersUpdate {
                     strongSelf.rootController.updateRootControllers(showContactsTab: strongSelf.showContactsTab, showCallsTab: strongSelf.showCallsTab, showNewsTab: strongSelf.showNewsTab)
                 }
-                }
             }
         })
 

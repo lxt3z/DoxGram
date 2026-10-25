@@ -51,11 +51,11 @@ public func isOAuthUrl(_ url: URL) -> Bool {
     guard let query = url.query, let params = QueryParameters(query), ["oauth", "resolve"].contains(url.host) else {
         return false
     }
-
+    
     let domain = params["domain"]
     let startApp = params["startapp"]
     let token = params["token"]
-
+    
     var valid = false
     if url.host == "resolve" {
         if domain == "oauth", let _ = startApp {
@@ -66,7 +66,7 @@ public func isOAuthUrl(_ url: URL) -> Bool {
             valid = true
         }
     }
-
+    
     return valid
 }
 
@@ -74,7 +74,7 @@ public func parseSecureIdUrl(_ url: URL) -> ParsedSecureIdUrl? {
     guard let query = url.query, let params = QueryParameters(query), ["passport", "resolve"].contains(url.host) else {
         return nil
     }
-
+    
     let domain = params["domain"]
     let botId = params["bot_id"].flatMap(Int64.init)
     let scope = params["scope"]
@@ -88,7 +88,7 @@ public func parseSecureIdUrl(_ url: URL) -> ParsedSecureIdUrl? {
     if let nonceValue = params["nonce"], let data = nonceValue.data(using: .utf8) {
         opaqueNonce = data
     }
-
+    
     let valid: Bool
     if url.host == "resolve" {
         if domain == "telegrampassport" {
@@ -99,7 +99,7 @@ public func parseSecureIdUrl(_ url: URL) -> ParsedSecureIdUrl? {
     } else {
         valid = true
     }
-
+    
     if valid {
         if let botId = botId, let scope = scope, let publicKey = publicKey, let callbackUrl = callbackUrl {
             if scope.hasPrefix("{") && scope.hasSuffix("}") {
@@ -110,11 +110,11 @@ public func parseSecureIdUrl(_ url: URL) -> ParsedSecureIdUrl? {
             } else if opaquePayload.isEmpty {
                 return nil
             }
-
+            
             return ParsedSecureIdUrl(peerId: EnginePeer.Id(namespace: Namespaces.Peer.CloudUser, id: EnginePeer.Id.Id._internalFromInt64Value(botId)), scope: scope, publicKey: publicKey, callbackUrl: callbackUrl, opaquePayload: opaquePayload, opaqueNonce: opaqueNonce)
         }
     }
-
+    
     return nil
 }
 
@@ -248,7 +248,7 @@ private func handleInternetUrl(
     if urlScheme == "tonsite" {
         isInternetUrl = true
     }
-
+    
     if isInternetUrl {
         if let host = parsedUrl.host, telegramMeHosts.contains(host) {
             handleInternalUrl(parsedUrl.absoluteString)
@@ -263,19 +263,19 @@ private func handleInternetUrl(
                 let accountSettings = accountSettingsEntry?.get(AccountWebBrowserSettings.self) ?? AccountWebBrowserSettings.defaultSettings
                 return (localSettings, accountSettings)
             }
-
+            
             let _ = (settings
             |> deliverOnMainQueue).startStandalone(next: { settings in
                 let localSettings = settings.0
                 let accountSettings = settings.1
-
+                
                 var isTonSite = false
                 if let host = parsedUrl.host, host.lowercased().hasSuffix(".ton") {
                     isTonSite = true
                 } else if let scheme = parsedUrl.scheme, scheme.lowercased().hasPrefix("tonsite") {
                     isTonSite = true
                 }
-
+                
                 var isExceptedDomain = false
                 let host = ".\((parsedUrl.host ?? "").lowercased())"
                 let exceptions = accountSettings.openExternalBrowser ? accountSettings.inAppExceptions : accountSettings.externalExceptions
@@ -285,7 +285,7 @@ private func handleInternetUrl(
                         break
                     }
                 }
-
+                
                 let shouldOpenInApp: Bool
                 if isTonSite {
                     shouldOpenInApp = true
@@ -294,7 +294,7 @@ private func handleInternetUrl(
                 } else {
                     shouldOpenInApp = !isExceptedDomain
                 }
-
+                
                 if shouldOpenInApp {
                     let controller = BrowserScreen(context: context, subject: .webPage(url: parsedUrl.absoluteString))
                     navigationController?.pushViewController(controller)
@@ -330,21 +330,21 @@ private func handleInternetUrl(
 private struct QueryParameters {
     private let map: [String: [String?]]
     let items: [URLQueryItem]
-
+    
     init?(_ query: String) {
         guard let components = URLComponents(string: "/?" + query) else {
             return nil
         }
         let queryItems = components.queryItems ?? []
         self.items = queryItems
-
+        
         var map: [String: [String?]] = [:]
         for item in queryItems {
             map[item.name, default: []].append(item.value)
         }
         self.map = map
     }
-
+    
     subscript(_ name: String) -> String? {
         return self.map[name]?.first ?? nil
     }
@@ -368,8 +368,61 @@ private func makeTelegramUrl(_ path: String, queryItems: [URLQueryItem] = []) ->
 }
 
 func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, url: String, forceExternal: Bool, presentationData: PresentationData, navigationController: NavigationController?, dismissInput: @escaping () -> Void, skipSecurityCheck: Bool = false) {
+    var url = url
+    let lowercasedUrl = url.lowercased()
+    let isSpecialScheme = lowercasedUrl.hasPrefix("tel:") || lowercasedUrl.hasPrefix("calshow:") || lowercasedUrl.hasPrefix("mailto:")
+
+    if !isSpecialScheme {
+        if SGSimpleSettings.shared.cleanUrlTrackers {
+            url = SGUrlSanitizer.sanitize(urlString: url)
+        }
+
+        let warnIpLoggers = SGSimpleSettings.shared.warnOnIpLoggers
+        let warnAll = SGSimpleSettings.shared.warnOnAllExternalLinks
+
+        if !skipSecurityCheck && (warnIpLoggers || warnAll) {
+            let checkResult = SGUrlSanitizer.checkSuspicious(urlString: url, checkIpLoggers: warnIpLoggers, warnOnAllExternal: warnAll)
+            if checkResult.isSuspicious {
+                let isRussian = presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
+                let alertTitle = checkResult.isIpGrabber ? (isRussian ? "🛡️ Защита IP: Граббер" : "🛡️ IP Grabber Warning") : (isRussian ? "🛡️ Подозрительная ссылка" : "🛡️ Suspicious Link")
+                let alertText = isRussian ? "Переход по этой ссылке может раскрыть ваш реальный IP-адрес и местоположение:\n\n\(url)\n\nВы уверены, что хотите продолжить?" : "Opening this link may expose your real IP address and location:\n\n\(url)\n\nAre you sure you want to proceed?"
+
+                let targetUrl = url
+                let alertController = textAlertController(
+                    context: context,
+                    title: alertTitle,
+                    text: alertText,
+                    actions: [
+                        TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
+                        TextAlertAction(type: .defaultAction, title: isRussian ? "Перейти" : "Open", action: {
+                            openExternalUrlImpl(context: context, urlContext: urlContext, url: targetUrl, forceExternal: forceExternal, presentationData: presentationData, navigationController: navigationController, dismissInput: dismissInput, skipSecurityCheck: true)
+                        })
+                    ]
+                )
+                context.sharedContext.presentGlobalController(alertController, nil)
+                return
+            }
+        }
+    }
     // A login part hides the host a link opens (see `externalUrlWithLoginPart`). Every external link leaves through
-    // here, whoever opens it, so here it is confirmed.
+    // here, whoever opens it, so here it is confirmed, unless a prompt that showed the real host was just accepted.
+    if let loginPartUrl = externalUrlWithLoginPart(url), !consumeLoginPartConfirmation(loginPartUrl) {
+        let controller = openLinkConfirmationController(
+            context: context,
+            presentationData: presentationData,
+            updatedPresentationData: .single(presentationData),
+            displayUrl: urlRemovingLoginPart(loginPartUrl).absoluteString,
+            open: {
+                openCheckedExternalUrl(context: context, urlContext: urlContext, url: url, forceExternal: forceExternal, presentationData: presentationData, navigationController: navigationController, dismissInput: dismissInput)
+            }
+        )
+        context.sharedContext.presentGlobalController(controller, nil)
+        return
+    }
+    openCheckedExternalUrl(context: context, urlContext: urlContext, url: url, forceExternal: forceExternal, presentationData: presentationData, navigationController: navigationController, dismissInput: dismissInput)
+}
+
+private func openCheckedExternalUrl(context: AccountContext, urlContext: OpenURLContext, url: String, forceExternal: Bool, presentationData: PresentationData, navigationController: NavigationController?, dismissInput: @escaping () -> Void) {
     if forceExternal || url.lowercased().hasPrefix("tel:") || url.lowercased().hasPrefix("calshow:") {
         if url.lowercased().hasPrefix("tel:+888") {
             context.sharedContext.presentGlobalController(textAlertController(context: context, title: nil, text: presentationData.strings.Conversation_CantPhoneCallAnonymousNumberError, actions: [
@@ -381,10 +434,11 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
         context.sharedContext.applicationBindings.openUrl(url)
         return
     }
-
+    
     guard let canonicalUrl = canonicalExternalUrl(from: url) else {
         return
     }
+    
     if canonicalUrl.scheme?.lowercased() == "tg", canonicalUrl.host?.lowercased() == "companion" {
         dismissInput()
         let controller = DebugCompanionScreen(context: context, standalone: navigationController == nil)
@@ -395,7 +449,367 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
         }
         return
     }
-    var noPaidMessagesToken: String?
+
+    if canonicalUrl.scheme == "mailto" {
+        context.sharedContext.applicationBindings.openUrl(url)
+        return
+    }
+    
+    var parsedUrl = canonicalUrl
+    
+    if let host = parsedUrl.host?.lowercased() {
+        if host == "itunes.apple.com" {
+            if context.sharedContext.applicationBindings.canOpenUrl(parsedUrl.absoluteString) {
+                context.sharedContext.applicationBindings.openUrl(url)
+                return
+            }
+        }
+        if host == "twitter.com" || host == "mobile.twitter.com" {
+            if context.sharedContext.applicationBindings.canOpenUrl("twitter://status") {
+                context.sharedContext.applicationBindings.openUrl(url)
+                return
+            }
+        } else if host == "instagram.com" {
+            if context.sharedContext.applicationBindings.canOpenUrl("instagram://photo") {
+                context.sharedContext.applicationBindings.openUrl(url)
+                return
+            }
+        }
+    }
+    
+    let handleResolvedUrl = makeResolvedUrlHandler(
+        context: context,
+        presentationData: presentationData,
+        navigationController: navigationController,
+        dismissInput: dismissInput
+    )
+    let handleInternalUrl = makeInternalUrlHandler(
+        context: context,
+        resolvedHandler: handleResolvedUrl
+    )
+    
+    let continueHandling: () -> Void = {
+        if let scheme = parsedUrl.scheme, (scheme == "tg" || scheme == context.sharedContext.applicationBindings.appSpecificScheme) {
+            if parsedUrl.host == "tonsite" {
+                if let value = URL(string: "tonsite:/" + parsedUrl.path) {
+                    parsedUrl = value
+                }
+            }
+        }
+        
+        if let scheme = parsedUrl.scheme, (scheme == "tg" || scheme == context.sharedContext.applicationBindings.appSpecificScheme) {
+            var convertedUrl: String?
+            let host = parsedUrl.host?.lowercased() ?? ""
+            if host == "debug", parsedUrl.path == "/crash_reports" {
+                handleResolvedUrl(.settings(.path("debug/crash_reports")))
+                return
+            }
+            if host == "sendgrams" {
+                guard parsedUrl.path.isEmpty || parsedUrl.path == "/",
+                      let components = URLComponents(url: parsedUrl, resolvingAgainstBaseURL: false) else {
+                    return
+                }
+                handleInternalUrl("https://t.me/sendgrams" + (components.percentEncodedQuery.map { "?" + $0 } ?? ""))
+                return
+            }
+            if let query = parsedUrl.query, let params = QueryParameters(query) {
+                switch host {
+                case "localpeer":
+                    if let peerIdValue = params["id"].flatMap(Int64.init), let accountId = params["accountId"].flatMap(Int64.init) {
+                        let peerId = EnginePeer.Id(peerIdValue)
+                        context.sharedContext.applicationBindings.dismissNativeController()
+                        context.sharedContext.navigateToChat(accountId: AccountRecordId(rawValue: accountId), peerId: peerId, messageId: nil)
+                    }
+                case "join":
+                    if let invite = params["invite"] {
+                        convertedUrl = makeTelegramUrl("/joinchat/\(invite)")
+                    }
+                case "addstickers":
+                    if let set = params["set"] {
+                        convertedUrl = makeTelegramUrl("/addstickers/\(set)")
+                    }
+                case "addemoji":
+                    if let set = params["set"] {
+                        convertedUrl = makeTelegramUrl("/addemoji/\(set)")
+                    }
+                case "invoice":
+                    if let slug = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/invoice/\(slug)")
+                    }
+                case "setlanguage":
+                    if let lang = params["lang"] {
+                        convertedUrl = makeTelegramUrl("/setlanguage/\(lang)")
+                    }
+                case "msg":
+                    let sharePhoneNumber = params["to"]
+                    let shareText = params["text"]
+                    if sharePhoneNumber != nil || shareText != nil {
+                        handleResolvedUrl(.share(url: nil, text: shareText, to: sharePhoneNumber))
+                        return
+                    }
+                case "msg_url":
+                    if let shareUrl = params["url"] {
+                        var queryItems: [URLQueryItem] = [URLQueryItem(name: "url", value: shareUrl)]
+                        if let shareText = params["text"] {
+                            queryItems.append(URLQueryItem(name: "text", value: shareText))
+                        }
+                        convertedUrl = makeTelegramUrl("/share/url", queryItems: queryItems)
+                    }
+                case "webproxy":
+                    // A WEB relay has no port (always 443) and no user/pass, so it cannot
+                    // reuse the socks/proxy conversion below without being read back as .mtp.
+                    // `host` is a legacy input alias for `server`.
+                    if let server = params["server"] ?? params["host"], !server.isEmpty, let secret = params["secret"], !secret.isEmpty {
+                        convertedUrl = makeTelegramUrl("/webproxy", queryItems: [
+                            URLQueryItem(name: "server", value: server),
+                            URLQueryItem(name: "secret", value: secret)
+                        ])
+                    }
+                case "socks", "proxy":
+                    let server = params["server"] ?? params["proxy"]
+                    let port = params["port"]
+                    let user = params["user"]
+                    let pass = params["pass"]
+                    let secret = params["secret"]
+                    let secretHost = params["host"]
+                    
+                    if let server, !server.isEmpty, let port, let _ = Int32(port) {
+                        var queryItems: [URLQueryItem] = [
+                            URLQueryItem(name: "proxy", value: server),
+                            URLQueryItem(name: "port", value: port)
+                        ]
+                        if let user {
+                            queryItems.append(URLQueryItem(name: "user", value: user))
+                            if let pass {
+                                queryItems.append(URLQueryItem(name: "pass", value: pass))
+                            }
+                        }
+                        if let secret {
+                            queryItems.append(URLQueryItem(name: "secret", value: secret))
+                        }
+                        if let secretHost {
+                            queryItems.append(URLQueryItem(name: "host", value: secretHost))
+                        }
+                        convertedUrl = makeTelegramUrl("/proxy", queryItems: queryItems)
+                    }
+                case "passport", "oauth", "resolve":
+                    if isOAuthUrl(parsedUrl) {
+                        switch urlContext {
+                        case .external:
+                            handleResolvedUrl(.oauth(url: url))
+                        default:
+                            break
+                        }
+                        return
+                    } else if let secureId = parseSecureIdUrl(parsedUrl) {
+                        if case .chat = urlContext {
+                            return
+                        }
+                        let controller = SecureIdAuthController(context: context, mode: .form(peerId: secureId.peerId, scope: secureId.scope, publicKey: secureId.publicKey, callbackUrl: secureId.callbackUrl, opaquePayload: secureId.opaquePayload, opaqueNonce: secureId.opaqueNonce))
+                        
+                        if let navigationController = navigationController {
+                            context.sharedContext.applicationBindings.dismissNativeController()
+                            
+                            navigationController.view.window?.endEditing(true)
+                            context.sharedContext.applicationBindings.getWindowHost()?.present(controller, on: .root, blockInteraction: false, completion: {})
+                        }
+                        return
+                    }
+                case "user":
+                    if let idValue = params["id"].flatMap(Int64.init), idValue > 0 {
+                        let _ = (context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: EnginePeer.Id(namespace: Namespaces.Peer.CloudUser, id: EnginePeer.Id.Id._internalFromInt64Value(idValue))))
+                        |> deliverOnMainQueue).startStandalone(next: { peer in
+                            if let peer = peer, let controller = context.sharedContext.makePeerInfoController(
+                                context: context,
+                                updatedPresentationData: nil,
+                                peer: peer,
+                                mode: .generic,
+                                avatarInitiallyExpanded: false,
+                                fromChat: false,
+                                requestsContext: nil
+                            ) {
+                                navigationController?.pushViewController(controller)
+                            }
+                        })
+                        return
+                    }
+                case "login":
+                    if let _ = params["token"] {
+                        let alertController = textAlertController(
+                            context: context,
+                            title: nil,
+                            text: presentationData.strings.AuthSessions_AddDevice_UrlLoginHint,
+                            actions: [TextAlertAction(type: .genericAction, title: presentationData.strings.Common_OK, action: {})],
+                            parseMarkdown: true
+                        )
+                        context.sharedContext.presentGlobalController(alertController, nil)
+                        return
+                    }
+                    if let code = params["code"] {
+                        convertedUrl = makeTelegramUrl("/login/\(code)")
+                    }
+                case "contact":
+                    if let token = params["token"] {
+                        var queryItems: [URLQueryItem] = []
+                        if let noPaidMessagesToken = params["free"], !noPaidMessagesToken.isEmpty {
+                            queryItems.append(URLQueryItem(name: "free", value: noPaidMessagesToken))
+                        }
+                        convertedUrl = makeTelegramUrl("/contact/\(token)", queryItems: queryItems)
+                    }
+                case "confirmphone":
+                    if let phone = params["phone"], let hash = params["hash"] {
+                        let queryItems = [
+                            URLQueryItem(name: "phone", value: phone),
+                            URLQueryItem(name: "hash", value: hash)
+                        ]
+                        convertedUrl = makeTelegramUrl("/confirmphone", queryItems: queryItems)
+                    }
+                case "bg":
+                    var parameter: String?
+                    var queryItems: [URLQueryItem] = []
+                    for item in params.items {
+                        guard let value = item.value else {
+                            continue
+                        }
+                        switch item.name {
+                        case "slug", "color", "gradient":
+                            parameter = value
+                        case "mode", "bg_color", "intensity", "rotation":
+                            queryItems.append(URLQueryItem(name: item.name, value: value))
+                        default:
+                            break
+                        }
+                    }
+                    if let parameter = parameter {
+                        convertedUrl = makeTelegramUrl("/bg/\(parameter)", queryItems: queryItems)
+                    }
+                case "addtheme":
+                    if let parameter = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/addtheme/\(parameter)")
+                    }
+                case "nft":
+                    if let slug = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/nft/\(slug)")
+                    }
+                case "stargift_auction":
+                    if let slug = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/auction/\(slug)")
+                    }
+                case "privatepost":
+                    let channelId = params["channel"].flatMap(Int64.init)
+                    let postId = params["post"].flatMap(Int32.init)
+                    let threadId = params["thread"].flatMap(Int64.init)
+                    
+                    if let channelId {
+                        if let postId {
+                            if let threadId {
+                                convertedUrl = makeTelegramUrl("/c/\(channelId)/\(threadId)/\(postId)")
+                            } else {
+                                convertedUrl = makeTelegramUrl("/c/\(channelId)/\(postId)")
+                            }
+                        } else if let threadId {
+                            convertedUrl = makeTelegramUrl("/c/\(channelId)/\(threadId)")
+                        }
+                    }
+                case "giftcode":
+                    if let slug = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/giftcode/\(slug)")
+                    }
+                case "message":
+                    if let parameter = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/m/\(parameter)")
+                    }
+                case "premium_offer":
+                    let reference = params["ref"]
+                    handleResolvedUrl(.premiumOffer(reference: reference))
+                case "premium_multigift":
+                    let reference = params["ref"]
+                    handleResolvedUrl(.premiumMultiGift(reference: reference))
+                case "stars_topup":
+                    let amount = params["balance"].flatMap(Int64.init)
+                    let purpose = params["purpose"]
+                    if let amount, amount > 0 && amount < Int64(Int32.max) {
+                        handleResolvedUrl(.starsTopup(amount: amount, purpose: purpose))
+                    } else {
+                        handleResolvedUrl(.starsTopup(amount: nil, purpose: purpose))
+                    }
+                case "addlist":
+                    if let slug = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/addlist/\(slug)")
+                    }
+                case "boost":
+                    if let domain = params["domain"] {
+                        convertedUrl = makeTelegramUrl("/\(domain)", queryItems: [URLQueryItem(name: "boost", value: nil)])
+                    } else if let channel = params["channel"].flatMap(Int64.init) {
+                        convertedUrl = makeTelegramUrl("/c/\(channel)", queryItems: [URLQueryItem(name: "boost", value: nil)])
+                    }
+                case "call":
+                    if let slug = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/call/\(slug)")
+                    }
+                case "sharestory":
+                    if let session = params["session"].flatMap(Int64.init) {
+                        handleResolvedUrl(.shareStory(session))
+                        return
+                    }
+                case "send_gift":
+                    if let recipient = params["to"] {
+                        if let id = Int64(recipient) {
+                            handleResolvedUrl(.sendGift(peerId: EnginePeer.Id(namespace: Namespaces.Peer.CloudUser, id: EnginePeer.Id.Id._internalFromInt64Value(id))))
+                        } else {
+                            let _ = (context.engine.peers.resolvePeerByName(name: recipient, referrer: nil)
+                            |> deliverOnMainQueue).start(next: { result in
+                                guard case let .result(peer) = result, let peer else {
+                                    return
+                                }
+                                handleResolvedUrl(.sendGift(peerId: peer.id))
+                            })
+                        }
+                    } else {
+                        handleResolvedUrl(.sendGift(peerId: nil))
+                    }
+                case "newbot":
+                    if let managerBotName = params["manager"] {
+                        let _ = (context.engine.peers.resolvePeerByName(name: managerBotName, referrer: nil)
+                        |> deliverOnMainQueue).start(next: { result in
+                            guard case let .result(peer) = result, let peer else {
+                                return
+                            }
+                            handleResolvedUrl(.createBot(parentBot: peer.id, username: params["username"], title: params["name"]))
+                        })
+                    }
+                case "textStyle":
+                    if let slug = params["slug"] {
+                        convertedUrl = makeTelegramUrl("/addstyle/\(slug)")
+                    }
+                default:
+                    break
+                }
+                
+                if host == "resolve" {
+                    var phone: String?
+                    var domain: String?
+                    var start: String?
+                    var startGroup: String?
+                    var startChannel: String?
+                    var admin: String?
+                    var game: String?
+                    var post: String?
+                    var voiceChat: String?
+                    var attach: String?
+                    var startAttach: String?
+                    var choose: String?
+                    var threadId: Int64?
+                    var appName: String?
+                    var startApp: String?
+                    var text: String?
+                    var profile = false
+                    var direct = false
+                    var referrer: String?
+                    var albumId: Int64?
+                    var collectionId: Int64?
+                    var noPaidMessagesToken: String?
+                    
                     for queryItem in params.items {
                         if let value = queryItem.value {
                             switch queryItem.name {
@@ -461,7 +875,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                             }
                         }
                     }
-
+                    
                     if let phone = phone {
                         var queryItems: [URLQueryItem] = []
                         if let text {
@@ -498,7 +912,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                         } else if let collectionId {
                             path += "/c/\(collectionId)"
                         }
-
+                        
                         var queryItems: [URLQueryItem] = []
                         if let startApp {
                             queryItems.append(URLQueryItem(name: "startapp", value: startApp.isEmpty ? "" : startApp))
@@ -522,7 +936,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                         } else if let attach {
                             queryItems.append(URLQueryItem(name: "attach", value: attach))
                         }
-
+                        
                         if let startAttach {
                             queryItems.append(URLQueryItem(name: "startattach", value: startAttach.isEmpty ? nil : startAttach))
                             if let choose {
@@ -575,20 +989,19 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                                 navigationController?.pushViewController(context.sharedContext.makeSGProController(context: context))
                             case "restart":
                                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                                let lang = presentationData.strings.baseLanguageCode
-                                context.sharedContext.presentGlobalController(
-                                    UndoOverlayController(
-                                        presentationData: presentationData,
-                                        content: .info(title: nil,
-                                            text: "Common.RestartRequired".i18n(lang),
-                                            timeout: nil,
-                                            customUndoText: "Common.RestartNow".i18n(lang)
-                                        ),
-                                        elevatedLayout: false,
-                                        action: { action in if action == .undo { exit(0) }; return true }
-                                    ),
-                                    nil
+                                let controller = textAlertController(
+                                    context: context,
+                                    title: presentationData.strings.Restart_Title,
+                                    text: presentationData.strings.Restart_Text,
+                                    actions: [
+                                        TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
+                                        TextAlertAction(type: .destructiveAction, title: presentationData.strings.Restart_Restart, action: {
+                                            restartApp()
+                                        })
+                                    ]
                                 )
+                                context.sharedContext.presentGlobalController(controller, nil)
+                                return
                             default:
                                 break
                         }
@@ -602,10 +1015,10 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                 case "restore_purchases":
                     let statusController = OverlayStatusController(theme: presentationData.theme, type: .loading(cancelled: nil))
                     context.sharedContext.presentGlobalController(statusController, nil)
-
+                    
                     context.inAppPurchaseManager?.restorePurchases(completion: { [weak statusController] result in
                         statusController?.dismiss()
-
+                        
                         let text: String?
                         switch result {
                         case let .succeed(serverProvided):
@@ -716,7 +1129,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                     break
                 }
             }
-
+            
             if let convertedUrl {
                 handleInternalUrl(convertedUrl)
             } else if let path = parsedUrl.host {
@@ -724,7 +1137,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
             }
             return
         }
-
+        
         handleInternetUrl(
             parsedUrl: parsedUrl,
             originalUrl: url,
@@ -734,7 +1147,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
             handleInternalUrl: handleInternalUrl
         )
     }
-
+    
     if let scheme = parsedUrl.scheme, internetSchemes.contains(scheme) {
         if let host = parsedUrl.host, telegramMeHosts.contains(host) {
             continueHandling()

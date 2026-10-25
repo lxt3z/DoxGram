@@ -1668,8 +1668,6 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             } else if let urlString = url as? String, urlString.lowercased().hasPrefix("tg:") || urlString.lowercased().hasPrefix("ton:") || urlString.lowercased().hasPrefix("\(buildConfig.appSpecificUrlScheme):") || WalletContext.isTonConnectUrl(urlString), let url = URL(string: urlString) {
                 self.openUrlWhenReady(url: sgActionRequestHandlerSanitizer(url), external: true)
             }
-                self.openUrlWhenReady(url: url, external: true)
-            }
         }
         
         if application.applicationState == .active {

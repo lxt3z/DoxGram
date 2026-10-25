@@ -116,6 +116,252 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     public let previewing: Bool
 
     let openMessageFromSearchDisposable: MetaDisposable = MetaDisposable()
+    
+    /// The chat list draws its own header (no Display bar); it takes part in navigation transitions itself. During a search too:
+    /// `displayNavigationBar` doubles as the search flag here, so it is not consulted.
+    override public var navigationBarTransitionSource: NavigationBarTransitionSource? {
+        guard self.isNodeLoaded else {
+            return nil
+        }
+        return self.chatListDisplayNode.navigationBarView.view as? ChatListNavigationBar.View
+    }
+
+    private var chatListDisplayNode: ChatListControllerNode {
+        return super.displayNode as! ChatListControllerNode
+    }
+    
+    fileprivate private(set) var primaryContext: ChatListLocationContext?
+    private let primaryInfoReady = Promise<Bool>()
+    private let mainReady = Promise<Bool>()
+    private let storiesReady = Promise<Bool>()
+    
+    private var pendingSecondaryContext: ChatListLocationContext?
+    fileprivate private(set) var secondaryContext: ChatListLocationContext?
+    
+    fileprivate var effectiveContext: ChatListLocationContext? {
+        return self.secondaryContext ?? self.primaryContext
+    }
+    
+    public var effectiveLocation: ChatListControllerLocation {
+        return self.secondaryContext?.location ?? self.location
+    }
+    
+    private var badgeDisposable: Disposable?
+    private var badgeIconDisposable: Disposable?
+    
+    private var didAppear = false
+    private var dismissSearchOnDisappear = false
+    public var onDidAppear: (() -> Void)?
+        
+    private var passcodeLockTooltipDisposable = MetaDisposable()
+    private var didShowPasscodeLockTooltipController = false
+    
+    private var suggestLocalizationDisposable = MetaDisposable()
+    private var didSuggestLocalization = false
+    
+    private let suggestAutoarchiveDisposable = MetaDisposable()
+    private let dismissAutoarchiveDisposable = MetaDisposable()
+    private var didSuggestAutoarchive = false
+    private var didSuggestLoginEmailSetup = false
+    private var didSuggestLoginPasskeySetup = false
+    
+    private(set) var presentationData: PresentationData
+    private let presentationDataValue = Promise<PresentationData>()
+    private var presentationDataDisposable: Disposable?
+    
+    private let stateDisposable = MetaDisposable()
+    private let filterDisposable = MetaDisposable()
+    private let featuredFiltersDisposable = MetaDisposable()
+    private var processedFeaturedFilters = false
+    
+    private let isReorderingTabsValue = ValuePromise<Bool>(false)
+    
+    private(set) var tabContainerData: ([ChatListFilterTabEntry], Bool, Int32?)?
+    var hasTabs: Bool {
+        if let tabContainerData = self.tabContainerData {
+            let isEmpty = tabContainerData.0.count <= 1 || tabContainerData.1
+            return !isEmpty
+        } else {
+            return false
+        }
+    }
+
+    private var foldersCount: Int32 {
+        guard let tabContainerData = self.tabContainerData else {
+            return 0
+        }
+        return Int32(tabContainerData.0.count(where: { entry in
+            if case .filter = entry {
+                return true
+            } else {
+                return false
+            }
+        }))
+    }
+    
+    private var hasDownloads: Bool = false
+    private var activeDownloadsDisposable: Disposable?
+    private var clearUnseenDownloadsTimer: SwiftSignalKit.Timer?
+    
+    private(set) var isPremium: Bool = false
+    private(set) var storyPostingAvailability: StoriesConfiguration.PostingAvailability = .disabled
+    private var storiesPostingAvailabilityDisposable: Disposable?
+    private let storyPostingAvailabilityValue = ValuePromise<StoriesConfiguration.PostingAvailability>(.disabled)
+    
+    private var didSetupTabs = false
+    
+    private weak var emojiStatusSelectionController: ViewController?
+    
+    private var forumChannelTracker: ForumChannelTopics?
+    
+    private let selectAddMemberDisposable = MetaDisposable()
+    private let addMemberDisposable = MetaDisposable()
+    private let joinForumDisposable = MetaDisposable()
+    private let actionDisposables = DisposableSet()
+    
+    private var plainTitle: String = ""
+    
+    private var powerSavingMonitoringDisposable: Disposable?
+    
+    private var rawStoryArchiveSubscriptions: EngineStorySubscriptions?
+    private var storyArchiveSubscriptionsDisposable: Disposable?
+    
+    private var rawStorySubscriptions: EngineStorySubscriptions?
+    private var shouldFixStorySubscriptionOrder: Bool = false
+    private var fixedStorySubscriptionOrder: [EnginePeer.Id] = []
+    private(set) var orderedStorySubscriptions: EngineStorySubscriptions?
+    private var displayedStoriesTooltip: Bool = false
+    
+    public var hasStorySubscriptions: Bool {
+        if let rawStorySubscriptions = self.rawStorySubscriptions, !rawStorySubscriptions.items.isEmpty {
+            return true
+        } else {
+            return false
+        }
+    }
+    
+    private let hasPendingStoriesPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
+    public var hasPendingStories: Signal<Bool, NoError> {
+        return self.hasPendingStoriesPromise.get()
+    }
+    
+    private var storyProgressDisposable: Disposable?
+    private var storySubscriptionsDisposable: Disposable?
+    private var preloadStorySubscriptionsDisposable: Disposable?
+    private var preloadStoryResourceDisposables: [MediaId: Disposable] = [:]
+    
+    private var sharedOpenStoryProgressDisposable = MetaDisposable()
+    
+    var currentTooltipUpdateTimer: Foundation.Timer?
+    
+    let globalControlPanelsContext: GlobalControlPanelsContext
+    private(set) var globalControlPanelsContextState: GlobalControlPanelsContext.State?
+    private var globalControlPanelsContextStateDisposable: Disposable?
+    
+    public override func updateNavigationCustomData(_ data: Any?, progress: CGFloat, transition: ContainedViewLayoutTransition) {
+        if self.isNodeLoaded {
+            self.chatListDisplayNode.effectiveContainerNode.updateSelectedChatLocation(data: data as? ChatLocation, progress: progress, transition: transition)
+        }
+    }
+    
+    public init(context: AccountContext, location: ChatListControllerLocation, controlsHistoryPreload: Bool, hideNetworkActivityStatus: Bool = false, previewing: Bool = false, enableDebugActions: Bool) {
+        self.context = context
+        self.controlsHistoryPreload = controlsHistoryPreload
+        self.hideNetworkActivityStatus = hideNetworkActivityStatus
+        
+        self.location = location
+        self.previewing = previewing
+        
+        self.presentationData = (context.sharedContext.currentPresentationData.with { $0 })
+        self.presentationDataValue.set(.single(self.presentationData))
+        
+        self.animationCache = context.animationCache
+        self.animationRenderer = context.animationRenderer
+        
+        var groupCallPanelSource: EnginePeer.Id?
+        var chatListNotices = false
+        switch self.location {
+        case let .chatList(groupId):
+            if case .root = groupId {
+                chatListNotices = true
+            }
+        case let .forum(peerId):
+            groupCallPanelSource = peerId
+        case .savedMessagesChats:
+            break
+        }
+        
+        self.globalControlPanelsContext = GlobalControlPanelsContext(
+            context: context,
+            mediaPlayback: true,
+            liveLocationMode: .all,
+            groupCalls: groupCallPanelSource,
+            chatListNotices: chatListNotices
+        )
+                
+        super.init(context: context, navigationBarPresentationData: nil)
+        
+        self.accessoryPanelContainer = ASDisplayNode()
+        
+        self.tabBarItemContextActionType = .always
+        self.automaticallyControlPresentationContextLayout = false
+        
+        self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
+        
+        let title: String
+        switch self.location {
+        case let .chatList(groupId):
+            if groupId == .root {
+                title = self.presentationData.strings.DialogList_Title
+            } else {
+                title = self.presentationData.strings.ChatList_ArchivedChatsTitle
+            }
+            self.plainTitle = title
+        case let .forum(peerId):
+            title = ""
+            self.forumChannelTracker = ForumChannelTopics(account: self.context.account, peerId: peerId)
+        case .savedMessagesChats:
+            title = ""
+        }
+        
+        let primaryContext = ChatListLocationContext(
+            context: context,
+            location: self.location,
+            parentController: self,
+            hideNetworkActivityStatus: self.hideNetworkActivityStatus,
+            containerNode: self.chatListDisplayNode.mainContainerNode,
+            isReorderingTabs: self.isReorderingTabsValue.get(),
+            storyPostingAvailable: self.storyPostingAvailabilityValue.get() |> map { availability -> Bool in
+                switch availability {
+                case .enabled, .premium:
+                    return true
+                default:
+                    return false
+                }
+            }
+        )
+        self.primaryContext = primaryContext
+        self.primaryInfoReady.set(primaryContext.ready.get())
+        
+        if !previewing {
+            switch self.location {
+            case let .chatList(groupId):
+                if groupId == .root {
+                    self.tabBarItem.title = self.presentationData.strings.DialogList_Title
+                    
+                    let icon: UIImage?
+                    if useSpecialTabBarIcons() {
+                        icon = UIImage(bundleImageName: "Chat List/Tabs/Holiday/IconChats")
+                    } else {
+                        icon = UIImage(bundleImageName: "Chat List/Tabs/IconChats")
+                    }
+                    
+                    self.tabBarItem.image = icon
+                    self.tabBarItem.selectedImage = icon
+                    if !self.presentationData.reduceMotion {
+                        self.tabBarItem.animationName = "TabChats"
+                        self.tabBarItem.animationOffset = CGPoint(x: 0.0, y: UIScreenPixel)
+                    }
                     
                     self.primaryContext?.leftButton = NavigationBarComponent.Button(id: "edit",
                         content: .text(title: self.presentationData.strings.Common_Edit, isBold: false),
@@ -149,7 +395,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                     case .savedMessagesChats:
                         break
                     }
-
+                    
                     let backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
                     backBarButtonItem.accessibilityLabel = self.presentationData.strings.Common_Back
                     self.navigationItem.backBarButtonItem = backBarButtonItem
@@ -160,7 +406,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 break
             }
         }
-
+        
         self.scrollToTop = { [weak self] in
             if let strongSelf = self {
                 strongSelf.chatListDisplayNode.willScrollToTop()
@@ -6667,17 +6913,7 @@ private final class ChatListLocationContext {
         }
         return result
     }
-        if let rightButton = self.rightButton {
-            result.append(rightButton)
-        }
-        if let storyButton = self.storyButton {
-            result.append(storyButton)
-        }
-        if let proxyButton = self.proxyButton {
-            result.append(proxyButton)
-        }
-        return result
-    }
+
 
     private(set) var toolbar: Toolbar?
 
