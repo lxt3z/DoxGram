@@ -748,12 +748,7 @@ public final class TabBarComponent: Component {
             let itemsLayout = tabBarItemsLayout(axis: component.axis, isCompact: component.isCompact, unboundItemWidths: unboundItemWidths, availableLength: availableLength)
             let tabsSize = itemsLayout.size
 
-            let itemHeight: CGFloat = (SGSimpleSettings.shared.showTabNames ? 56.0 : 40.0)
-            let contentWidth: CGFloat = innerInset * 2.0 + totalItemsWidth
-            let tabsSize = CGSize(width: min(availableSize.width, contentWidth), height: itemHeight + innerInset * 2.0)
-
             var selectedItemFrame: CGRect?
-            var nextItemX: CGFloat = innerInset
             for index in 0 ..< component.items.count {
                 let item = component.items[index]
                 
