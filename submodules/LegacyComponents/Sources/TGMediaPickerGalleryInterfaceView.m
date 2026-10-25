@@ -266,7 +266,10 @@ static TGMediaLivePhotoMode TGMediaPickerGalleryResolvedLivePhotoMode(NSNumber *
     
         _telescopeButton = [[TGModernButton alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
         _telescopeButton.hidden = true;
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wdeprecated-declarations" // legacy non-configuration UIButton: property is still honored
         _telescopeButton.adjustsImageWhenHighlighted = false;
+        #pragma clang diagnostic pop
         [_telescopeButton setBackgroundImage:[TGPhotoEditorInterfaceAssets gifBackgroundImage] forState:UIControlStateNormal];
         [_telescopeButton setImage:[TGPhotoEditorInterfaceAssets telescopeIcon] forState:UIControlStateNormal];
         if (_canSendTelescope) {
