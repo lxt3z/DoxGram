@@ -7,20 +7,7 @@ public func chatTextInputAddFormattingAttribute(forceRemoveAll: Bool = false, _ 
     if !state.selectionRange.isEmpty {
         let nsRange = NSRange(location: state.selectionRange.lowerBound, length: state.selectionRange.count)
         if forceRemoveAll {
-            var attributesToRemove: [NSAttributedString.Key] = []
-            state.inputText.enumerateAttributes(in: nsRange, options: .longestEffectiveRangeNotRequired) { attributes, _, _ in
-                for (key, _) in attributes {
-                    if !attributesToRemove.contains(key) {
-                        attributesToRemove.append(key)
-                    }
-                }
-            }
-            if !attributesToRemove.isEmpty {
-                for key in attributesToRemove {
-                    state.inputText.removeAttribute(key, range: nsRange)
-                }
-                return state
-            }
+            return chatTextInputClearFormattingAttributes(state)
         }
         // Toggle: remove the attribute when it already covers the WHOLE selection, add it otherwise.
         // Ask about this one attribute's own runs: `enumerateAttributes` splits runs wherever any
