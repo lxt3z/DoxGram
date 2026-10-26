@@ -153,6 +153,8 @@ public protocol RichTextEditor: UIView {
     var composerContentOffset: CGPoint { get }
     var initialInputPrimaryLanguage: String? { get set }
     func resetInputPrimaryLanguage()
+    // MARK: Swiftgram
+    var composerReturnKeyType: UIReturnKeyType { get set }
 
     // MARK: The full-page article editor's surface
     //

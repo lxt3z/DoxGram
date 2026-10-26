@@ -402,6 +402,12 @@ extension RichTextEngineEditorView {
 
     /// Re-arm the pre-selection so the next focus re-applies `initialInputPrimaryLanguage`.
     public func resetInputPrimaryLanguage() { engine.tgid_resetInitialPrimaryLanguage() }
+
+    // MARK: Swiftgram
+    public var composerReturnKeyType: UIReturnKeyType {
+        get { engine.returnKeyType }
+        set { engine.returnKeyType = newValue }
+    }
 }
 
 /// Composer-host state with no engine equivalent. Distinct from `DeferredConfiguration`: every field
