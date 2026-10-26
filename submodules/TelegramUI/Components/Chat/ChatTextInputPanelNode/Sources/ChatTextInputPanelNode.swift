@@ -5496,8 +5496,7 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
         self.updateActivity()
         
         // MARK: Swiftgram
-        if self.sendWithReturnKey && text == "
-" {
+        if self.sendWithReturnKey && text == "\n" {
             self.sendButtonPressed()
             return false
         }
