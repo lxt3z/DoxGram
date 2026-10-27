@@ -612,6 +612,11 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
         let filtersLimit = self.filtersLimit.flatMap({ $0 + 1 }) ?? Int32(_availableFilters.count)
         let maxFilterIndex = min(Int(filtersLimit), _availableFilters.count) - 1
 
+        var hasLiveStream = false
+        if let componentView = self.controller?.chatListHeaderView(), let storyPeerListView = componentView.storyPeerListView(), storyPeerListView.isLiveStreaming {
+            hasLiveStream = true
+        }
+
         let canOpenStoryCamera = self.validLayout?.0.metrics.widthClass == .compact
             && _availableFilters.first == .all
             && self.controller?.isStoryPostingAvailable == true
@@ -672,12 +677,7 @@ public final class ChatListContainerNode: ASDisplayNode, ASGestureRecognizerDele
                     return bandingStart + (1.0 - (1.0 / ((bandedOffset * coefficient / range) + 1.0))) * range
                 }
                 
-                var hasLiveStream = false
-                if let componentView = self.controller?.chatListHeaderView(), let storyPeerListView = componentView.storyPeerListView(), storyPeerListView.isLiveStreaming {
-                    hasLiveStream = true
-                }
-                     
-                if canOpenStoryCamera && !hasLiveStream {
+                if canOpenStoryCamera {
                     if hasLiveStream {
                         if translation.x >= 30.0 {
                             self.panRecognizer?.cancel()
