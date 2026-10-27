@@ -9,19 +9,20 @@ import TelegramPresentationData
 import ChatMessageBubbleContentNode
 import ChatMessageItemCommon
 import SGSimpleSettings
+import LottieSettings
 
 public final class ChatMessageHiddenAdBubbleContentNode: ChatMessageBubbleContentNode {
     private let backgroundNode: NavigationBackgroundNode
     private let labelNode: TextNode
     private let buttonView: HighlightTrackingButton
     
-    required public init() {
+    required public init(lottieSettings: LottieRenderingSettings) {
         self.backgroundNode = NavigationBackgroundNode(color: .clear)
         self.labelNode = TextNode()
         self.labelNode.isUserInteractionEnabled = false
         self.buttonView = HighlightTrackingButton()
         
-        super.init()
+        super.init(lottieSettings: lottieSettings)
         
         self.addSubnode(self.backgroundNode)
         self.addSubnode(self.labelNode)

@@ -11,6 +11,7 @@ import ChatMessageBubbleContentNode
 import ChatMessageItemCommon
 import ChatControllerInteraction
 import SGSimpleSettings
+import LottieSettings
 
 public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleContentNode {
     private static var artworkCache: [String: UIImage] = [:]
@@ -34,7 +35,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
     private var currentTitle: String = ""
     private var currentArtist: String = ""
     
-    required public init() {
+    required public init(lottieSettings: LottieRenderingSettings) {
         self.cardBackgroundNode = ASDisplayNode()
         self.cardBackgroundNode.clipsToBounds = true
         self.cardBackgroundNode.cornerRadius = 16.0
@@ -84,7 +85,7 @@ public final class ChatMessageDoxMediaBubbleContentNode: ChatMessageBubbleConten
         
         self.dateAndStatusNode = ChatMessageDateAndStatusNode()
         
-        super.init()
+        super.init(lottieSettings: lottieSettings)
         
         self.addSubnode(self.cardBackgroundNode)
         self.cardBackgroundNode.addSubnode(self.headerNode)
