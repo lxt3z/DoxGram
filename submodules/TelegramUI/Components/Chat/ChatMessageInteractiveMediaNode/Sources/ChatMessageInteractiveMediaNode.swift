@@ -976,9 +976,6 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                 }
             } else if let image = media as? TelegramMediaImage, let dimensions = largestImageRepresentation(image.representations)?.dimensions {
                 unboundSize = CGSize(width: max(10.0, floor(dimensions.cgSize.width * 0.5)), height: max(10.0, floor(dimensions.cgSize.height * 0.5)))
-            } else if let file = media as? TelegramMediaFile, file.isDisplayablePass {
-                unboundSize = chatMessagePassImageSize
-            } else {
                 // MARK: Swiftgram
                 if let channel = message.peers[message.id.peerId] as? TelegramChannel, case .broadcast = channel.info, SGSimpleSettings.shared.wideChannelPosts {
                     imageOriginalMaxDimensions = maxDimensions
@@ -989,6 +986,8 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                         break
                     }
                 }
+            } else if let file = media as? TelegramMediaFile, file.isDisplayablePass {
+                unboundSize = chatMessagePassImageSize
             } else if let file = media as? TelegramMediaFile, var dimensions = file.dimensions {
                 if let thumbnail = file.previewRepresentations.first {
                     let dimensionsVertical = dimensions.width < dimensions.height
