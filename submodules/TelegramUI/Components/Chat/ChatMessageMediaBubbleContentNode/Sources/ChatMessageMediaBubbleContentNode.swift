@@ -444,7 +444,12 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
                 }
             }
             
-            let (unboundSize, initialWidth, refineLayout) = interactiveImageLayout(item.context, item.presentationData, item.presentationData.dateTimeFormat, EngineMessage(item.message), item.associatedData, item.attributes, EngineMedia(selectedMedia), automaticDownload: automaticDownload, incoming: item.message.effectivelyIncoming(item.context.account.peerId), defaultHorizontalMargins: 0.0, constrainedSize: wideChannelsConstrainedSize, adjustForFit: wideChannelsAdjustForFit, isChannelAd: isChannelAd)
+            if isChannelAd {
+                automaticDownload = .none
+                automaticPlayback = false
+            }
+            
+            let (unboundSize, initialWidth, refineLayout) = interactiveImageLayout(item.context, item.presentationData, item.presentationData.dateTimeFormat, EngineMessage(item.message), item.associatedData, item.attributes, EngineMedia(selectedMedia!), selectedMediaIndex, dateAndStatus, automaticDownload, item.associatedData.automaticDownloadPeerType, item.associatedData.automaticDownloadPeerId, sizeCalculation, layoutConstants, contentMode, item.controllerInteraction.presentationContext)
             
             let forceFullCorners = false
             let contentProperties = ChatMessageBubbleContentProperties(hidesSimpleAuthorHeader: true, headerSpacing: 7.0, hidesBackground: .emptyWallpaper, forceFullCorners: forceFullCorners, forceAlignment: .none)
