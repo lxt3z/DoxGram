@@ -74,6 +74,7 @@ submodules/TelegramUI/Components/MediaEditor/Sources/MediaEditorComposerEntity.s
 submodules/TelegramUI/Components/MediaEditor/Sources/MediaEditorDraft.swift
 submodules/TelegramUI/Components/MediaEditor/Sources/MediaEditorVideoExport.swift
 submodules/TelegramUI/Components/MediaEditorScreen/Sources/StorySource.swift
+submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoData.swift
 submodules/TelegramUI/Components/Resources/FetchVideoMediaResource/Sources/FetchVideoMediaResource.swift
 submodules/TelegramUI/Components/StickerPickerScreen/Sources/StickerPickerScreen.swift
 submodules/TelegramUI/Components/Stories/StoryContainerScreen/Sources/StoryChatContent.swift
