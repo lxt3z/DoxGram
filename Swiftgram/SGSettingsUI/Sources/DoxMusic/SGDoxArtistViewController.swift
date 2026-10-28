@@ -5,6 +5,7 @@ import TelegramCore
 import AccountContext
 import TelegramPresentationData
 import AppBundle
+import SGSimpleSettings
 
 public final class SGDoxArtistViewController: ViewController, UITableViewDataSource, UITableViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UIGestureRecognizerDelegate {
     public let context: AccountContext
@@ -317,7 +318,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.albumsCollectionView.showsHorizontalScrollIndicator = false
         self.albumsCollectionView.dataSource = self
         self.albumsCollectionView.delegate = self
-        self.albumsCollectionView.register(ArtistAlbumCell.self, forCellReuseIdentifier: "ArtistAlbumCell")
+        self.albumsCollectionView.register(ArtistAlbumCell.self, forCellWithReuseIdentifier: "ArtistAlbumCell")
         self.albumsCollectionView.isHidden = true
         self.headerView.addSubview(self.albumsCollectionView)
     }
@@ -404,7 +405,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.latestReleaseHeader.isHidden = !hasLatest
         self.latestReleaseCard.isHidden = !hasLatest
         
-        if let album = self.latestAlbum {
+        if self.latestAlbum != nil {
             self.latestReleaseHeader.frame = CGRect(x: 18.0, y: currentY, width: screenW - 36.0, height: 18.0)
             currentY += 24.0
             

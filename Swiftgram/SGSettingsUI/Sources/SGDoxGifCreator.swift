@@ -114,19 +114,27 @@ public final class SGDoxGifCreator: NSObject, PHPickerViewControllerDelegate, UI
             return
         }
         
+        final class ImagesBox: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var imagesByIndex: [Int: UIImage] = [:]
+            
+            func set(image: UIImage, for index: Int) {
+                lock.lock()
+                self.imagesByIndex[index] = image
+                lock.unlock()
+            }
+        }
+        
         // Multiple or single images: collect images in order
         let group = DispatchGroup()
-        var imagesByIndex: [Int: UIImage] = [:]
-        let lock = NSLock()
+        let imagesBox = ImagesBox()
         
         for (index, result) in results.enumerated() {
             if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
                 group.enter()
                 result.itemProvider.loadObject(ofClass: UIImage.self) { image, _ in
                     if let image = image as? UIImage {
-                        lock.lock()
-                        imagesByIndex[index] = image
-                        lock.unlock()
+                        imagesBox.set(image: image, for: index)
                     }
                     group.leave()
                 }
@@ -135,7 +143,7 @@ public final class SGDoxGifCreator: NSObject, PHPickerViewControllerDelegate, UI
         
         group.notify(queue: .global(qos: .userInitiated)) { [weak self] in
             guard let self = self else { return }
-            let sortedImages = imagesByIndex.keys.sorted().compactMap { imagesByIndex[$0] }
+            let sortedImages = imagesBox.imagesByIndex.keys.sorted().compactMap { imagesBox.imagesByIndex[$0] }
             guard !sortedImages.isEmpty else {
                 DispatchQueue.main.async {
                     self.showLoading(false)
@@ -195,7 +203,7 @@ public final class SGDoxGifCreator: NSObject, PHPickerViewControllerDelegate, UI
         guard !images.isEmpty else { return nil }
         
         let fileData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(fileData as CFMutableData, kUTTypeGIF, images.count, nil) else {
+        guard let destination = CGImageDestinationCreateWithData(fileData as CFMutableData, UTType.gif.identifier as CFString, images.count, nil) else {
             return nil
         }
         

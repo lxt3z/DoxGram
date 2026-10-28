@@ -973,8 +973,11 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         let statusBarH = self.validLayout?.statusBarHeight ?? 0.0
         let winSafeTop: CGFloat = {
-            if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first {
-                return window.safeAreaInsets.top
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            for scene in scenes {
+                if let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first {
+                    return window.safeAreaInsets.top
+                }
             }
             return 0.0
         }()

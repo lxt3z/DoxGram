@@ -182,9 +182,21 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
     }
     
     private func searchMusicVideoParallel(artist: String, title: String, countries: [String], completion: @escaping @Sendable (String?) -> Void) {
+        final class UrlBox: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var foundUrl: String?
+            
+            func setIfNil(_ url: String) {
+                lock.lock()
+                if self.foundUrl == nil {
+                    self.foundUrl = url
+                }
+                lock.unlock()
+            }
+        }
+        
         let group = DispatchGroup()
-        let lock = NSLock()
-        var foundUrl: String?
+        let urlBox = UrlBox()
         
         for country in countries {
             group.enter()
@@ -222,11 +234,7 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
                         || (normItemTrack.count >= 3 && normTargetTitle.contains(normItemTrack))
                         
                     if artistMatches && titleMatches {
-                        lock.lock()
-                        if foundUrl == nil {
-                            foundUrl = previewUrl
-                        }
-                        lock.unlock()
+                        urlBox.setIfNil(previewUrl)
                         return
                     }
                 }
@@ -234,10 +242,7 @@ public final class SGDoxVideoClipService: @unchecked Sendable {
         }
         
         group.notify(queue: .global(qos: .userInitiated)) {
-            lock.lock()
-            let res = foundUrl
-            lock.unlock()
-            completion(res)
+            completion(urlBox.foundUrl)
         }
     }
 }

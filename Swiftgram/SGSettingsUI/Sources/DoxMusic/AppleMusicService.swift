@@ -302,8 +302,8 @@ public final class AppleMusicService: @unchecked Sendable {
             return
         }
         
-        let cacheKey = cleanQuery.lowercased() as NSString
-        if let cached = self.searchCache.object(forKey: cacheKey) as? [SGDoxMusicTrack], !cached.isEmpty {
+        let cacheKey = cleanQuery.lowercased()
+        if let cached = self.searchCache.object(forKey: cacheKey as NSString) as? [SGDoxMusicTrack], !cached.isEmpty {
             completion(cached, nil)
             return
         }
@@ -315,15 +315,25 @@ public final class AppleMusicService: @unchecked Sendable {
             deviceCountry = Locale.current.regionCode ?? "RU"
         }
         
-        var primaryCountries = [deviceCountry, "KZ", "US"].filter { !$0.isEmpty }
+        let primaryCountries = [deviceCountry, "KZ", "US"].filter { !$0.isEmpty }
         var uniqueCountries: [String] = []
         for c in primaryCountries {
             if !uniqueCountries.contains(c) { uniqueCountries.append(c) }
         }
         
+        final class SearchAccumulator: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var tracks: [SGDoxMusicTrack] = []
+            
+            func append(_ newTracks: [SGDoxMusicTrack]) {
+                lock.lock()
+                tracks.append(contentsOf: newTracks)
+                lock.unlock()
+            }
+        }
+        
         let group = DispatchGroup()
-        let lock = NSLock()
-        var allTracks: [SGDoxMusicTrack] = []
+        let accumulator = SearchAccumulator()
         
         // Query top 2 unique regions concurrently in parallel!
         let concurrentCountries = Array(uniqueCountries.prefix(2))
@@ -332,25 +342,23 @@ public final class AppleMusicService: @unchecked Sendable {
             self.performITunesSearch(term: encoded, cleanQuery: cleanQuery, country: country) { tracks, _ in
                 defer { group.leave() }
                 if !tracks.isEmpty {
-                    lock.lock()
-                    allTracks.append(contentsOf: tracks)
-                    lock.unlock()
+                    accumulator.append(tracks)
                 }
             }
         }
         
         group.notify(queue: .main) { [weak self] in
             guard let self = self else { return }
-            let deduplicated = AppleMusicService.deduplicateTracks(allTracks)
+            let deduplicated = AppleMusicService.deduplicateTracks(accumulator.tracks)
             if !deduplicated.isEmpty {
-                self.searchCache.setObject(deduplicated as NSArray, forKey: cacheKey)
+                self.searchCache.setObject(deduplicated as NSArray, forKey: cacheKey as NSString)
                 completion(deduplicated, nil)
             } else {
                 let remaining = Array(uniqueCountries.dropFirst(2))
                 if !remaining.isEmpty {
                     self.performMultiCountrySearch(term: encoded, cleanQuery: cleanQuery, countries: remaining, index: 0) { remTracks, err in
                         if !remTracks.isEmpty {
-                            self.searchCache.setObject(remTracks as NSArray, forKey: cacheKey)
+                            self.searchCache.setObject(remTracks as NSArray, forKey: cacheKey as NSString)
                         }
                         completion(remTracks, err)
                     }
@@ -381,10 +389,26 @@ public final class AppleMusicService: @unchecked Sendable {
         let songUrlString = "https://itunes.apple.com/search?term=\(term)&media=music&entity=song&limit=40&country=\(country)"
         let artistUrlString = "https://itunes.apple.com/search?term=\(term)&media=music&entity=musicArtist&limit=1&country=\(country)"
         
+        final class ITunesSearchBox: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var songTracks: [SGDoxMusicTrack] = []
+            private(set) var artistTracks: [SGDoxMusicTrack] = []
+            
+            func setSongTracks(_ tracks: [SGDoxMusicTrack]) {
+                lock.lock()
+                self.songTracks = tracks
+                lock.unlock()
+            }
+            
+            func setArtistTracks(_ tracks: [SGDoxMusicTrack]) {
+                lock.lock()
+                self.artistTracks = tracks
+                lock.unlock()
+            }
+        }
+        
         let group = DispatchGroup()
-        let lock = NSLock()
-        var songTracks: [SGDoxMusicTrack] = []
-        var artistTracks: [SGDoxMusicTrack] = []
+        let searchBox = ITunesSearchBox()
         
         // 1. Direct song search
         if let songUrl = URL(string: songUrlString) {
@@ -397,9 +421,7 @@ public final class AppleMusicService: @unchecked Sendable {
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let results = json["results"] as? [[String: Any]] else { return }
                 let parsed = self.parseITunesResults(results)
-                lock.lock()
-                songTracks = parsed
-                lock.unlock()
+                searchBox.setSongTracks(parsed)
             }.resume()
         }
         
@@ -427,14 +449,14 @@ public final class AppleMusicService: @unchecked Sendable {
                           let lResults = lJson["results"] as? [[String: Any]] else { return }
                     let tracksOnly = lResults.filter { ($0["wrapperType"] as? String) == "track" }
                     let parsed = self.parseITunesResults(tracksOnly)
-                    lock.lock()
-                    artistTracks = parsed
-                    lock.unlock()
+                    searchBox.setArtistTracks(parsed)
                 }.resume()
             }.resume()
         }
         
         group.notify(queue: .main) {
+            let songTracks = searchBox.songTracks
+            let artistTracks = searchBox.artistTracks
             var combined: [SGDoxMusicTrack] = []
             
             // Prioritize artistTracks if artist name closely matches search query
@@ -934,11 +956,33 @@ public final class AppleMusicService: @unchecked Sendable {
         let songsUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=song&limit=50&country=\(country)")
         let albumsUrl = URL(string: "https://itunes.apple.com/lookup?id=\(artistId)&entity=album&limit=25&country=\(country)")
         
+        final class ArtistLookupBox: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var topTracks: [SGDoxMusicTrack] = []
+            private(set) var albums: [SGDoxAlbum] = []
+            private(set) var deezerPhoto: String? = nil
+            
+            func setDeezerPhoto(_ photo: String?) {
+                lock.lock()
+                self.deezerPhoto = photo
+                lock.unlock()
+            }
+            
+            func setTopTracks(_ tracks: [SGDoxMusicTrack]) {
+                lock.lock()
+                self.topTracks = tracks
+                lock.unlock()
+            }
+            
+            func setAlbums(_ albums: [SGDoxAlbum]) {
+                lock.lock()
+                self.albums = albums
+                lock.unlock()
+            }
+        }
+        
         let group = DispatchGroup()
-        let lock = NSLock()
-        var topTracks: [SGDoxMusicTrack] = []
-        var albums: [SGDoxAlbum] = []
-        var deezerPhoto: String? = nil
+        let lookupBox = ArtistLookupBox()
         
         // Fetch real artist avatar from Deezer concurrently
         if let encoded = artistName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
@@ -956,9 +1000,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 let clean = artistName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                 if dName == clean || dName.contains(clean) || clean.contains(dName) {
                     let pic = (first["picture_xl"] as? String) ?? (first["picture_big"] as? String) ?? (first["picture_medium"] as? String)
-                    lock.lock()
-                    deezerPhoto = pic
-                    lock.unlock()
+                    lookupBox.setDeezerPhoto(pic)
                 }
             }.resume()
         }
@@ -974,9 +1016,7 @@ public final class AppleMusicService: @unchecked Sendable {
                       let results = json["results"] as? [[String: Any]] else { return }
                 let tracksOnly = results.filter { ($0["wrapperType"] as? String) == "track" }
                 let parsed = self.parseITunesResults(tracksOnly)
-                lock.lock()
-                topTracks = parsed
-                lock.unlock()
+                lookupBox.setTopTracks(parsed)
             }.resume()
         }
         
@@ -1006,13 +1046,14 @@ public final class AppleMusicService: @unchecked Sendable {
                         ))
                     }
                 }
-                lock.lock()
-                albums = parsedAlbums
-                lock.unlock()
+                lookupBox.setAlbums(parsedAlbums)
             }.resume()
         }
         
         group.notify(queue: .main) {
+            let topTracks = lookupBox.topTracks
+            let albums = lookupBox.albums
+            let deezerPhoto = lookupBox.deezerPhoto
             let finalImage = deezerPhoto ?? (albums.first?.artworkUrl ?? topTracks.first?.artworkUrl)
             completion(topTracks, albums, finalImage)
         }

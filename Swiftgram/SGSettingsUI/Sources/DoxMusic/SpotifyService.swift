@@ -8,13 +8,9 @@ import SGLogging
 @MainActor
 private final class SpotifyPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        if #available(iOS 15.0, *) {
-            if let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-               let window = windowScene.keyWindow ?? windowScene.windows.first {
-                return window
-            }
-        }
-        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first,
+           let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first {
             return window
         }
         return ASPresentationAnchor()
