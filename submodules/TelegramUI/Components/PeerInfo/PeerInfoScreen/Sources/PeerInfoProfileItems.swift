@@ -342,7 +342,7 @@ func infoItems(
                         icon: .none,
                         action: { _, _ in
                             SGDoxMusicManager.shared.playPinnedProfileTrack()
-                            if let controller = interaction.getController() {
+                            if interaction.getController() != nil {
                                 SGDoxMusicPlayerController.present(context: context)
                             }
                         },
@@ -370,7 +370,7 @@ func infoItems(
                                     })
                                 ])
                             ])
-                            interaction.presentController(actionSheet, nil)
+                            interaction.getController()?.present(actionSheet, in: .window(.root))
                         },
                         requestLayout: { animated in
                             interaction.requestLayout(animated)

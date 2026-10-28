@@ -2,6 +2,7 @@ import SGRegDateScheme
 import SGRegDate
 import Foundation
 import UIKit
+import Postbox
 import TelegramCore
 import SwiftSignalKit
 import AccountContext
@@ -1606,7 +1607,8 @@ func peerInfoScreenData(
                 savedMusicContext.state,
                 combineLatest(businessConnectedBot, walletBalance)
             )
-            |> mapToSignal { regDate, peerView, availablePanes, globalNotificationSettings, encryptionKeyFingerprint, status, hasStories, hasStoryArchive, recommendedBots, accountIsPremium, savedMessagesPeer, hasSavedMessagesChats, hasSavedMessages, hasSavedMessageTags, hasBotPreviewItems, personalChannel, privacySettings, starsRevenueContextAndState, revenueContextAndState, premiumGiftOptions, webAppPermissions, sendAsPeerId, areGiftsEmpty, profileGiftsState, verification, businessAccountSetup, pendingStory, accountFreezeConfiguration, memberSinceDate -> Signal<PeerInfoScreenData, NoError> in
+            |> mapToSignal { regDate, peerView, availablePanes, globalNotificationSettings, encryptionKeyFingerprint, status, hasStories, hasStoryArchive, recommendedBots, accountIsPremium, savedMessagesPeer, hasSavedMessagesChats, hasSavedMessages, hasSavedMessageTags, hasBotPreviewItems, personalChannel, privacySettings, starsRevenueContextAndState, revenueContextAndState, premiumGiftOptions, webAppPermissions, savedMusicState, businessConnectedBotAndWalletBalance -> Signal<PeerInfoScreenData, NoError> in
+                let (businessConnectedBot, walletBalance) = businessConnectedBotAndWalletBalance
                 var availablePanes = availablePanes
                 if isMyProfile {
                     availablePanes?.insert(.stories, at: 0)

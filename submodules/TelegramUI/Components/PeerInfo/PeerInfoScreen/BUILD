@@ -201,6 +201,7 @@ swift_library(
         "//submodules/TelegramAnimatedStickerNode",
         "//submodules/UIKitRuntimeUtils",
         "//submodules/UrlWhitelist",
+        "//submodules/Postbox",
     ],
     visibility = [
         "//visibility:public",

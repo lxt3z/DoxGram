@@ -592,7 +592,7 @@ func settingsEditingItems(data: PeerInfoScreenData?, state: PeerInfoState, conte
             icon: PresentationResourcesSettings.music,
             action: {
                 SGDoxMusicManager.shared.playPinnedProfileTrack()
-                if let controller = interaction.getController() {
+                if interaction.getController() != nil {
                     SGDoxMusicPlayerController.present(context: context)
                 }
             }
