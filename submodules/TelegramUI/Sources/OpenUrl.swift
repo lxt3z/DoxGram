@@ -989,18 +989,20 @@ private func openCheckedExternalUrl(context: AccountContext, urlContext: OpenURL
                                 navigationController?.pushViewController(context.sharedContext.makeSGProController(context: context))
                             case "restart":
                                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                                let controller = textAlertController(
-                                    context: context,
-                                    title: presentationData.strings.Restart_Title,
-                                    text: presentationData.strings.Restart_Text,
-                                    actions: [
-                                        TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
-                                        TextAlertAction(type: .destructiveAction, title: presentationData.strings.Restart_Restart, action: {
-                                            restartApp()
-                                        })
-                                    ]
+                                let lang = presentationData.strings.baseLanguageCode
+                                context.sharedContext.presentGlobalController(
+                                    UndoOverlayController(
+                                        presentationData: presentationData,
+                                        content: .info(title: nil,
+                                            text: "Common.RestartRequired".i18n(lang),
+                                            timeout: nil,
+                                            customUndoText: "Common.RestartNow".i18n(lang)
+                                        ),
+                                        elevatedLayout: false,
+                                        action: { action in if action == .undo { exit(0) }; return true }
+                                    ),
+                                    nil
                                 )
-                                context.sharedContext.presentGlobalController(controller, nil)
                                 return
                             default:
                                 break

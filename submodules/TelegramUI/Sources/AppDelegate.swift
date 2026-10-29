@@ -1499,7 +1499,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     updateSGWebSettingsInteractivelly(context: context.context)
                     updateSGGHSettingsInteractivelly(context: context.context)
                     let _ = (context.context.sharedContext.presentationData.start(next: { presentationData in
-                        SGLocalizationManager.shared.downloadLocale(presentationData: presentationData)
+                        SGLocalizationManager.shared.downloadLocale(presentationData.strings.baseLanguageCode)
                     }))
                     
                     self.crashReportPromptDisposable.set(setupCrashReportPrompt(context: context.context, isInternalBuild: buildConfig.isInternalBuild, navigationController: context.rootController, present: { [weak appDelegate = self, weak applicationContext = context] controller in

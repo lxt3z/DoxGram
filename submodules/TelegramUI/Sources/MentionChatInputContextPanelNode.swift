@@ -165,6 +165,11 @@ final class MentionChatInputContextPanelNode: ChatInputContextPanelNode {
                                     let replacementText = addressName + (mentionNext ? " @" : " ")
                                     return (textInputState.replacingFlatRange(range, with: replacementText), inputMode)
                                 } else if !peer.compactDisplayTitle.isEmpty {
+                                    let replacementText = NSMutableAttributedString()
+                                    replacementText.append(NSAttributedString(string: peer.compactDisplayTitle, attributes: [ChatTextInputAttributes.textMention: ChatTextInputTextMentionAttribute(peerId: peer.id)]))
+                                    // MARK: Swiftgram
+                                    replacementText.append(NSAttributedString(string: mentionNext ? " @" : " "))
+                                    
                                     let updatedRange = NSRange(location: range.location - 1, length: range.length + 1)
 
                                     return (textInputState.replacingFlatRange(updatedRange, with: replacementText), inputMode)
