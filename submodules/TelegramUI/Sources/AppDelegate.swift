@@ -1506,7 +1506,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                         guard let appDelegate, let applicationContext, appDelegate.contextValue === applicationContext else {
                             return
                         }
-                        applicationContext.rootController.present(controller, in: .window(.root))
+                        applicationContext.rootController.present(controller, animated: true)
                     }))
                 }))
             } else {
