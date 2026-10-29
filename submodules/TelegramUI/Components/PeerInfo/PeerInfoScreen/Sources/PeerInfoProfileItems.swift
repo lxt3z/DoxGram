@@ -353,7 +353,7 @@ func infoItems(
                                     ActionSheetButtonItem(title: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Слушать" : "Play", color: .accent, action: { [weak actionSheet] in
                                         actionSheet?.dismissAnimated()
                                         SGDoxMusicManager.shared.playPinnedProfileTrack()
-                                        if let controller = interaction.getController() {
+                                        if interaction.getController() != nil {
                                             SGDoxMusicPlayerController.present(context: context)
                                         }
                                     }),
