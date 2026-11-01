@@ -179,15 +179,26 @@ def copy_profiles_from_directory(source_path, destination_path, team_id, bundle_
             if not file_path.endswith('.mobileprovision'):
                 continue
 
-            profile_data = run_executable_with_output('openssl', arguments=[
-                'smime',
-                '-inform',
-                'der',
-                '-verify',
-                '-noverify',
-                '-in',
-                file_path
-            ], decode=False, stderr_to_stdout=False, check_result=True)
+            try:
+                profile_data = run_executable_with_output('openssl', arguments=[
+                    'smime',
+                    '-inform',
+                    'der',
+                    '-verify',
+                    '-noverify',
+                    '-in',
+                    file_path
+                ], decode=False, stderr_to_stdout=False, check_result=False)
+            except Exception:
+                profile_data = b''
+
+            if not profile_data or b'<plist' not in profile_data:
+                with open(file_path, 'rb') as pf:
+                    raw = pf.read()
+                    import re as _re
+                    m = _re.search(rb'<\?xml.*?</plist>', raw, _re.DOTALL)
+                    if m:
+                        profile_data = m.group(0)
 
             profile_dict = plistlib.loads(profile_data)
             profile_name = profile_dict['Entitlements']['application-identifier']
@@ -207,15 +218,26 @@ def resolve_aps_environment_from_directory(source_path, team_id, bundle_id):
             if not file_path.endswith('.mobileprovision'):
                 continue
 
-            profile_data = run_executable_with_output('openssl', arguments=[
-                'smime',
-                '-inform',
-                'der',
-                '-verify',
-                '-noverify',
-                '-in',
-                file_path
-            ], decode=False, stderr_to_stdout=False, check_result=True)
+            try:
+                profile_data = run_executable_with_output('openssl', arguments=[
+                    'smime',
+                    '-inform',
+                    'der',
+                    '-verify',
+                    '-noverify',
+                    '-in',
+                    file_path
+                ], decode=False, stderr_to_stdout=False, check_result=False)
+            except Exception:
+                profile_data = b''
+
+            if not profile_data or b'<plist' not in profile_data:
+                with open(file_path, 'rb') as pf:
+                    raw = pf.read()
+                    import re as _re
+                    m = _re.search(rb'<\?xml.*?</plist>', raw, _re.DOTALL)
+                    if m:
+                        profile_data = m.group(0)
 
             profile_dict = plistlib.loads(profile_data)
             profile_name = profile_dict['Entitlements']['application-identifier']
