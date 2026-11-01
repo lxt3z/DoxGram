@@ -329,55 +329,7 @@ func infoItems(
                     }))
                 }
                 
-                if isMyProfile, !SGSimpleSettings.shared.doxProfileTrackTitle.isEmpty {
-                    let trackTitle = SGSimpleSettings.shared.doxProfileTrackTitle
-                    let trackArtist = SGSimpleSettings.shared.doxProfileTrackArtist
-                    let label = presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Любимый трек" : "Favorite Track"
-                    let desc = trackArtist.isEmpty ? trackTitle : "\(trackArtist) — \(trackTitle)"
-                    items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(
-                        id: AnyHashable("sg_pinned_music"),
-                        label: label,
-                        text: desc,
-                        textColor: .accent,
-                        icon: .none,
-                        action: { _, _ in
-                            SGDoxMusicManager.shared.playPinnedProfileTrack()
-                            if interaction.getController() != nil {
-                                SGDoxMusicPlayerController.present(context: context)
-                            }
-                        },
-                        contextAction: { _, _, _ in
-                            let actionSheet = ActionSheetController(presentationData: presentationData)
-                            actionSheet.setItemGroups([
-                                ActionSheetItemGroup(items: [
-                                    ActionSheetButtonItem(title: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Слушать" : "Play", color: .accent, action: { [weak actionSheet] in
-                                        actionSheet?.dismissAnimated()
-                                        SGDoxMusicManager.shared.playPinnedProfileTrack()
-                                        if interaction.getController() != nil {
-                                            SGDoxMusicPlayerController.present(context: context)
-                                        }
-                                    }),
-                                    ActionSheetButtonItem(title: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Удалить из профиля" : "Remove from Profile", color: .destructive, action: { [weak actionSheet] in
-                                        actionSheet?.dismissAnimated()
-                                        SGSimpleSettings.shared.doxProfileTrackTitle = ""
-                                        SGSimpleSettings.shared.doxProfileTrackId = ""
-                                        interaction.requestLayout(true)
-                                    })
-                                ]),
-                                ActionSheetItemGroup(items: [
-                                    ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, action: { [weak actionSheet] in
-                                        actionSheet?.dismissAnimated()
-                                    })
-                                ])
-                            ])
-                            interaction.getController()?.present(actionSheet, in: .window(.root))
-                        },
-                        requestLayout: { animated in
-                            interaction.requestLayout(animated)
-                        }
-                    ))
-                }
-                
+               
                 if let note = cachedData.note, !note.text.isEmpty {
                     var entities = note.entities
                     if context.isPremium {

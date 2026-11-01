@@ -178,9 +178,11 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         
         self.session.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self, let data = data, error == nil, let image = UIImage(data: data) else {
-                // If 600x600 failed, fallback to 100x100 if applicable
+                // Fallback sequence: 1200x1200 -> 600x600 -> 100x100
                 var fallbackStr: String? = nil
-                if effectiveUrl.contains("600x600") {
+                if effectiveUrl.contains("1200x1200") {
+                    fallbackStr = effectiveUrl.replacingOccurrences(of: "1200x1200", with: "600x600")
+                } else if effectiveUrl.contains("600x600") {
                     fallbackStr = effectiveUrl.replacingOccurrences(of: "600x600", with: "100x100")
                 } else if effectiveUrl.contains("500x500") {
                     fallbackStr = effectiveUrl.replacingOccurrences(of: "500x500", with: "100x100")

@@ -3161,6 +3161,11 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                 return
             }
             let peerId = self.peerId
+            if listState.files.isEmpty && (peerId == self.context.account.peerId || self.isMyProfile) && !SGSimpleSettings.shared.doxProfileTrackTitle.isEmpty {
+                SGDoxMusicManager.shared.playPinnedProfileTrack()
+                SGDoxMusicPlayerController.present(context: self.context)
+                return
+            }
             var initialId: Int32
             if let initialFileId = listState.files.first?.fileId {
                 initialId = Int32(clamping: initialFileId.id % Int64(Int32.max))

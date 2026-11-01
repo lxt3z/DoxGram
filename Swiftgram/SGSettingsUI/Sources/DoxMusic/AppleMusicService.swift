@@ -534,6 +534,7 @@ public final class AppleMusicService: @unchecked Sendable {
             let durationMs = item["trackTimeMillis"] as? Double ?? 30000.0
             let duration = durationMs / 1000.0
             let isDolbyAtmos = false
+            let collectionId: String? = ((item["collectionId"] as? Int64) ?? (item["collectionId"] as? Int).map(Int64.init)).map { "\($0)" }
             
             return SGDoxMusicTrack(
                 id: "am_\(trackId)",
@@ -547,7 +548,8 @@ public final class AppleMusicService: @unchecked Sendable {
                 appleMusicId: "\(trackId)",
                 isLossless: true,
                 isDolbyAtmos: isDolbyAtmos,
-                hasDynamicLyrics: true
+                hasDynamicLyrics: true,
+                collectionId: collectionId
             )
         }
     }
@@ -1033,7 +1035,7 @@ public final class AppleMusicService: @unchecked Sendable {
                 for item in results where (item["wrapperType"] as? String) == "collection" {
                     if let colName = item["collectionName"] as? String,
                        let colId = (item["collectionId"] as? Int64) ?? (item["collectionId"] as? Int).map(Int64.init) {
-                        let artUrl = (item["artworkUrl100"] as? String)?.replacingOccurrences(of: "100x100bb", with: "1200x1200bb")
+                        let artUrl = (item["artworkUrl100"] as? String)?.replacingOccurrences(of: "100x100bb", with: "600x600bb")
                         let relDate = item["releaseDate"] as? String
                         let trackCount = (item["trackCount"] as? Int) ?? 0
                         parsedAlbums.append(SGDoxAlbum(

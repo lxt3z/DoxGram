@@ -1,3 +1,19 @@
+private func formatRussianTracksCount(_ count: Int) -> String {
+    if count <= 0 { return "Сингл" }
+    let rem100 = count % 100
+    let rem10 = count % 10
+    if rem100 >= 11 && rem100 <= 19 {
+        return "\(count) треков"
+    }
+    if rem10 == 1 {
+        return "\(count) трек"
+    }
+    if rem10 >= 2 && rem10 <= 4 {
+        return "\(count) трека"
+    }
+    return "\(count) треков"
+}
+
 import Foundation
 import UIKit
 import Display
@@ -6,6 +22,7 @@ import AccountContext
 import TelegramPresentationData
 import AppBundle
 import SGSimpleSettings
+import UndoUI
 
 public final class SGDoxArtistViewController: ViewController, UITableViewDataSource, UITableViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UIGestureRecognizerDelegate {
     public let context: AccountContext
@@ -503,7 +520,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                     let yearStr = latest.releaseDate.flatMap { $0.count >= 4 ? String($0.prefix(4)) : nil } ?? ""
                     self.latestReleaseYear.text = yearStr
                     self.latestReleaseTitle.text = latest.title
-                    let countStr = latest.trackCount > 0 ? "\(latest.trackCount) треков" : "Сингл"
+                    let countStr = formatRussianTracksCount(latest.trackCount)
                     self.latestReleaseSubtitle.text = yearStr.isEmpty ? countStr : "Релиз • \(countStr)"
                     
                     self.latestReleaseArtwork.image = SGDoxImageLoader.shared.placeholderArtwork()
@@ -634,11 +651,74 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                     SGDoxMusicManager.shared.play(track: track)
                     self.openPlayer()
                 }))
-                alert.addAction(UIAlertAction(title: "Закрепить в профиле", style: .default, handler: { _ in
-                    SGSimpleSettings.shared.doxProfileTrackId = track.id
-                    SGSimpleSettings.shared.doxProfileTrackTitle = track.title
-                    SGSimpleSettings.shared.doxProfileTrackArtist = track.artist
-                    SGSimpleSettings.shared.doxProfileTrackArtworkUrl = track.artworkUrl
+                
+                if !track.album.isEmpty {
+                    alert.addAction(UIAlertAction(title: "Перейти к альбому (\(track.album))", style: .default, handler: { [weak self] _ in
+                        guard let self = self else { return }
+                        let albumId = track.collectionId ?? track.album
+                        let album = SGDoxAlbum(id: albumId, title: track.album, artist: track.artist, artworkUrl: track.artworkUrl)
+                        let albumVc = SGDoxAlbumViewController(context: self.context, album: album)
+                        if let nav = self.navigationController as? NavigationController {
+                            nav.pushViewController(albumVc)
+                        } else {
+                            self.present(albumVc, in: .window(.root))
+                        }
+                    }))
+                }
+                
+                let separators = [", ", " & ", " feat. ", " ft. ", " / "]
+                var artistTokens: [String] = [track.artist]
+                for sep in separators {
+                    artistTokens = artistTokens.flatMap { $0.components(separatedBy: sep) }
+                }
+                let cleanTokens = artistTokens.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty && $0.lowercased() != self.artistName.lowercased() }
+                for otherArtist in cleanTokens {
+                    alert.addAction(UIAlertAction(title: "Артист: \(otherArtist)", style: .default, handler: { [weak self] _ in
+                        guard let self = self else { return }
+                        let otherVc = SGDoxArtistViewController(context: self.context, artistName: otherArtist)
+                        if let nav = self.navigationController as? NavigationController {
+                            nav.pushViewController(otherVc)
+                        } else {
+                            self.present(otherVc, in: .window(.root))
+                        }
+                    }))
+                }
+                
+                let isPinned = SGSimpleSettings.shared.doxProfileTrackId == track.id
+                let pinTitle = isPinned ? "Удалить из профиля" : "Поставить трек в профиле"
+                alert.addAction(UIAlertAction(title: pinTitle, style: isPinned ? .destructive : .default, handler: { [weak self] _ in
+                    guard let self = self else { return }
+                    if isPinned {
+                        SGSimpleSettings.shared.doxProfileTrackId = ""
+                        SGSimpleSettings.shared.doxProfileTrackTitle = ""
+                        SGSimpleSettings.shared.doxProfileTrackArtist = ""
+                        SGSimpleSettings.shared.doxProfileTrackArtworkUrl = ""
+                        SGSimpleSettings.shared.doxProfileTrackDuration = 0
+                        NotificationCenter.default.post(name: NSNotification.Name("SGDoxProfileTrackUpdated"), object: nil)
+                    } else {
+                        SGSimpleSettings.shared.doxProfileTrackId = track.id
+                        SGSimpleSettings.shared.doxProfileTrackTitle = track.title
+                        SGSimpleSettings.shared.doxProfileTrackArtist = track.artist
+                        SGSimpleSettings.shared.doxProfileTrackArtworkUrl = track.artworkUrl
+                        SGSimpleSettings.shared.doxProfileTrackDuration = Int(track.duration)
+                        NotificationCenter.default.post(name: NSNotification.Name("SGDoxProfileTrackUpdated"), object: nil)
+                        let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Peer Info/SavedMusic"), color: .white) ?? UIImage()
+                        let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
+                        let overlay = UndoOverlayController(
+                            presentationData: presentationData,
+                            content: .universalImage(
+                                image: iconImage,
+                                size: nil,
+                                title: nil,
+                                text: presentationData.strings.MediaPlayer_SavedMusic_AddedToProfile,
+                                customUndoText: nil,
+                                timeout: 3.0
+                            ),
+                            elevatedLayout: false,
+                            action: { _ in return false }
+                        )
+                        self.present(overlay, in: .window(.root))
+                    }
                 }))
                 alert.addAction(UIAlertAction(title: "Отмена", style: .cancel, handler: nil))
                 self.present(alert, animated: true)
@@ -850,9 +930,10 @@ private final class ArtistTrackCell: UITableViewCell {
         self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
         if let artUrl = track.artworkUrl {
             SGDoxImageLoader.shared.loadImage(urlString: artUrl) { [weak self] image in
-                if self?.currentTrackId == track.id, let image = image {
-                    self?.artworkImageView.image = image
-                }
+                guard let self = self, self.currentTrackId == track.id, let image = image else { return }
+                UIView.transition(with: self.artworkImageView, duration: 0.22, options: .transitionCrossDissolve, animations: {
+                    self.artworkImageView.image = image
+                })
             }
         }
         self.setNeedsLayout()

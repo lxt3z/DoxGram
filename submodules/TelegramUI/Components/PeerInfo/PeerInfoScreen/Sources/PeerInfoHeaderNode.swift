@@ -209,7 +209,28 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         let list = screenData.savedMusicState.map { state -> (files: [TelegramMediaFile], isLoading: Bool) in
             return (state.files, state.dataState == .loading)
         }
-        return peerInfoProfileMusic(list: list, fullUserMusic: (screenData.cachedData as? CachedUserData)?.savedMusic)
+        if let nativeFile = peerInfoProfileMusic(list: list, fullUserMusic: (screenData.cachedData as? CachedUserData)?.savedMusic) {
+            return nativeFile
+        }
+        if (peer.id == self.context.account.peerId || self.isMyProfile) && !SGSimpleSettings.shared.doxProfileTrackTitle.isEmpty {
+            let title = SGSimpleSettings.shared.doxProfileTrackTitle
+            let artist = SGSimpleSettings.shared.doxProfileTrackArtist
+            let duration = Int(SGSimpleSettings.shared.doxProfileTrackDuration)
+            let audioAttr = TelegramMediaFileAttribute.Audio(isVoice: false, duration: duration > 0 ? duration : 180, title: title, performer: artist, waveform: nil)
+            return TelegramMediaFile(
+                fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: 999999),
+                partialReference: nil,
+                resource: EmptyMediaResource(),
+                previewRepresentations: [],
+                videoThumbnails: [],
+                immediateThumbnailData: nil,
+                mimeType: "audio/mp4",
+                size: nil,
+                attributes: [audioAttr],
+                alternativeRepresentations: []
+            )
+        }
+        return nil
     }
     
     var performButtonAction: ((PeerInfoHeaderButtonKey, PeerInfoHeaderButtonNode?, ContextGesture?) -> Void)?

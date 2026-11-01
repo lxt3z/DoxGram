@@ -20,7 +20,7 @@ public struct SGDoxLyricsLine: Identifiable, Equatable, Codable, Sendable {
 public struct SGDoxLyrics: Equatable, Codable, Sendable {
     public let trackId: String
     public let plainText: String?
-    public let lines: [SGDoxLyricsLine]
+    public var lines: [SGDoxLyricsLine]
     
     public var plainLyrics: String? {
         return self.plainText
@@ -34,6 +34,16 @@ public struct SGDoxLyrics: Equatable, Codable, Sendable {
         self.trackId = trackId
         self.plainText = plainText
         self.lines = lines
+    }
+    
+    public mutating func adjustTimestampsForDuration(_ duration: Double) {
+        guard let plain = self.plainText, !plain.isEmpty, duration > 10.0 else { return }
+        let raw = plain.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard !raw.isEmpty else { return }
+        let step = max(2.2, (duration - 4.0) / Double(raw.count))
+        self.lines = raw.enumerated().map { i, text in
+            SGDoxLyricsLine(timestamp: Double(i) * step, text: text)
+        }
     }
 }
 
@@ -256,6 +266,13 @@ public final class SGDoxLyricsService: @unchecked Sendable {
         let cleanPlain = plainStr?.trimmingCharacters(in: .whitespacesAndNewlines)
         if lines.isEmpty && (cleanPlain == nil || cleanPlain!.isEmpty) {
             return nil
+        }
+        
+        if lines.isEmpty, let plain = cleanPlain {
+            let raw = plain.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            lines = raw.enumerated().map { i, text in
+                SGDoxLyricsLine(timestamp: Double(i) * 3.5, text: text)
+            }
         }
         
         return SGDoxLyrics(trackId: trackId, plainText: cleanPlain, lines: lines)

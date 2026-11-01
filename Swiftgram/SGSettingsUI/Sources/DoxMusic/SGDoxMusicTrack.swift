@@ -32,6 +32,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
     public var isLossless: Bool
     public var isDolbyAtmos: Bool
     public var hasDynamicLyrics: Bool
+    public var collectionId: String?
     
     public init(
         id: String,
@@ -48,7 +49,8 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         telegramFile: FileMediaReference? = nil,
         isLossless: Bool = false,
         isDolbyAtmos: Bool = false,
-        hasDynamicLyrics: Bool = true
+        hasDynamicLyrics: Bool = true,
+        collectionId: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -65,6 +67,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         self.isLossless = isLossless
         self.isDolbyAtmos = isDolbyAtmos
         self.hasDynamicLyrics = hasDynamicLyrics
+        self.collectionId = collectionId
     }
     
     public static func == (lhs: SGDoxMusicTrack, rhs: SGDoxMusicTrack) -> Bool {
@@ -77,7 +80,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
     }
     
     private enum CodingKeys: String, CodingKey {
-        case id, title, artist, album, artworkUrl, duration, previewUrl, videoUrl, source, spotifyUri, appleMusicId, isLossless, isDolbyAtmos, hasDynamicLyrics
+        case id, title, artist, album, artworkUrl, duration, previewUrl, videoUrl, source, spotifyUri, appleMusicId, isLossless, isDolbyAtmos, hasDynamicLyrics, collectionId
     }
     
     public init(from decoder: Decoder) throws {
@@ -97,6 +100,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         self.isLossless = try container.decodeIfPresent(Bool.self, forKey: .isLossless) ?? false
         self.isDolbyAtmos = try container.decodeIfPresent(Bool.self, forKey: .isDolbyAtmos) ?? false
         self.hasDynamicLyrics = try container.decodeIfPresent(Bool.self, forKey: .hasDynamicLyrics) ?? true
+        self.collectionId = try container.decodeIfPresent(String.self, forKey: .collectionId)
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -115,6 +119,7 @@ public struct SGDoxMusicTrack: Identifiable, Equatable, Hashable, Codable, @unch
         try container.encode(self.isLossless, forKey: .isLossless)
         try container.encode(self.isDolbyAtmos, forKey: .isDolbyAtmos)
         try container.encode(self.hasDynamicLyrics, forKey: .hasDynamicLyrics)
+        try container.encodeIfPresent(self.collectionId, forKey: .collectionId)
     }
 }
 
