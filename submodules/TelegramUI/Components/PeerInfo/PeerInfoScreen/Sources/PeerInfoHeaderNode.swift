@@ -4,6 +4,7 @@ import SGSimpleSettings
 import AsyncDisplayKit
 import Display
 import TelegramCore
+import Postbox
 import AvatarNode
 import AccountContext
 import SwiftSignalKit
