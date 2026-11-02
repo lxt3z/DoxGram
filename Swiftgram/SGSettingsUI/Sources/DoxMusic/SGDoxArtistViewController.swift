@@ -39,8 +39,11 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     private let activityIndicator = UIActivityIndicatorView(style: .large)
     private let emptyStateLabel = UILabel()
     
-    // Top Navigation Bar (Apple Music Frosted Circles)
+    // Top Navigation Bar (Apple Music Frosted Bar with Scroll Fade)
     private let topNavBar = UIView()
+    private let navBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialDark))
+    private let navBorder = UIView()
+    private let navTitleLabel = UILabel()
     private let backButton = UIButton(type: .system)
     private let shareButton = UIButton(type: .system)
     private let moreOptionsButton = UIButton(type: .system)
@@ -49,27 +52,26 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     private let headerView = UIView()
     private let heroContainer = UIView()
     private let bannerImageView = UIImageView()
-    private let backdropBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let bannerGradient = CAGradientLayer()
     
-    // Artist Title & Info
+    // Artist Title & Info (Hero)
     private let nameLabel = UILabel()
-    private let nameChevron = UIImageView()
+    private let genreSubtitleLabel = UILabel()
     
-    // Three Action Circles: ( i )  ( ▶ )  ( ★ )
-    private let actionButtonsStack = UIStackView()
-    private let infoCircleButton = UIButton(type: .system)
-    private let playCircleButton = UIButton(type: .system)
-    private let favoriteCircleButton = UIButton(type: .system)
+    // Action Buttons Row: [ ▶  Слушать ]  [ 🔀  Перемешать ]  ( ★ )
+    private let actionButtonsContainer = UIView()
+    private let playButton = UIButton(type: .system)
+    private let shuffleButton = UIButton(type: .system)
+    private let favoriteButton = UIButton(type: .system)
     
     // Latest Release Hero Card ("ПОСЛЕДНИЙ РЕЛИЗ")
     private let latestReleaseHeader = UILabel()
     private let latestReleaseCard = UIButton(type: .custom)
     private let latestReleaseArtwork = UIImageView()
-    private let latestReleaseYear = UILabel()
+    private let latestReleaseCategory = UILabel()
     private let latestReleaseTitle = UILabel()
     private let latestReleaseSubtitle = UILabel()
-    private let latestReleaseActionIcon = UIImageView()
+    private let latestReleaseChevron = UIImageView()
     private var latestAlbum: SGDoxAlbum?
     
     // Top Songs Section Header
@@ -79,7 +81,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     private let albumsSectionHeader = UILabel()
     private var albumsCollectionView: UICollectionView!
     
-    private let heroBannerHeight: CGFloat = 360.0
+    private let heroBannerHeight: CGFloat = 340.0
     private var panGesture: UIPanGestureRecognizer?
     
     public init(context: AccountContext, artistName: String) {
@@ -97,7 +99,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     
     public override func loadDisplayNode() {
         super.loadDisplayNode()
-        self.displayNode.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
+        self.displayNode.backgroundColor = UIColor(red: 0.07, green: 0.08, blue: 0.12, alpha: 1.0)
     }
     
     public override func viewWillAppear(_ animated: Bool) {
@@ -122,18 +124,27 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         let statusBarHeight = layout.statusBarHeight ?? layout.safeInsets.top
         self.grabber.frame = CGRect(x: (layout.size.width - 38) * 0.5, y: max(8, statusBarHeight - 22), width: 38, height: 5)
         
-        // Layout Top Nav Bar (Frosted round buttons)
-        let topBarY = inNav ? statusBarHeight : max(10.0, statusBarHeight - 16.0)
-        self.topNavBar.frame = CGRect(x: 0, y: topBarY, width: layout.size.width, height: 44.0)
-        let btnSide: CGFloat = 36.0
-        self.backButton.frame = CGRect(x: 18.0, y: (44.0 - btnSide) * 0.5, width: btnSide, height: btnSide)
+        // Layout Top Nav Bar
+        let topBarY = inNav ? statusBarHeight : max(8.0, statusBarHeight - 14.0)
+        let topBarH: CGFloat = 44.0
+        self.topNavBar.frame = CGRect(x: 0, y: topBarY, width: layout.size.width, height: topBarH)
+        self.navBlurView.frame = self.topNavBar.bounds
+        self.navBorder.frame = CGRect(x: 0, y: topBarH - 0.5, width: layout.size.width, height: 0.5)
+        
+        let btnSide: CGFloat = 38.0
+        self.backButton.frame = CGRect(x: 16.0, y: (topBarH - btnSide) * 0.5, width: btnSide, height: btnSide)
         self.backButton.layer.cornerRadius = btnSide * 0.5
         
-        self.moreOptionsButton.frame = CGRect(x: layout.size.width - 18.0 - btnSide, y: (44.0 - btnSide) * 0.5, width: btnSide, height: btnSide)
+        self.moreOptionsButton.frame = CGRect(x: layout.size.width - 16.0 - btnSide, y: (topBarH - btnSide) * 0.5, width: btnSide, height: btnSide)
         self.moreOptionsButton.layer.cornerRadius = btnSide * 0.5
         
-        self.shareButton.frame = CGRect(x: self.moreOptionsButton.frame.minX - 10.0 - btnSide, y: (44.0 - btnSide) * 0.5, width: btnSide, height: btnSide)
+        self.shareButton.frame = CGRect(x: self.moreOptionsButton.frame.minX - 10.0 - btnSide, y: (topBarH - btnSide) * 0.5, width: btnSide, height: btnSide)
         self.shareButton.layer.cornerRadius = btnSide * 0.5
+        
+        let navTitleLeft = self.backButton.frame.maxX + 12.0
+        let navTitleRight = self.shareButton.frame.minX - 12.0
+        let navTitleW = max(0, navTitleRight - navTitleLeft)
+        self.navTitleLabel.frame = CGRect(x: navTitleLeft, y: 0, width: navTitleW, height: topBarH)
         
         self.view.bringSubviewToFront(self.topNavBar)
         
@@ -150,7 +161,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
+        self.view.backgroundColor = UIColor(red: 0.07, green: 0.08, blue: 0.12, alpha: 1.0)
         
         self.blurView.frame = self.view.bounds
         self.blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -163,13 +174,13 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         
         // Table View
         self.tableView.backgroundColor = .clear
-        self.tableView.separatorColor = UIColor(white: 1.0, alpha: 0.08)
+        self.tableView.separatorColor = UIColor(white: 1.0, alpha: 0.07)
         self.tableView.separatorInset = UIEdgeInsets(top: 0, left: 88, bottom: 0, right: 16)
         self.tableView.dataSource = self
         self.tableView.delegate = self
         self.tableView.register(ArtistTrackCell.self, forCellReuseIdentifier: "ArtistTrackCell")
         self.tableView.contentInsetAdjustmentBehavior = .never
-        self.tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 80, right: 0)
+        self.tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 90, right: 0)
         self.view.addSubview(self.tableView)
         
         // Setup Apple Music Header View
@@ -186,7 +197,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.activityIndicator.startAnimating()
         
         // Empty State Label
-        self.emptyStateLabel.textColor = UIColor(white: 1.0, alpha: 0.55)
+        self.emptyStateLabel.textColor = UIColor(white: 1.0, alpha: 0.50)
         self.emptyStateLabel.font = UIFont.systemFont(ofSize: 15.0, weight: .medium)
         self.emptyStateLabel.textAlignment = .center
         self.emptyStateLabel.text = "Треки исполнителя не найдены"
@@ -204,9 +215,23 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     
     private func setupTopNavBar() {
         self.topNavBar.backgroundColor = .clear
-        self.view.addSubview(self.topNavBar)
+        self.topNavBar.clipsToBounds = false
         
-        let backConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
+        self.navBlurView.alpha = 0.0
+        self.topNavBar.addSubview(self.navBlurView)
+        
+        self.navBorder.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
+        self.navBorder.alpha = 0.0
+        self.topNavBar.addSubview(self.navBorder)
+        
+        self.navTitleLabel.text = self.artistName
+        self.navTitleLabel.font = UIFont.systemFont(ofSize: 17, weight: .bold)
+        self.navTitleLabel.textColor = .white
+        self.navTitleLabel.textAlignment = .center
+        self.navTitleLabel.alpha = 0.0
+        self.topNavBar.addSubview(self.navTitleLabel)
+        
+        let backConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
         self.backButton.setImage(UIImage(systemName: "chevron.left", withConfiguration: backConfig), for: .normal)
         self.styleFrostedNavButton(self.backButton)
         self.backButton.addTarget(self, action: #selector(self.backPressed), for: .touchUpInside)
@@ -223,11 +248,13 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.styleFrostedNavButton(self.moreOptionsButton)
         self.moreOptionsButton.addTarget(self, action: #selector(self.moreOptionsPressed), for: .touchUpInside)
         self.topNavBar.addSubview(self.moreOptionsButton)
+        
+        self.view.addSubview(self.topNavBar)
     }
     
     private func styleFrostedNavButton(_ button: UIButton) {
         button.tintColor = .white
-        button.backgroundColor = UIColor(white: 0.18, alpha: 0.70)
+        button.backgroundColor = UIColor(white: 0.15, alpha: 0.72)
         button.layer.borderWidth = 0.5
         button.layer.borderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
         button.clipsToBounds = true
@@ -236,96 +263,117 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     private func setupHeaderView() {
         self.headerView.clipsToBounds = false
         
-        // Hero container
+        // 1. Hero container
         self.heroContainer.clipsToBounds = true
         self.headerView.addSubview(self.heroContainer)
         
         self.bannerImageView.contentMode = .scaleAspectFill
         self.bannerImageView.clipsToBounds = true
-        self.bannerImageView.backgroundColor = UIColor(white: 0.10, alpha: 1.0)
+        self.bannerImageView.backgroundColor = UIColor(red: 0.10, green: 0.11, blue: 0.16, alpha: 1.0)
         self.heroContainer.addSubview(self.bannerImageView)
         
-        self.backdropBlurView.clipsToBounds = true
-        self.heroContainer.addSubview(self.backdropBlurView)
-        
+        // Linear fade gradient: top is 100% transparent/clear so artist face is crystal clear!
+        // Bottom smoothly dissolves into the page background.
         self.bannerGradient.colors = [
-            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.15).cgColor,
-            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.50).cgColor,
-            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.90).cgColor,
-            UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.00).cgColor
+            UIColor.clear.cgColor,
+            UIColor.clear.cgColor,
+            UIColor(red: 0.07, green: 0.08, blue: 0.12, alpha: 0.35).cgColor,
+            UIColor(red: 0.07, green: 0.08, blue: 0.12, alpha: 0.85).cgColor,
+            UIColor(red: 0.07, green: 0.08, blue: 0.12, alpha: 1.00).cgColor
         ]
-        self.bannerGradient.locations = [0.0, 0.40, 0.80, 1.0]
+        self.bannerGradient.locations = [0.0, 0.45, 0.68, 0.86, 1.00]
         self.bannerGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
         self.bannerGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
         self.heroContainer.layer.addSublayer(self.bannerGradient)
         
-        // Artist Title (Apple Music Large Title)
+        // 2. Artist Title & Genre/Subtitle
         self.nameLabel.text = self.artistName
-        self.nameLabel.font = UIFont.systemFont(ofSize: 32, weight: .heavy)
+        self.nameLabel.font = UIFont.systemFont(ofSize: 34, weight: .heavy)
         self.nameLabel.textColor = .white
         self.nameLabel.numberOfLines = 1
-        self.nameLabel.textAlignment = .left
+        self.nameLabel.layer.shadowColor = UIColor.black.cgColor
+        self.nameLabel.layer.shadowOpacity = 0.55
+        self.nameLabel.layer.shadowRadius = 8.0
+        self.nameLabel.layer.shadowOffset = CGSize(width: 0, height: 2)
         self.headerView.addSubview(self.nameLabel)
         
-        let chevConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        self.nameChevron.image = UIImage(systemName: "chevron.right", withConfiguration: chevConfig)
-        self.nameChevron.tintColor = UIColor(white: 1.0, alpha: 0.45)
-        self.nameChevron.contentMode = .scaleAspectFit
-        self.headerView.addSubview(self.nameChevron)
+        self.genreSubtitleLabel.text = "Исполнитель"
+        self.genreSubtitleLabel.font = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
+        self.genreSubtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.70)
+        self.genreSubtitleLabel.layer.shadowColor = UIColor.black.cgColor
+        self.genreSubtitleLabel.layer.shadowOpacity = 0.45
+        self.genreSubtitleLabel.layer.shadowRadius = 6.0
+        self.genreSubtitleLabel.layer.shadowOffset = CGSize(width: 0, height: 1)
+        self.headerView.addSubview(self.genreSubtitleLabel)
         
-        // Three Action Circular Buttons: ( i )  ( ▶ )  ( ★ )
-        self.actionButtonsStack.axis = .horizontal
-        self.actionButtonsStack.alignment = .center
-        self.actionButtonsStack.distribution = .equalCentering
-        self.actionButtonsStack.spacing = 32.0
-        self.headerView.addSubview(self.actionButtonsStack)
+        // 3. Apple Music Action Row: [ ▶  Слушать ]   [ 🔀  Перемешать ]   ( ★ )
+        self.headerView.addSubview(self.actionButtonsContainer)
         
-        // Info Button ( i )
-        let infoCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
-        self.infoCircleButton.setImage(UIImage(systemName: "info.circle", withConfiguration: infoCfg), for: .normal)
-        self.styleActionCircleButton(self.infoCircleButton, side: 46.0, bg: UIColor(white: 0.20, alpha: 0.70), tint: .white)
-        self.infoCircleButton.addTarget(self, action: #selector(self.infoPressed), for: .touchUpInside)
-        self.actionButtonsStack.addArrangedSubview(self.infoCircleButton)
+        let playCfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
+        self.playButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playCfg), for: .normal)
+        self.playButton.setTitle("  Слушать", for: .normal)
+        self.playButton.setTitleColor(.black, for: .normal)
+        self.playButton.titleLabel?.font = UIFont.systemFont(ofSize: 16.0, weight: .bold)
+        self.playButton.tintColor = .black
+        self.playButton.backgroundColor = .white
+        self.playButton.layer.cornerRadius = 23.0
+        self.playButton.layer.cornerCurve = .continuous
+        self.playButton.clipsToBounds = true
+        self.playButton.addTarget(self, action: #selector(self.playAllPressed), for: .touchUpInside)
+        self.actionButtonsContainer.addSubview(self.playButton)
         
-        // Play Button ( ▶ ) - prominent white circle
-        let playCfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .heavy)
-        self.playCircleButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playCfg), for: .normal)
-        self.styleActionCircleButton(self.playCircleButton, side: 54.0, bg: .white, tint: .black)
-        self.playCircleButton.addTarget(self, action: #selector(self.playAllPressed), for: .touchUpInside)
-        self.actionButtonsStack.addArrangedSubview(self.playCircleButton)
+        let shuffleCfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
+        self.shuffleButton.setImage(UIImage(systemName: "shuffle", withConfiguration: shuffleCfg), for: .normal)
+        self.shuffleButton.setTitle("  Перемешать", for: .normal)
+        self.shuffleButton.setTitleColor(.white, for: .normal)
+        self.shuffleButton.titleLabel?.font = UIFont.systemFont(ofSize: 16.0, weight: .bold)
+        self.shuffleButton.tintColor = .white
+        self.shuffleButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.shuffleButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.15).cgColor
+        self.shuffleButton.layer.borderWidth = 0.5
+        self.shuffleButton.layer.cornerRadius = 23.0
+        self.shuffleButton.layer.cornerCurve = .continuous
+        self.shuffleButton.clipsToBounds = true
+        self.shuffleButton.addTarget(self, action: #selector(self.shuffleAllPressed), for: .touchUpInside)
+        self.actionButtonsContainer.addSubview(self.shuffleButton)
         
-        // Favorite Button ( ★ )
-        let starCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
-        self.favoriteCircleButton.setImage(UIImage(systemName: "star", withConfiguration: starCfg), for: .normal)
-        self.styleActionCircleButton(self.favoriteCircleButton, side: 46.0, bg: UIColor(white: 0.20, alpha: 0.70), tint: .white)
-        self.favoriteCircleButton.addTarget(self, action: #selector(self.toggleFavoritePressed), for: .touchUpInside)
-        self.actionButtonsStack.addArrangedSubview(self.favoriteCircleButton)
+        let starCfg = UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)
+        self.favoriteButton.setImage(UIImage(systemName: "star", withConfiguration: starCfg), for: .normal)
+        self.favoriteButton.tintColor = .white
+        self.favoriteButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        self.favoriteButton.layer.borderColor = UIColor(white: 1.0, alpha: 0.15).cgColor
+        self.favoriteButton.layer.borderWidth = 0.5
+        self.favoriteButton.layer.cornerRadius = 23.0
+        self.favoriteButton.layer.cornerCurve = .continuous
+        self.favoriteButton.clipsToBounds = true
+        self.favoriteButton.addTarget(self, action: #selector(self.toggleFavoritePressed), for: .touchUpInside)
+        self.actionButtonsContainer.addSubview(self.favoriteButton)
         
-        // Featured / Latest Release Header & Hero Card
+        // 4. Latest Release Hero Card ("ПОСЛЕДНИЙ РЕЛИЗ")
         self.latestReleaseHeader.text = "ПОСЛЕДНИЙ РЕЛИЗ"
-        self.latestReleaseHeader.font = UIFont.systemFont(ofSize: 12.5, weight: .bold)
-        self.latestReleaseHeader.textColor = UIColor(white: 1.0, alpha: 0.50)
+        self.latestReleaseHeader.font = UIFont.systemFont(ofSize: 13.0, weight: .bold)
+        self.latestReleaseHeader.textColor = UIColor(white: 1.0, alpha: 0.48)
         self.latestReleaseHeader.isHidden = true
         self.headerView.addSubview(self.latestReleaseHeader)
         
         self.setupLatestReleaseCard()
         
-        // Top Songs Header
+        // 5. Top Songs Section Header
         self.topSongsHeader.text = "Лучшие песни  ›"
-        self.topSongsHeader.font = UIFont.systemFont(ofSize: 21, weight: .bold)
+        self.topSongsHeader.font = UIFont.systemFont(ofSize: 22, weight: .bold)
         self.topSongsHeader.textColor = .white
         self.topSongsHeader.isHidden = true
         self.headerView.addSubview(self.topSongsHeader)
         
-        // Albums Section
+        // 6. Albums Section Collection View
         let collLayout = UICollectionViewFlowLayout()
         collLayout.scrollDirection = .horizontal
-        collLayout.itemSize = CGSize(width: 132, height: 180)
-        collLayout.minimumLineSpacing = 16
+        collLayout.itemSize = CGSize(width: 140, height: 195)
+        collLayout.minimumLineSpacing = 14
         collLayout.sectionInset = UIEdgeInsets(top: 0, left: 18, bottom: 0, right: 18)
         
         self.albumsSectionHeader.text = "Альбомы  ›"
-        self.albumsSectionHeader.font = UIFont.systemFont(ofSize: 21, weight: .bold)
+        self.albumsSectionHeader.font = UIFont.systemFont(ofSize: 22, weight: .bold)
         self.albumsSectionHeader.textColor = .white
         self.albumsSectionHeader.isHidden = true
         self.headerView.addSubview(self.albumsSectionHeader)
@@ -340,23 +388,9 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.headerView.addSubview(self.albumsCollectionView)
     }
     
-    private func styleActionCircleButton(_ button: UIButton, side: CGFloat, bg: UIColor, tint: UIColor) {
-        button.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: side),
-            button.heightAnchor.constraint(equalToConstant: side)
-        ])
-        button.layer.cornerRadius = side * 0.5
-        button.backgroundColor = bg
-        button.tintColor = tint
-        button.layer.borderWidth = (bg == .white) ? 0.0 : 0.5
-        button.layer.borderColor = UIColor(white: 1.0, alpha: 0.20).cgColor
-        button.clipsToBounds = true
-    }
-    
     private func setupLatestReleaseCard() {
         self.latestReleaseCard.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
-        self.latestReleaseCard.layer.cornerRadius = 16.0
+        self.latestReleaseCard.layer.cornerRadius = 18.0
         self.latestReleaseCard.layer.cornerCurve = .continuous
         self.latestReleaseCard.layer.borderWidth = 0.5
         self.latestReleaseCard.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
@@ -367,30 +401,30 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         
         self.latestReleaseArtwork.contentMode = .scaleAspectFill
         self.latestReleaseArtwork.clipsToBounds = true
-        self.latestReleaseArtwork.layer.cornerRadius = 8.0
+        self.latestReleaseArtwork.layer.cornerRadius = 10.0
         self.latestReleaseArtwork.layer.cornerCurve = .continuous
-        self.latestReleaseArtwork.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
+        self.latestReleaseArtwork.backgroundColor = UIColor(white: 0.14, alpha: 1.0)
         self.latestReleaseCard.addSubview(self.latestReleaseArtwork)
         
-        self.latestReleaseYear.font = UIFont.systemFont(ofSize: 12.0, weight: .regular)
-        self.latestReleaseYear.textColor = UIColor(white: 1.0, alpha: 0.50)
-        self.latestReleaseCard.addSubview(self.latestReleaseYear)
+        self.latestReleaseCategory.font = UIFont.systemFont(ofSize: 11.5, weight: .bold)
+        self.latestReleaseCategory.textColor = UIColor(white: 1.0, alpha: 0.45)
+        self.latestReleaseCard.addSubview(self.latestReleaseCategory)
         
-        self.latestReleaseTitle.font = UIFont.systemFont(ofSize: 15.0, weight: .bold)
+        self.latestReleaseTitle.font = UIFont.systemFont(ofSize: 16.5, weight: .bold)
         self.latestReleaseTitle.textColor = .white
         self.latestReleaseTitle.numberOfLines = 1
         self.latestReleaseCard.addSubview(self.latestReleaseTitle)
         
-        self.latestReleaseSubtitle.font = UIFont.systemFont(ofSize: 12.5, weight: .regular)
+        self.latestReleaseSubtitle.font = UIFont.systemFont(ofSize: 13.0, weight: .regular)
         self.latestReleaseSubtitle.textColor = UIColor(white: 1.0, alpha: 0.50)
         self.latestReleaseSubtitle.numberOfLines = 1
         self.latestReleaseCard.addSubview(self.latestReleaseSubtitle)
         
-        let downCfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
-        self.latestReleaseActionIcon.image = UIImage(systemName: "arrow.down.circle", withConfiguration: downCfg)
-        self.latestReleaseActionIcon.tintColor = UIColor(white: 1.0, alpha: 0.65)
-        self.latestReleaseActionIcon.contentMode = .scaleAspectFit
-        self.latestReleaseCard.addSubview(self.latestReleaseActionIcon)
+        let chevCfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        self.latestReleaseChevron.image = UIImage(systemName: "chevron.right", withConfiguration: chevCfg)
+        self.latestReleaseChevron.tintColor = UIColor(white: 1.0, alpha: 0.45)
+        self.latestReleaseChevron.contentMode = .scaleAspectFit
+        self.latestReleaseCard.addSubview(self.latestReleaseChevron)
     }
     
     private func layoutHeader(width: CGFloat) {
@@ -401,21 +435,28 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         let heroH = self.heroBannerHeight
         self.heroContainer.frame = CGRect(x: 0, y: 0, width: screenW, height: heroH)
         self.bannerImageView.frame = self.heroContainer.bounds
-        self.backdropBlurView.frame = self.heroContainer.bounds
         self.bannerGradient.frame = self.heroContainer.bounds
         
-        // 2. Artist Title
-        let nameY: CGFloat = 130.0
-        let nameSize = self.nameLabel.sizeThatFits(CGSize(width: screenW - 64.0, height: 42.0))
-        let nameW = min(screenW - 64.0, nameSize.width)
+        // 2. Artist Title & Genre positioned at the bottom of the hero banner
+        let nameY = heroH - 74.0
+        let nameW = screenW - 36.0
         self.nameLabel.frame = CGRect(x: 18.0, y: nameY, width: nameW, height: 38.0)
-        self.nameChevron.frame = CGRect(x: self.nameLabel.frame.maxX + 4.0, y: nameY + 9.0, width: 14.0, height: 20.0)
+        self.genreSubtitleLabel.frame = CGRect(x: 18.0, y: nameY + 38.0, width: nameW, height: 18.0)
         
-        // 3. Action Buttons Row ( (i)  (▶)  (★) )
-        let stackY = nameY + 46.0
-        self.actionButtonsStack.frame = CGRect(x: (screenW - 220.0) * 0.5, y: stackY, width: 220.0, height: 56.0)
+        // 3. Apple Music Action Row: [ ▶  Слушать ]   [ 🔀  Перемешать ]   ( ★ )
+        let rowY = heroH + 16.0
+        let rowH: CGFloat = 46.0
+        let favSide: CGFloat = 46.0
+        let gap: CGFloat = 10.0
+        let availableWidthForPills = screenW - 36.0 - favSide - (gap * 2)
+        let pillW = floor(availableWidthForPills * 0.5)
         
-        var currentY = stackY + 66.0
+        self.actionButtonsContainer.frame = CGRect(x: 18.0, y: rowY, width: screenW - 36.0, height: rowH)
+        self.playButton.frame = CGRect(x: 0, y: 0, width: pillW, height: rowH)
+        self.shuffleButton.frame = CGRect(x: pillW + gap, y: 0, width: pillW, height: rowH)
+        self.favoriteButton.frame = CGRect(x: pillW * 2 + gap * 2, y: 0, width: favSide, height: rowH)
+        
+        var currentY = rowY + rowH + 28.0
         
         // 4. Latest Release Hero Card
         let hasLatest = (self.latestAlbum != nil)
@@ -426,25 +467,23 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
             self.latestReleaseHeader.frame = CGRect(x: 18.0, y: currentY, width: screenW - 36.0, height: 18.0)
             currentY += 24.0
             
-            let cardH: CGFloat = 82.0
+            let cardH: CGFloat = 86.0
             self.latestReleaseCard.frame = CGRect(x: 18.0, y: currentY, width: screenW - 36.0, height: cardH)
             
-            let artSide: CGFloat = 66.0
-            self.latestReleaseArtwork.frame = CGRect(x: 8.0, y: (cardH - artSide) * 0.5, width: artSide, height: artSide)
+            let artSide: CGFloat = 68.0
+            self.latestReleaseArtwork.frame = CGRect(x: 9.0, y: (cardH - artSide) * 0.5, width: artSide, height: artSide)
             
-            let textX = self.latestReleaseArtwork.frame.maxX + 12.0
-            let rightIconSide: CGFloat = 28.0
+            let textX = self.latestReleaseArtwork.frame.maxX + 14.0
+            let rightIconSide: CGFloat = 20.0
             let textW = self.latestReleaseCard.bounds.width - textX - rightIconSide - 16.0
             
-            self.latestReleaseYear.frame = CGRect(x: textX, y: 12.0, width: textW, height: 16.0)
-            self.latestReleaseTitle.frame = CGRect(x: textX, y: 30.0, width: textW, height: 20.0)
-            self.latestReleaseSubtitle.frame = CGRect(x: textX, y: 52.0, width: textW, height: 16.0)
+            self.latestReleaseCategory.frame = CGRect(x: textX, y: 13.0, width: textW, height: 15.0)
+            self.latestReleaseTitle.frame = CGRect(x: textX, y: 31.0, width: textW, height: 21.0)
+            self.latestReleaseSubtitle.frame = CGRect(x: textX, y: 55.0, width: textW, height: 16.0)
             
-            self.latestReleaseActionIcon.frame = CGRect(x: self.latestReleaseCard.bounds.width - rightIconSide - 12.0, y: (cardH - rightIconSide) * 0.5, width: rightIconSide, height: rightIconSide)
+            self.latestReleaseChevron.frame = CGRect(x: self.latestReleaseCard.bounds.width - rightIconSide - 16.0, y: (cardH - rightIconSide) * 0.5, width: rightIconSide, height: rightIconSide)
             
             currentY += cardH + 28.0
-        } else {
-            currentY += 12.0
         }
         
         // 5. Top Songs Section Header
@@ -452,24 +491,34 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.topSongsHeader.isHidden = !hasTracks
         if hasTracks {
             self.topSongsHeader.frame = CGRect(x: 18.0, y: currentY, width: screenW - 36.0, height: 26.0)
-            currentY += 34.0
+            currentY += 36.0
         }
         
         self.headerView.frame = CGRect(x: 0, y: 0, width: screenW, height: currentY)
         self.tableView.tableHeaderView = self.headerView
     }
     
-    // Parallax stretching on scroll
+    // Parallax stretching and navigation bar transition on scroll
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         if scrollView == self.tableView {
             let offsetY = scrollView.contentOffset.y
+            
+            // 1. Parallax stretch down
             if offsetY < 0 {
                 let stretch = abs(offsetY)
                 self.heroContainer.frame = CGRect(x: 0, y: offsetY, width: self.view.bounds.width, height: self.heroBannerHeight + stretch)
                 self.bannerImageView.frame = self.heroContainer.bounds
-                self.backdropBlurView.frame = self.heroContainer.bounds
                 self.bannerGradient.frame = self.heroContainer.bounds
             }
+            
+            // 2. Navigation bar title and blur transition on scroll up
+            let fadeStart: CGFloat = self.heroBannerHeight - 120.0
+            let fadeEnd: CGFloat = self.heroBannerHeight - 40.0
+            let progress = max(0.0, min(1.0, (offsetY - fadeStart) / (fadeEnd - fadeStart)))
+            
+            self.navBlurView.alpha = progress
+            self.navBorder.alpha = progress
+            self.navTitleLabel.alpha = progress
         }
     }
     
@@ -518,10 +567,11 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                 // Configure Latest Release Card
                 if let latest = self.latestAlbum {
                     let yearStr = latest.releaseDate.flatMap { $0.count >= 4 ? String($0.prefix(4)) : nil } ?? ""
-                    self.latestReleaseYear.text = yearStr
-                    self.latestReleaseTitle.text = latest.title
                     let countStr = formatRussianTracksCount(latest.trackCount)
-                    self.latestReleaseSubtitle.text = yearStr.isEmpty ? countStr : "Релиз • \(countStr)"
+                    let categoryStr = latest.trackCount <= 1 ? "СИНГЛ" : "АЛЬБОМ"
+                    self.latestReleaseCategory.text = yearStr.isEmpty ? categoryStr : "\(categoryStr) • \(yearStr)"
+                    self.latestReleaseTitle.text = latest.title
+                    self.latestReleaseSubtitle.text = "Релиз • \(countStr)"
                     
                     self.latestReleaseArtwork.image = SGDoxImageLoader.shared.placeholderArtwork()
                     if let art = latest.artworkUrl {
@@ -533,7 +583,9 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                     }
                 }
                 
-                if let imgUrl = artistImageUrl {
+                // Reliable Hero Banner: use Deezer artist photo or fallback to top album cover
+                let bestHeroUrl = self.artistImageUrl ?? self.albums.first?.artworkUrl ?? self.topTracks.first?.artworkUrl
+                if let imgUrl = bestHeroUrl {
                     SGDoxImageLoader.shared.loadImage(urlString: imgUrl) { [weak self] loadedImage in
                         guard let self = self, let loadedImage = loadedImage else { return }
                         UIView.transition(with: self.bannerImageView, duration: 0.35, options: [.transitionCrossDissolve], animations: {
@@ -555,7 +607,8 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     }
     
     @objc private func sharePressed() {
-        let shareText = "\(self.artistName)\nСлушайте в DoxMusic"
+        let shareText = "\(self.artistName)
+Слушайте в DoxMusic"
         let activityVc = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
         activityVc.popoverPresentationController?.sourceView = self.shareButton
         activityVc.popoverPresentationController?.sourceRect = self.shareButton.bounds
@@ -576,19 +629,13 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
         self.present(alert, animated: true)
     }
     
-    @objc private func infoPressed() {
-        let alert = UIAlertController(title: self.artistName, message: "Исполнитель Apple Music\nТреков: \(self.topTracks.count)\nАльбомов: \(self.albums.count)", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
-        self.present(alert, animated: true)
-    }
-    
     @objc private func toggleFavoritePressed() {
         self.isFavoriteArtist.toggle()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let starCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        let starCfg = UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)
         let starImg = UIImage(systemName: self.isFavoriteArtist ? "star.fill" : "star", withConfiguration: starCfg)
-        self.favoriteCircleButton.setImage(starImg, for: .normal)
-        self.favoriteCircleButton.tintColor = self.isFavoriteArtist ? UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : .white
+        self.favoriteButton.setImage(starImg, for: .normal)
+        self.favoriteButton.tintColor = self.isFavoriteArtist ? UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : .white
     }
     
     @objc private func latestReleaseCardTapped() {
@@ -603,7 +650,18 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     
     @objc private func playAllPressed() {
         guard !self.topTracks.isEmpty else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         var list = self.topTracks
+        let first = list.removeFirst()
+        SGDoxMusicManager.shared.play(track: first, queue: list)
+        self.tableView.reloadData()
+        self.openPlayer()
+    }
+    
+    @objc private func shuffleAllPressed() {
+        guard !self.topTracks.isEmpty else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        var list = self.topTracks.shuffled()
         let first = list.removeFirst()
         SGDoxMusicManager.shared.play(track: first, queue: list)
         self.tableView.reloadData()
@@ -650,6 +708,12 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
                 alert.addAction(UIAlertAction(title: "Воспроизвести", style: .default, handler: { _ in
                     SGDoxMusicManager.shared.play(track: track)
                     self.openPlayer()
+                }))
+                alert.addAction(UIAlertAction(title: "Слушать следующим", style: .default, handler: { _ in
+                    SGDoxMusicManager.shared.playNext(track: track)
+                }))
+                alert.addAction(UIAlertAction(title: "Добавить в очередь", style: .default, handler: { _ in
+                    SGDoxMusicManager.shared.addToQueue(track: track)
                 }))
                 
                 if !track.album.isEmpty {
@@ -728,7 +792,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
             let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
             cell.backgroundColor = .clear
             cell.selectionStyle = .none
-            self.albumsCollectionView.frame = CGRect(x: 0, y: 10, width: tableView.bounds.width, height: 190)
+            self.albumsCollectionView.frame = CGRect(x: 0, y: 10, width: tableView.bounds.width, height: 195)
             cell.contentView.addSubview(self.albumsCollectionView)
             self.albumsCollectionView.isHidden = false
             return cell
@@ -740,7 +804,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
             let container = UIView(frame: CGRect(x: 0, y: 0, width: tableView.bounds.width, height: 38.0))
             let lbl = UILabel(frame: CGRect(x: 18.0, y: 6.0, width: tableView.bounds.width - 36.0, height: 26.0))
             lbl.text = "Альбомы  ›"
-            lbl.font = UIFont.systemFont(ofSize: 21, weight: .bold)
+            lbl.font = UIFont.systemFont(ofSize: 22, weight: .bold)
             lbl.textColor = .white
             container.addSubview(lbl)
             return container
@@ -802,30 +866,30 @@ private final class ArtistTrackCell: UITableViewCell {
     private let titleLabel = UILabel()
     private let explicitBadge = UILabel()
     private let subtitleLabel = UILabel()
-    private let dolbyBadge = UILabel()
     private let losslessBadge = UILabel()
     private let playingIndicator = UIImageView()
     private let moreButton = UIButton(type: .system)
+    private var currentTrackId: String?
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         self.backgroundColor = .clear
         self.selectionStyle = .none
         
-        // Track number (Apple Music gray monospaced)
-        self.indexLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 15, weight: .medium)
-        self.indexLabel.textColor = UIColor(white: 1.0, alpha: 0.40)
+        // Track number (Apple Music style)
+        self.indexLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 15.5, weight: .medium)
+        self.indexLabel.textColor = UIColor(white: 1.0, alpha: 0.38)
         self.indexLabel.textAlignment = .center
         self.contentView.addSubview(self.indexLabel)
         
-        self.artworkImageView.layer.cornerRadius = 6.0
+        self.artworkImageView.layer.cornerRadius = 8.0
         self.artworkImageView.layer.cornerCurve = .continuous
         self.artworkImageView.clipsToBounds = true
         self.artworkImageView.contentMode = .scaleAspectFill
-        self.artworkImageView.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
+        self.artworkImageView.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
         self.contentView.addSubview(self.artworkImageView)
         
-        self.titleLabel.font = UIFont.systemFont(ofSize: 15.5, weight: .semibold)
+        self.titleLabel.font = UIFont.systemFont(ofSize: 16.0, weight: .semibold)
         self.titleLabel.textColor = .white
         self.contentView.addSubview(self.titleLabel)
         
@@ -839,7 +903,7 @@ private final class ArtistTrackCell: UITableViewCell {
         self.explicitBadge.isHidden = true
         self.contentView.addSubview(self.explicitBadge)
         
-        self.subtitleLabel.font = UIFont.systemFont(ofSize: 12.5, weight: .regular)
+        self.subtitleLabel.font = UIFont.systemFont(ofSize: 13.0, weight: .regular)
         self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.50)
         self.contentView.addSubview(self.subtitleLabel)
         
@@ -853,8 +917,10 @@ private final class ArtistTrackCell: UITableViewCell {
         self.losslessBadge.isHidden = true
         self.contentView.addSubview(self.losslessBadge)
         
-        self.playingIndicator.image = UIImage(systemName: "waveform")
+        let waveCfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
+        self.playingIndicator.image = UIImage(systemName: "waveform", withConfiguration: waveCfg)
         self.playingIndicator.tintColor = UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0)
+        self.playingIndicator.contentMode = .scaleAspectFit
         self.playingIndicator.isHidden = true
         self.contentView.addSubview(self.playingIndicator)
         
@@ -873,44 +939,46 @@ private final class ArtistTrackCell: UITableViewCell {
         self.onMoreTap?()
     }
     
+    override func setHighlighted(_ highlighted: Bool, animated: Bool) {
+        super.setHighlighted(highlighted, animated: animated)
+        UIView.animate(withDuration: 0.15) {
+            self.contentView.backgroundColor = highlighted ? UIColor(white: 1.0, alpha: 0.08) : .clear
+        }
+    }
+    
     override func layoutSubviews() {
         super.layoutSubviews()
         let bounds = self.contentView.bounds
         
         self.indexLabel.frame = CGRect(x: 4.0, y: (bounds.height - 20.0) * 0.5, width: 28.0, height: 20.0)
         
-        let artSide: CGFloat = 40.0
+        let artSide: CGFloat = 42.0
         self.artworkImageView.frame = CGRect(x: 34.0, y: (bounds.height - artSide) * 0.5, width: artSide, height: artSide)
         
-        let rightSide: CGFloat = 34.0
-        self.moreButton.frame = CGRect(x: bounds.width - rightSide - 6.0, y: (bounds.height - rightSide) * 0.5, width: rightSide, height: rightSide)
+        let rightSide: CGFloat = 36.0
+        self.moreButton.frame = CGRect(x: bounds.width - rightSide - 8.0, y: (bounds.height - rightSide) * 0.5, width: rightSide, height: rightSide)
         self.playingIndicator.frame = CGRect(x: self.moreButton.frame.minX - 22.0, y: (bounds.height - 18.0) * 0.5, width: 18.0, height: 18.0)
         
-        let textX: CGFloat = self.artworkImageView.frame.maxX + 12.0
-        let rightLimit = self.playingIndicator.isHidden ? self.moreButton.frame.minX - 6.0 : self.playingIndicator.frame.minX - 6.0
-        let textW = max(50.0, rightLimit - textX)
+        let textX = self.artworkImageView.frame.maxX + 12.0
+        let rightBoundary = self.playingIndicator.isHidden ? self.moreButton.frame.minX - 8.0 : self.playingIndicator.frame.minX - 8.0
+        let textW = max(0, rightBoundary - textX)
         
-        let titleSize = self.titleLabel.sizeThatFits(CGSize(width: textW, height: 20.0))
-        let titleW = min(textW, titleSize.width)
-        self.titleLabel.frame = CGRect(x: textX, y: 8.0, width: titleW, height: 20.0)
+        self.titleLabel.frame = CGRect(x: textX, y: 8.0, width: textW, height: 21.0)
         
+        var subX = textX
         if !self.explicitBadge.isHidden {
-            self.explicitBadge.frame = CGRect(x: textX + titleW + 5.0, y: 12.0, width: 13.0, height: 12.0)
+            self.explicitBadge.frame = CGRect(x: subX, y: 32.0, width: 13.0, height: 13.0)
+            subX += 17.0
         }
-        
-        var subBadgesW: CGFloat = 0.0
-        if !self.losslessBadge.isHidden { subBadgesW += 54.0 }
-        
-        let subSize = self.subtitleLabel.sizeThatFits(CGSize(width: textW, height: 16.0))
-        let subW = min(max(30.0, textW - subBadgesW), subSize.width)
-        self.subtitleLabel.frame = CGRect(x: textX, y: 29.0, width: subW, height: 16.0)
         
         if !self.losslessBadge.isHidden {
-            self.losslessBadge.frame = CGRect(x: textX + subW + 5.0, y: 31.0, width: 48.0, height: 12.5)
+            self.losslessBadge.frame = CGRect(x: subX, y: 32.5, width: 44.0, height: 13.0)
+            subX += 48.0
         }
+        
+        let subW = max(0, rightBoundary - subX)
+        self.subtitleLabel.frame = CGRect(x: subX, y: 30.5, width: subW, height: 18.0)
     }
-    
-    private var currentTrackId: String?
     
     func configure(track: SGDoxMusicTrack, index: Int, isCurrent: Bool) {
         self.currentTrackId = track.id
@@ -952,21 +1020,22 @@ private final class ArtistAlbumCell: UICollectionViewCell {
         super.init(frame: frame)
         self.backgroundColor = .clear
         
-        self.artworkImageView.layer.cornerRadius = 10.0
+        self.artworkImageView.layer.cornerRadius = 12.0
         self.artworkImageView.layer.cornerCurve = .continuous
         self.artworkImageView.clipsToBounds = true
         self.artworkImageView.contentMode = .scaleAspectFill
         self.artworkImageView.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
         self.contentView.addSubview(self.artworkImageView)
         
-        self.titleLabel.font = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+        self.titleLabel.font = UIFont.systemFont(ofSize: 14.0, weight: .semibold)
         self.titleLabel.textColor = .white
         self.titleLabel.numberOfLines = 2
         self.titleLabel.lineBreakMode = .byTruncatingTail
         self.contentView.addSubview(self.titleLabel)
         
-        self.subtitleLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .regular)
+        self.subtitleLabel.font = UIFont.systemFont(ofSize: 12.5, weight: .regular)
         self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.50)
+        self.subtitleLabel.numberOfLines = 1
         self.contentView.addSubview(self.subtitleLabel)
     }
     
@@ -977,30 +1046,28 @@ private final class ArtistAlbumCell: UICollectionViewCell {
     override func layoutSubviews() {
         super.layoutSubviews()
         let w = self.contentView.bounds.width
+        
         self.artworkImageView.frame = CGRect(x: 0, y: 0, width: w, height: w)
-        self.titleLabel.frame = CGRect(x: 0, y: w + 6, width: w, height: 32)
-        self.subtitleLabel.frame = CGRect(x: 0, y: w + 40, width: w, height: 16)
+        self.titleLabel.frame = CGRect(x: 0, y: w + 8.0, width: w, height: 18.0)
+        self.subtitleLabel.frame = CGRect(x: 0, y: self.titleLabel.frame.maxY + 2.0, width: w, height: 16.0)
     }
     
     func configure(album: SGDoxAlbum) {
         self.currentAlbumId = album.id
         self.titleLabel.text = album.title
-        var subParts: [String] = []
-        if let rel = album.releaseDate, rel.count >= 4 {
-            subParts.append(String(rel.prefix(4)))
-        }
-        if album.trackCount > 0 {
-            subParts.append("\(album.trackCount) тр.")
-        }
-        self.subtitleLabel.text = subParts.joined(separator: " • ")
+        let yearStr = album.releaseDate.flatMap { $0.count >= 4 ? String($0.prefix(4)) : nil } ?? ""
+        let catStr = album.trackCount <= 1 ? "Сингл" : "Альбом"
+        self.subtitleLabel.text = yearStr.isEmpty ? catStr : "\(catStr) • \(yearStr)"
         
         self.artworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
         if let artUrl = album.artworkUrl {
             SGDoxImageLoader.shared.loadImage(urlString: artUrl) { [weak self] image in
-                if self?.currentAlbumId == album.id, let image = image {
-                    self?.artworkImageView.image = image
-                }
+                guard let self = self, self.currentAlbumId == album.id, let image = image else { return }
+                UIView.transition(with: self.artworkImageView, duration: 0.22, options: .transitionCrossDissolve, animations: {
+                    self.artworkImageView.image = image
+                })
             }
         }
+        self.setNeedsLayout()
     }
 }

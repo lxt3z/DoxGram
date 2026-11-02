@@ -987,30 +987,28 @@ public final class AppleMusicService: @unchecked Sendable {
         let lookupBox = ArtistLookupBox()
         
         // Fetch real artist avatar from Deezer concurrently
-        if let encoded = artistName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-           let dUrl = URL(string: "https://api.deezer.com/search/artist?q=\(encoded)&limit=1") {
+        let clean = artistName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let primaryArtist = clean.components(separatedBy: CharacterSet(charactersIn: ",/&;")).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? clean
+        if let encoded = primaryArtist.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+           let dUrl = URL(string: "https://api.deezer.com/search/artist?q=\(encoded)&limit=3") {
             group.enter()
             var dReq = URLRequest(url: dUrl)
-            dReq.timeoutInterval = 3.5
+            dReq.timeoutInterval = 7.0
             URLSession.shared.dataTask(with: dReq) { dData, _, _ in
                 defer { group.leave() }
                 guard let dData = dData,
                       let json = try? JSONSerialization.jsonObject(with: dData) as? [String: Any],
                       let dataList = json["data"] as? [[String: Any]],
                       let first = dataList.first else { return }
-                let dName = (first["name"] as? String)?.lowercased() ?? ""
-                let clean = artistName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                if dName == clean || dName.contains(clean) || clean.contains(dName) {
-                    let pic = (first["picture_xl"] as? String) ?? (first["picture_big"] as? String) ?? (first["picture_medium"] as? String)
-                    lookupBox.setDeezerPhoto(pic)
-                }
+                let pic = (first["picture_xl"] as? String) ?? (first["picture_big"] as? String) ?? (first["picture_medium"] as? String)
+                lookupBox.setDeezerPhoto(pic)
             }.resume()
         }
         
         if let sUrl = songsUrl {
             group.enter()
             var sReq = URLRequest(url: sUrl)
-            sReq.timeoutInterval = 4.0
+            sReq.timeoutInterval = 8.0
             URLSession.shared.dataTask(with: sReq) { [weak self] data, _, _ in
                 defer { group.leave() }
                 guard let self = self, let data = data,
@@ -1025,7 +1023,7 @@ public final class AppleMusicService: @unchecked Sendable {
         if let aUrl = albumsUrl {
             group.enter()
             var aReq = URLRequest(url: aUrl)
-            aReq.timeoutInterval = 4.0
+            aReq.timeoutInterval = 8.0
             URLSession.shared.dataTask(with: aReq) { data, _, _ in
                 defer { group.leave() }
                 guard let data = data,
