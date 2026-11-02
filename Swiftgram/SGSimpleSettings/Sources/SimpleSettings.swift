@@ -123,6 +123,10 @@ public class SGSimpleSettings {
         get { return UserDefaults.standard.string(forKey: "dox_profile_track_artwork_url") }
         set { UserDefaults.standard.set(newValue, forKey: "dox_profile_track_artwork_url") }
     }
+    public var doxProfileTrackDuration: Int {
+        get { return UserDefaults.standard.integer(forKey: "dox_profile_track_duration") }
+        set { UserDefaults.standard.set(newValue, forKey: "dox_profile_track_duration") }
+    }
     
     public enum Keys: String, CaseIterable {
         case hidePhoneInSettings
