@@ -4,7 +4,6 @@ import SGSimpleSettings
 import AsyncDisplayKit
 import Display
 import TelegramCore
-import Postbox
 import AvatarNode
 import AccountContext
 import SwiftSignalKit
@@ -219,7 +218,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             let duration = Int(SGSimpleSettings.shared.doxProfileTrackDuration)
             let audioAttr = TelegramMediaFileAttribute.Audio(isVoice: false, duration: duration > 0 ? duration : 180, title: title, performer: artist, waveform: nil)
             return TelegramMediaFile(
-                fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: 999999),
+                fileId: EngineMedia.Id(namespace: Namespaces.Media.LocalFile, id: 999999),
                 partialReference: nil,
                 resource: EmptyMediaResource(),
                 previewRepresentations: [],
