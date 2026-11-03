@@ -643,6 +643,18 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.notifyStateChanged()
     }
     
+    public func playNext(track: SGDoxMusicTrack) {
+        self.queue.removeAll(where: { $0.id == track.id })
+        self.queue.insert(track, at: 0)
+        self.notifyStateChanged()
+    }
+    
+    public func addToQueue(track: SGDoxMusicTrack) {
+        guard !self.queue.contains(where: { $0.id == track.id }) else { return }
+        self.queue.append(track)
+        self.notifyStateChanged()
+    }
+    
     // MARK: - Playback
     
     public func playPinnedProfileTrack() {

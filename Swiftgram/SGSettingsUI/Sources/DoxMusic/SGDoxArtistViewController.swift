@@ -607,8 +607,7 @@ public final class SGDoxArtistViewController: ViewController, UITableViewDataSou
     }
     
     @objc private func sharePressed() {
-        let shareText = "\(self.artistName)
-Слушайте в DoxMusic"
+        let shareText = "\(self.artistName)\nСлушайте в DoxMusic"
         let activityVc = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
         activityVc.popoverPresentationController?.sourceView = self.shareButton
         activityVc.popoverPresentationController?.sourceRect = self.shareButton.bounds
