@@ -60,6 +60,7 @@ public final class ChatMessageHiddenAdBubbleContentNode: ChatMessageBubbleConten
         
         return { item, layoutConstants, _, _, constrainedSize, _ in
             let contentProperties = ChatMessageBubbleContentProperties(
+                hidesHeaders: true,
                 hidesSimpleAuthorHeader: true,
                 headerSpacing: 0.0,
                 hidesBackground: .always,

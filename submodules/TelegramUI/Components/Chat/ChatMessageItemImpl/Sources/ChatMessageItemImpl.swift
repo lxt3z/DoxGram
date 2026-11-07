@@ -19,6 +19,7 @@ import ChatMessageItemView
 import ChatMessageStickerItemNode
 import ChatMessageAnimatedStickerItemNode
 import ChatMessageBubbleItemNode
+import ChatMessageBubbleContentNode
 
 public final class ChatMessageItemImpl: ChatMessageItem, CustomStringConvertible {
     public let presentationData: ChatPresentationData
@@ -276,8 +277,18 @@ public final class ChatMessageItemImpl: ChatMessageItem, CustomStringConvertible
         }
         self.avatarHeader = avatarHeader
         
+        var isSelfHiddenAd = false
+        if SGSimpleSettings.shared.hideChannelAds {
+            for (message, _) in content {
+                if SGAdDetector.isAd(message) && !SGAdFilterState.shared.isRevealed(message.id) {
+                    isSelfHiddenAd = true
+                    break
+                }
+            }
+        }
+
         var headers: [ListViewItemHeader] = []
-        if !self.disableDate {
+        if !self.disableDate && !isSelfHiddenAd {
             headers.append(self.dateHeader)
             if let topicHeader = self.topicHeader {
                 headers.append(topicHeader)
@@ -289,7 +300,7 @@ public final class ChatMessageItemImpl: ChatMessageItem, CustomStringConvertible
         if !controllerInteraction.chatIsRotated {
             headers = []
         }
-        if let avatarHeader = self.avatarHeader {
+        if let avatarHeader = self.avatarHeader, !isSelfHiddenAd {
             headers.append(avatarHeader)
         }
         self.headers = headers
@@ -441,6 +452,18 @@ public final class ChatMessageItemImpl: ChatMessageItem, CustomStringConvertible
     }
     
     public func merged(with neighbors: ChatHistoryItemNeighbors, isRotated: Bool) -> (top: ChatMessageMerge, bottom: ChatMessageMerge, dateAtBottom: ChatMessageHeaderSpec) {
+        if SGSimpleSettings.shared.hideChannelAds {
+            var isSelfHiddenAd = false
+            for (message, _) in self.content {
+                if SGAdDetector.isAd(message) && !SGAdFilterState.shared.isRevealed(message.id) {
+                    isSelfHiddenAd = true
+                    break
+                }
+            }
+            if isSelfHiddenAd {
+                return (.none, .none, ChatMessageHeaderSpec(hasDate: false, hasTopic: false))
+            }
+        }
         var top = neighbors.previous
         var bottom = neighbors.next
         if !isRotated {

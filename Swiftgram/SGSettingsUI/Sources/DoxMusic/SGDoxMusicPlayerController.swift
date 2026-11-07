@@ -1,10 +1,45 @@
 // MARK: - Capsule Slider
 final class SGDoxCapsuleSlider: UISlider {
     var trackHeight: CGFloat = 5.0
+    var showsThumb: Bool = false
     
     override func trackRect(forBounds bounds: CGRect) -> CGRect {
         let h = self.isTracking ? (self.trackHeight + 2.5) : self.trackHeight
         return CGRect(x: bounds.origin.x, y: bounds.origin.y + (bounds.size.height - h) * 0.5, width: bounds.size.width, height: h)
+    }
+    
+    override func thumbRect(forBounds bounds: CGRect, trackRect rect: CGRect, value: Float) -> CGRect {
+        if !self.showsThumb {
+            return CGRect(x: 0, y: 0, width: 0, height: 0)
+        }
+        let superRect = super.thumbRect(forBounds: bounds, trackRect: rect, value: value)
+        return CGRect(x: superRect.midX - 2.0, y: rect.midY - 6.0, width: 4.0, height: 12.0)
+    }
+    
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        return self.bounds.insetBy(dx: -10, dy: -15).contains(point)
+    }
+    
+    override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        let pt = touch.location(in: self)
+        let total = self.bounds.width
+        if total > 0 {
+            let ratio = max(0.0, min(1.0, Float(pt.x / total)))
+            self.setValue(self.minimumValue + ratio * (self.maximumValue - self.minimumValue), animated: false)
+            self.sendActions(for: .valueChanged)
+        }
+        return true
+    }
+    
+    override func continueTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        let pt = touch.location(in: self)
+        let total = self.bounds.width
+        if total > 0 {
+            let ratio = max(0.0, min(1.0, Float(pt.x / total)))
+            self.setValue(self.minimumValue + ratio * (self.maximumValue - self.minimumValue), animated: false)
+            self.sendActions(for: .valueChanged)
+        }
+        return true
     }
 }
 
@@ -46,6 +81,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     // Top Grabber
     private let grabberView = UIView()
+    private let grabberContainerView = UIView()
     
     // Hidden System Volume Controller & Route Picker
     private let hiddenVolumeView = MPVolumeView(frame: CGRect(x: -2000, y: -2000, width: 1, height: 1))
@@ -491,7 +527,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 self.view.transform = CGAffineTransform(translationX: 0, y: rubberBand)
             }
         case .ended, .cancelled:
-            if translation.y > 150 || velocity.y > 600 {
+            if translation.y > 75 || velocity.y > 250 {
                 self.dismiss(animated: true)
             } else {
                 UIView.animate(withDuration: 0.32, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.curveEaseOut], animations: {
@@ -570,6 +606,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.grabberView.isUserInteractionEnabled = true
         self.grabberView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.dismissPressed)))
         self.view.addSubview(self.grabberView)
+        
+        self.grabberContainerView.backgroundColor = .clear
+        self.grabberContainerView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.dismissPressed)))
+        self.view.addSubview(self.grabberContainerView)
         
         // Hidden System Volume View
         self.view.addSubview(self.hiddenVolumeView)
@@ -658,8 +698,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.progressSlider.maximumValue = 1.0
         self.progressSlider.minimumTrackTintColor = .white
         self.progressSlider.maximumTrackTintColor = UIColor(white: 1.0, alpha: 0.20)
-        self.progressSlider.setThumbImage(UIImage(), for: .normal)
-        self.progressSlider.setThumbImage(UIImage(), for: .highlighted)
+        self.progressSlider.showsThumb = false
+        let transparentThumb = self.generateTransparentThumb()
+        self.progressSlider.setThumbImage(transparentThumb, for: .normal)
+        self.progressSlider.setThumbImage(transparentThumb, for: .highlighted)
+        self.progressSlider.setThumbImage(transparentThumb, for: .selected)
+        self.progressSlider.setThumbImage(transparentThumb, for: .disabled)
         self.progressSlider.addTarget(self, action: #selector(self.sliderTouchBegan), for: .touchDown)
         self.progressSlider.addTarget(self, action: #selector(self.sliderValueChanged), for: .valueChanged)
         self.progressSlider.addTarget(self, action: #selector(self.sliderTouchEnded), for: [.touchUpInside, .touchUpOutside])
@@ -906,14 +950,18 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         if let capSlider = slider as? SGDoxCapsuleSlider {
             capSlider.trackHeight = 7.0
+            capSlider.showsThumb = false
         }
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
         slider.value = self.currentActualVolume()
         slider.minimumTrackTintColor = UIColor(white: 1.0, alpha: 0.80)
         slider.maximumTrackTintColor = UIColor(white: 1.0, alpha: 0.22)
-        slider.setThumbImage(UIImage(), for: .normal)
-        slider.setThumbImage(UIImage(), for: .highlighted)
+        let volThumb = self.generateTransparentThumb()
+        slider.setThumbImage(volThumb, for: .normal)
+        slider.setThumbImage(volThumb, for: .highlighted)
+        slider.setThumbImage(volThumb, for: .selected)
+        slider.setThumbImage(volThumb, for: .disabled)
         slider.addTarget(self, action: #selector(self.volumeChanged(_:)), for: .valueChanged)
         container.addSubview(slider)
         
@@ -956,20 +1004,15 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         container.addSubview(queueBtn)
     }
     
-    private func generateScrubbingThumb() -> UIImage {
-        let size = CGSize(width: 4.0, height: 16.0)
-        let pad: CGFloat = 4.0
-        let totalW = size.width + pad * 2.0
-        let totalH = size.height + pad * 2.0
-        UIGraphicsBeginImageContextWithOptions(CGSize(width: totalW, height: totalH), false, 0.0)
-        let ctx = UIGraphicsGetCurrentContext()
-        ctx?.setFillColor(UIColor.white.cgColor)
-        let rect = CGRect(x: pad, y: pad, width: size.width, height: size.height)
-        let path = UIBezierPath(roundedRect: rect, cornerRadius: 2.0)
-        path.fill()
+    private func generateTransparentThumb() -> UIImage {
+        UIGraphicsBeginImageContextWithOptions(CGSize(width: 1, height: 1), false, 0.0)
         let img = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
         UIGraphicsEndImageContext()
         return img
+    }
+    
+    private func generateScrubbingThumb() -> UIImage {
+        return self.generateTransparentThumb()
     }
     
     // MARK: - Layout Implementation
@@ -996,7 +1039,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }()
         let topSafe = max(safeArea.top, self.view.safeAreaInsets.top, self.validLayout?.safeInsets.top ?? 0, statusBarH, winSafeTop, 52.0)
         let grabberY = topSafe + 6.0
-        self.grabberView.frame = CGRect(x: (bounds.width - 38.0) * 0.5, y: grabberY, width: 38.0, height: 5.0)
+        self.grabberView.frame = CGRect(x: (bounds.width - 40.0) * 0.5, y: grabberY, width: 40.0, height: 5.0)
+        self.grabberContainerView.frame = CGRect(x: (bounds.width - 120.0) * 0.5, y: grabberY - 14.0, width: 120.0, height: 44.0)
         
         let effectiveTop = topSafe + 28.0
         
@@ -1010,7 +1054,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Central Content Area between top safe area and bottom controls
         let contentY = effectiveTop
-        let contentH = max(100.0, bottomControlsY - contentY - 8.0)
+        let contentH = max(100.0, bottomControlsY - contentY - 2.0)
         let contentFrame = CGRect(x: 0, y: contentY, width: bounds.width, height: contentH)
         
         self.nowPlayingContainerView.frame = contentFrame
@@ -1090,14 +1134,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         guard bounds.width > 0 && bounds.height > 0 else { return }
         
         let infoH: CGFloat = 52.0
-        // Position title and artist comfortably lower, sitting 20pt above the bottom scrubber
-        let infoBottomGap: CGFloat = 20.0
+        // Position title and artist comfortably lower, sitting 6pt above the bottom scrubber
+        let infoBottomGap: CGFloat = 6.0
         let infoY = max(80.0, bounds.height - infoH - infoBottomGap)
         
-        let availableArtHeight = max(100.0, infoY - 24.0)
+        let availableArtHeight = max(100.0, infoY - 14.0)
         let artSide = min(bounds.width - 56.0, availableArtHeight)
         let artX = (bounds.width - artSide) * 0.5
-        let artY = max(6.0, (infoY - artSide) * 0.5)
+        let artY = max(4.0, (infoY - artSide) * 0.5)
         
         self.artworkContainerView.frame = CGRect(x: artX, y: artY, width: artSide, height: artSide)
         self.artworkImageView.frame = self.artworkContainerView.bounds
@@ -1583,8 +1627,9 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         var effectiveLyrics = lyrics
         if effectiveLyrics.lines.isEmpty, let plain = effectiveLyrics.plainLyrics, !plain.isEmpty {
-            let dur = SGDoxMusicManager.shared.currentTrack?.duration ?? 180.0
-            effectiveLyrics.adjustTimestampsForDuration(dur)
+            let dur = SGDoxMusicManager.shared.currentTrack?.duration ?? SGDoxMusicManager.shared.duration
+            let effectiveDur = dur > 10.0 ? dur : 180.0
+            effectiveLyrics.adjustTimestampsForDuration(effectiveDur)
             self.currentLyrics = effectiveLyrics
         }
         
@@ -1594,9 +1639,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             self.lyricsTableView.reloadData()
             self.updateLyricsMask()
         } else if let plain = effectiveLyrics.plainLyrics, !plain.isEmpty {
-            self.lyricsTableView.isHidden = true
-            self.lyricsPlainTextView.isHidden = false
-            self.lyricsPlainTextView.text = plain
+            effectiveLyrics.adjustTimestampsForDuration(180.0)
+            self.currentLyrics = effectiveLyrics
+            self.lyricsTableView.isHidden = false
+            self.lyricsPlainTextView.isHidden = true
+            self.lyricsTableView.reloadData()
+            self.updateLyricsMask()
         } else {
             self.showLyricsStatus("Текст песни пуст")
         }
@@ -1882,35 +1930,57 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         guard let track = SGDoxMusicManager.shared.currentTrack else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         
-        let isProfilePinned = SGSimpleSettings.shared.doxProfileTrackId == track.id
-        if isProfilePinned {
-            SGSimpleSettings.shared.doxProfileTrackId = ""
-            SGSimpleSettings.shared.doxProfileTrackTitle = ""
-            SGSimpleSettings.shared.doxProfileTrackArtist = ""
-            SGSimpleSettings.shared.doxProfileTrackArtworkUrl = ""
-            SGSimpleSettings.shared.doxProfileTrackDuration = 0
-            NotificationCenter.default.post(name: NSNotification.Name("SGDoxProfileTrackUpdated"), object: nil)
-            
-            let overlay = UndoOverlayController(presentationData: self.presentationData, content: .actionSucceeded(title: nil, text: "Музыка удалена из профиля", cancel: nil, destructive: true), elevatedLayout: false, action: { _ in return false })
-            self.present(overlay, in: .window(.root))
+        if let file = track.telegramFile {
+            let _ = (self.context.engine.peers.addSavedMusic(file: file)
+            |> deliverOnMainQueue).start(next: { [weak self] _ in
+                guard let self = self else { return }
+                let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Peer Info/SavedMusic"), color: .white) ?? UIImage()
+                let overlay = UndoOverlayController(
+                    presentationData: self.presentationData,
+                    content: .universalImage(
+                        image: iconImage,
+                        size: nil,
+                        title: nil,
+                        text: self.presentationData.strings.MediaPlayer_SavedMusic_AddedToProfile,
+                        customUndoText: self.presentationData.strings.MediaPlayer_SavedMusic_AddedToProfile_View,
+                        timeout: 3.0
+                    ),
+                    elevatedLayout: false,
+                    action: { [weak self] action in
+                        if let self = self, case .undo = action {
+                            let _ = (self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: self.context.account.peerId))
+                            |> deliverOnMainQueue).start(next: { [weak self] peer in
+                                guard let self = self, let peer = peer else { return }
+                                if let controller = self.context.sharedContext.makePeerInfoController(
+                                    context: self.context,
+                                    updatedPresentationData: nil,
+                                    peer: peer,
+                                    mode: .myProfile,
+                                    avatarInitiallyExpanded: false,
+                                    fromChat: false,
+                                    requestsContext: nil
+                                ) {
+                                    if let topNav = self.context.sharedContext.mainWindow?.viewController as? NavigationController {
+                                        self.dismiss(animated: true) {
+                                            topNav.pushViewController(controller)
+                                        }
+                                    }
+                                }
+                            })
+                        }
+                        return true
+                    }
+                )
+                self.present(overlay, in: .window(.root))
+            })
         } else {
-            SGSimpleSettings.shared.doxProfileTrackId = track.id
-            SGSimpleSettings.shared.doxProfileTrackTitle = track.title
-            SGSimpleSettings.shared.doxProfileTrackArtist = track.artist
-            SGSimpleSettings.shared.doxProfileTrackArtworkUrl = track.artworkUrl
-            SGSimpleSettings.shared.doxProfileTrackDuration = Int(track.duration)
-            NotificationCenter.default.post(name: NSNotification.Name("SGDoxProfileTrackUpdated"), object: nil)
-            
-            let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Peer Info/SavedMusic"), color: .white) ?? UIImage()
             let overlay = UndoOverlayController(
                 presentationData: self.presentationData,
-                content: .universalImage(
-                    image: iconImage,
-                    size: nil,
-                    title: nil,
-                    text: self.presentationData.strings.MediaPlayer_SavedMusic_AddedToProfile,
-                    customUndoText: nil,
-                    timeout: 3.0
+                content: .info(
+                    title: "Закрепление в профиле",
+                    text: "Для добавления в профиль Telegram трек должен быть отправлен в чат Telegram как аудиофайл",
+                    timeout: 4.0,
+                    customUndoText: nil
                 ),
                 elevatedLayout: false,
                 action: { _ in return false }
@@ -2053,8 +2123,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     
     @objc private func sliderTouchEnded() {
         self.isDraggingSlider = false
-        self.progressSlider.setThumbImage(UIImage(), for: .normal)
-        self.progressSlider.setThumbImage(UIImage(), for: .highlighted)
+        self.progressSlider.showsThumb = false
+        let transparentThumb = self.generateTransparentThumb()
+        self.progressSlider.setThumbImage(transparentThumb, for: .normal)
+        self.progressSlider.setThumbImage(transparentThumb, for: .highlighted)
+        self.progressSlider.setThumbImage(transparentThumb, for: .selected)
+        self.progressSlider.setThumbImage(transparentThumb, for: .disabled)
         let isPlaying = SGDoxMusicManager.shared.isPlaying
         UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.72, initialSpringVelocity: 0.6, options: [.allowUserInteraction], animations: {
             if self.currentMode == .nowPlaying {
@@ -2316,38 +2390,19 @@ private func splitTextIntoLines(text: String, font: UIFont, width: CGFloat) -> [
     return lines.isEmpty ? [cleanText] : lines
 }
 
-// MARK: - SGDoxLyricsLineView (Continuous Liquid Gradient Sweep)
+// MARK: - SGDoxLyricsLineView (Clean Apple Music Typography, No Rectangular Mask)
 private final class SGDoxLyricsLineView: UIView {
-    private let baseLabel = UILabel()
-    private let glowLabel = UILabel()
-    private let maskLayer = CAGradientLayer()
+    private let label = UILabel()
     
     override init(frame: CGRect) {
         super.init(frame: frame)
         self.clipsToBounds = false
         
-        self.baseLabel.font = SGDoxLyricsCell.font
-        self.baseLabel.textColor = UIColor(white: 1.0, alpha: 0.32)
-        self.baseLabel.numberOfLines = 1
-        self.baseLabel.lineBreakMode = .byClipping
-        self.addSubview(self.baseLabel)
-        
-        self.glowLabel.font = SGDoxLyricsCell.font
-        self.glowLabel.textColor = .white
-        self.glowLabel.numberOfLines = 1
-        self.glowLabel.lineBreakMode = .byClipping
-        
-        self.maskLayer.startPoint = CGPoint(x: 0.0, y: 0.5)
-        self.maskLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
-        self.maskLayer.colors = [
-            UIColor.black.cgColor,
-            UIColor.black.cgColor,
-            UIColor.clear.cgColor,
-            UIColor.clear.cgColor
-        ]
-        self.maskLayer.locations = [0.0, 0.0, 0.0, 1.0]
-        self.glowLabel.layer.mask = self.maskLayer
-        self.addSubview(self.glowLabel)
+        self.label.font = SGDoxLyricsCell.font
+        self.label.textColor = UIColor(white: 1.0, alpha: 0.35)
+        self.label.numberOfLines = 1
+        self.label.lineBreakMode = .byClipping
+        self.addSubview(self.label)
     }
     
     required init?(coder: NSCoder) {
@@ -2355,45 +2410,23 @@ private final class SGDoxLyricsLineView: UIView {
     }
     
     func setText(_ text: String) {
-        self.baseLabel.text = text
-        self.glowLabel.text = text
+        self.label.text = text
     }
     
     func setProgress(_ progress: Double, isActive: Bool) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        
         if !isActive {
-            self.glowLabel.isHidden = true
-            self.baseLabel.textColor = UIColor(white: 1.0, alpha: 0.32)
-            self.maskLayer.locations = [0.0, 0.0, 0.0, 1.0]
-            CATransaction.commit()
+            self.label.textColor = UIColor(white: 1.0, alpha: 0.35)
+            self.label.alpha = 0.35
             return
         }
         
-        self.glowLabel.isHidden = false
-        self.baseLabel.textColor = UIColor(white: 1.0, alpha: 0.32)
-        
-        let p = max(0.0, min(1.0, progress))
-        if p <= 0.0001 {
-            self.maskLayer.locations = [0.0, 0.0, 0.0, 1.0]
-        } else if p >= 0.9999 {
-            self.maskLayer.locations = [0.0, 1.0, 1.0, 1.0]
-        } else {
-            let w = max(1.0, self.bounds.width)
-            let feather = min(0.20, max(0.04, 28.0 / w))
-            let stop1 = max(0.0, p - feather * 0.5)
-            let stop2 = min(1.0, p + feather * 0.5)
-            self.maskLayer.locations = [0.0, NSNumber(value: Float(stop1)), NSNumber(value: Float(stop2)), 1.0]
-        }
-        CATransaction.commit()
+        self.label.textColor = .white
+        self.label.alpha = 1.0
     }
     
     override func layoutSubviews() {
         super.layoutSubviews()
-        self.baseLabel.frame = self.bounds
-        self.glowLabel.frame = self.bounds
-        self.maskLayer.frame = self.bounds
+        self.label.frame = self.bounds
     }
 }
 

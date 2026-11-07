@@ -518,7 +518,7 @@ public final class SGDoxMusicManager: NSObject, @unchecked Sendable {
         self.hasSyncedAudioStart = false
         
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
-        let intervalMs = self.isInBackground ? 1500 : 500
+        let intervalMs = self.isInBackground ? 1000 : 100
         timer.schedule(deadline: .now(), repeating: .milliseconds(intervalMs))
         timer.setEventHandler { [weak self] in
             guard let self = self, self.isPlaying else { return }

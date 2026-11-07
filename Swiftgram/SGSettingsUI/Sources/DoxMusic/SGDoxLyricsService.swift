@@ -37,12 +37,15 @@ public struct SGDoxLyrics: Equatable, Codable, Sendable {
     }
     
     public mutating func adjustTimestampsForDuration(_ duration: Double) {
-        guard let plain = self.plainText, !plain.isEmpty, duration > 10.0 else { return }
+        guard let plain = self.plainText, !plain.isEmpty else { return }
         let raw = plain.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         guard !raw.isEmpty else { return }
-        let step = max(2.2, (duration - 4.0) / Double(raw.count))
+        let totalDur = duration > 10.0 ? duration : 180.0
+        let introOffset: Double = min(8.0, max(2.0, totalDur * 0.05))
+        let singingDuration = max(10.0, totalDur - introOffset - 4.0)
+        let step = singingDuration / Double(raw.count)
         self.lines = raw.enumerated().map { i, text in
-            SGDoxLyricsLine(timestamp: Double(i) * step, text: text)
+            SGDoxLyricsLine(timestamp: introOffset + Double(i) * step, text: text)
         }
     }
 }

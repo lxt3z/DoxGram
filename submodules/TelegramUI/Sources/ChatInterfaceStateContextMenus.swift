@@ -1615,16 +1615,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        if (loggingSettings.logToFile || loggingSettings.logToConsole) && !downloadableMediaResourceInfos.isEmpty {
-            actions.append(.action(ContextMenuActionItem(text: "Send Logs", icon: { theme in
-                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Message"), color: theme.actionSheet.primaryTextColor)
-            }, action: { _, f in
-                triggerDebugSendLogsUI(context: context, additionalInfo: "User has requested download logs for \(downloadableMediaResourceInfos)", pushController: { c in
-                    controllerInteraction.navigationController()?.pushViewController(c)
-                })
-                f(.default)
-            })))
-        }
+
         
 
         
@@ -1633,7 +1624,9 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         ayuDateFormatter.locale = Locale(identifier: isRu ? "ru_RU" : "en_US")
         ayuDateFormatter.dateFormat = isRu ? "d MMMM, HH:mm" : "MMMM d, HH:mm"
 
-        if SGAyugramStorage.shared.hasEditHistory(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id) {
+        let hasLocalEditHistory = SGAyugramStorage.shared.hasEditHistory(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
+        let editedAttr = message.attributes.first(where: { $0 is EditedMessageAttribute }) as? EditedMessageAttribute
+        if hasLocalEditHistory || editedAttr != nil {
             let historyTitle = isRu ? "История изменений" : "Edit History"
             let editHistoryAction: ContextMenuItem = .action(ContextMenuActionItem(text: historyTitle, icon: { theme in
                 return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.actionSheet.primaryTextColor)
@@ -1641,11 +1634,18 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                 c?.dismiss(completion: {
                     let history = SGAyugramStorage.shared.getEditHistory(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
                     var sections: [String] = []
-                    for item in history {
-                        let dateStr = ayuDateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(item.timestamp)))
-                        sections.append("\(dateStr)\n\"\(item.text)\"")
+                    if !history.isEmpty {
+                        for (idx, item) in history.enumerated() {
+                            let dateStr = ayuDateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(item.timestamp)))
+                            let revLabel = isRu ? "Редакция \(idx + 1) (\(dateStr)):" : "Revision \(idx + 1) (\(dateStr)):"
+                            sections.append("\(revLabel)\n\"\(item.text)\"")
+                        }
+                    } else if let attr = editedAttr {
+                        let dateStr = ayuDateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(attr.date)))
+                        let note = isRu ? "Сообщение изменено \(dateStr).\nПредыдущая версия была отправлена до запуска сохранения истории." : "Message edited on \(dateStr).\nPrevious version was sent before edit history tracking was active."
+                        sections.append(note)
                     }
-                    let currentLabel = isRu ? "Текущая версия" : "Current version"
+                    let currentLabel = isRu ? "Текущая версия:" : "Current version:"
                     sections.append("\(currentLabel)\n\"\(message.text)\"")
                     let historyText = sections.joined(separator: "\n\n")
 

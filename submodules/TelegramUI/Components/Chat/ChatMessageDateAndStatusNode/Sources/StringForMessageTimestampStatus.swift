@@ -255,6 +255,10 @@ public func stringForMessageTimestampStatus(
     if SGAyugramStorage.shared.isDeleted(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id) {
         let deletedLabel = strings.baseLanguageCode.hasPrefix("ru") ? " • удалено" : " • deleted"
         dateText = "\(dateText)\(deletedLabel)"
+    } else if SGAyugramStorage.shared.hasEditHistory(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id) {
+        let count = SGAyugramStorage.shared.getEditHistory(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id).count
+        let editLabel = strings.baseLanguageCode.hasPrefix("ru") ? " • изм. (\(count))" : " • edited (\(count))"
+        dateText = "\(dateText)\(editLabel)"
     }
     
     return dateText

@@ -1945,9 +1945,15 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             }
         }
         
-        avatarInset = hasAvatar ? layoutConstants.avatarInset : 0.0
-        if isSidePanelOpen {
+        let isHiddenAd = SGSimpleSettings.shared.hideChannelAds && item.content.contains(where: { SGAdDetector.isAd($0.0) && !SGAdFilterState.shared.isRevealed($0.0.id) })
+        if isHiddenAd {
+            hasAvatar = false
             avatarInset = 0.0
+        } else {
+            avatarInset = hasAvatar ? layoutConstants.avatarInset : 0.0
+            if isSidePanelOpen {
+                avatarInset = 0.0
+            }
         }
         
         let isFailed = item.content.firstMessage.effectivelyFailed(timestamp: item.context.account.network.getApproximateRemoteTimestamp())
@@ -2291,7 +2297,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             }
         }
         
-        let isHiddenAd = SGSimpleSettings.shared.hideChannelAds && item.content.contains(where: { SGAdDetector.isAd($0.0) && !SGAdFilterState.shared.isRevealed($0.0.id) })
+        // isHiddenAd already resolved above
         if firstMessage.isRestricted(platform: "ios", contentSettings: item.context.currentContentSettings.with { $0 }) || isHiddenAd {
             replyMarkup = nil
         }
@@ -3862,18 +3868,23 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             layoutSize.height += 1.0 + actionButtonsSizeAndApply.0.height
         }
         
-        var layoutInsets = UIEdgeInsets(top: mergedTop.merged ? layoutConstants.bubble.mergedSpacing : layoutConstants.bubble.defaultSpacing, left: 0.0, bottom: mergedBottom.merged ? layoutConstants.bubble.mergedSpacing : layoutConstants.bubble.defaultSpacing, right: 0.0)
-        if dateHeaderAtBottom.hasDate && dateHeaderAtBottom.hasTopic {
-            layoutInsets.top += layoutConstants.timestampDateAndTopicHeaderHeight
+        var layoutInsets: UIEdgeInsets
+        if isHiddenAd {
+            layoutInsets = UIEdgeInsets(top: 3.0, left: 0.0, bottom: 3.0, right: 0.0)
         } else {
-            if dateHeaderAtBottom.hasDate {
-                layoutInsets.top += layoutConstants.timestampHeaderHeight
-            }
-            if dateHeaderAtBottom.hasTopic {
-                layoutInsets.top += layoutConstants.timestampHeaderHeight
-            }
-            if isAd {
-                layoutInsets.top += 4.0
+            layoutInsets = UIEdgeInsets(top: mergedTop.merged ? layoutConstants.bubble.mergedSpacing : layoutConstants.bubble.defaultSpacing, left: 0.0, bottom: mergedBottom.merged ? layoutConstants.bubble.mergedSpacing : layoutConstants.bubble.defaultSpacing, right: 0.0)
+            if dateHeaderAtBottom.hasDate && dateHeaderAtBottom.hasTopic {
+                layoutInsets.top += layoutConstants.timestampDateAndTopicHeaderHeight
+            } else {
+                if dateHeaderAtBottom.hasDate {
+                    layoutInsets.top += layoutConstants.timestampHeaderHeight
+                }
+                if dateHeaderAtBottom.hasTopic {
+                    layoutInsets.top += layoutConstants.timestampHeaderHeight
+                }
+                if isAd {
+                    layoutInsets.top += 4.0
+                }
             }
         }
         

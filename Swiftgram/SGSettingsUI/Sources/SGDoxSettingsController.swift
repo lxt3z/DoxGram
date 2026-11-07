@@ -202,17 +202,7 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     entries.append(.notice(id: id.count, section: .updates, text: isRu ? "Уведомления о выходе новых релизов DoxGram с описанием изменений и ссылкой на обновление." : "Notifications about new DoxGram releases with changelog and download link."))
 
 
-    // MARK: - Debug & Logs
-    entries.append(.header(id: id.count, section: .debug, text: i18n("Settings.Ayugram.DebugHeader", lang), badge: nil))
-    entries.append(.toggle(id: id.count, section: .debug, settingName: .ayugramDebugger, value: SGSimpleSettings.shared.ayugramDebugger, text: i18n("Settings.Ayugram.Debugger", lang), enabled: true))
-    let exportLogsTitle: String
-    if let size = SGAyugramLogger.getLogFileSize() {
-        exportLogsTitle = "\(i18n("Settings.Ayugram.ExportLogs", lang)) (\(size))"
-    } else {
-        exportLogsTitle = i18n("Settings.Ayugram.ExportLogs", lang)
-    }
-    entries.append(.disclosure(id: id.count, section: .debug, link: .ayugramExportLogs, text: exportLogsTitle))
-    entries.append(.disclosure(id: id.count, section: .debug, link: .ayugramClearLogs, text: i18n("Settings.Ayugram.ClearLogs", lang)))
+
 
     return entries
 }

@@ -212,24 +212,6 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         if let nativeFile = peerInfoProfileMusic(list: list, fullUserMusic: (screenData.cachedData as? CachedUserData)?.savedMusic) {
             return nativeFile
         }
-        if (peer.id == self.context.account.peerId || self.isMyProfile) && !SGSimpleSettings.shared.doxProfileTrackTitle.isEmpty {
-            let title = SGSimpleSettings.shared.doxProfileTrackTitle
-            let artist = SGSimpleSettings.shared.doxProfileTrackArtist
-            let duration = Int(SGSimpleSettings.shared.doxProfileTrackDuration)
-            let audioAttr = TelegramMediaFileAttribute.Audio(isVoice: false, duration: duration > 0 ? duration : 180, title: title, performer: artist, waveform: nil)
-            return TelegramMediaFile(
-                fileId: EngineMedia.Id(namespace: Namespaces.Media.LocalFile, id: 999999),
-                partialReference: nil,
-                resource: EmptyMediaResource(),
-                previewRepresentations: [],
-                videoThumbnails: [],
-                immediateThumbnailData: nil,
-                mimeType: "audio/mp4",
-                size: nil,
-                attributes: [audioAttr],
-                alternativeRepresentations: []
-            )
-        }
         return nil
     }
     

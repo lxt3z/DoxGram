@@ -317,6 +317,14 @@ public struct SGAdDetector {
     ]
 
     private static let vpnDirectKeywords: [String] = [
+        "freenet",
+        "фринет",
+        "создай собственный ускоритель интернета",
+        "собственный ускоритель интернета",
+        "ускоритель интернета",
+        "ускоритель тг",
+        "ускоритель телеграм",
+        "ускоритель telegram",
         "быстрый впн",
         "лучший впн",
         "бесплатный впн",
@@ -486,6 +494,30 @@ public struct SGAdDetector {
         "раздень подругу",
         "раздевает по фото",
         "раздеть по фото",
+        "найти девушку мечты в ии",
+        "найти девушку мечты",
+        "девушку мечты в ии",
+        "девушка мечты в ии",
+        "девушка мечты",
+        "все фуллы будут в старом канале",
+        "все фуллы будут старом канале",
+        "все фулы будут",
+        "фуллы в старом канале",
+        "фуллы в старом",
+        "с этой шлюшкой",
+        "этой шлюшкой",
+        "шлюшкой",
+        "как эту s#x-ии еще не удалили",
+        "как эту sex-ии еще не удалили",
+        "как эту секс-ии еще не удалили",
+        "s#x-ии",
+        "s#x ии",
+        "sex-ии",
+        "секс-ии",
+        "sex ии",
+        "секс ии",
+        "s#x",
+        "s*x",
         "слив тик-токерши",
         "слив тиктокерши",
         "сливы тиктокерш",
@@ -518,6 +550,103 @@ public struct SGAdDetector {
         "порно видео",
         "порнуха"
     ]
+
+    private static func mapMathScalarToAscii(_ val: UInt32) -> Character? {
+        let ranges: [(ClosedRange<UInt32>, UInt32)] = [
+            (0x1D400...0x1D419, 65), // Bold A-Z
+            (0x1D41A...0x1D433, 97), // Bold a-z
+            (0x1D434...0x1D44D, 65), // Italic A-Z
+            (0x1D44E...0x1D467, 97), // Italic a-z
+            (0x1D468...0x1D481, 65), // Bold Italic A-Z
+            (0x1D482...0x1D49B, 97), // Bold Italic a-z
+            (0x1D49C...0x1D4B5, 65), // Script A-Z
+            (0x1D4B6...0x1D4CF, 97), // Script a-z
+            (0x1D4D0...0x1D4E9, 65), // Bold Script A-Z
+            (0x1D4EA...0x1D503, 97), // Bold Script a-z
+            (0x1D504...0x1D51D, 65), // Fraktur A-Z
+            (0x1D51E...0x1D537, 97), // Fraktur a-z
+            (0x1D538...0x1D551, 65), // Double-struck A-Z
+            (0x1D552...0x1D56B, 97), // Double-struck a-z
+            (0x1D56C...0x1D585, 65), // Bold Fraktur A-Z
+            (0x1D586...0x1D59F, 97), // Bold Fraktur a-z
+            (0x1D5A0...0x1D5B9, 65), // Sans-serif A-Z
+            (0x1D5BA...0x1D5D3, 97), // Sans-serif a-z
+            (0x1D5D4...0x1D5ED, 65), // Sans-serif Bold A-Z
+            (0x1D5EE...0x1D607, 97), // Sans-serif Bold a-z
+            (0x1D608...0x1D621, 65), // Sans-serif Italic A-Z
+            (0x1D622...0x1D63B, 97), // Sans-serif Italic a-z
+            (0x1D63C...0x1D655, 65), // Sans-serif Bold Italic A-Z
+            (0x1D656...0x1D66F, 97), // Sans-serif Bold Italic a-z
+            (0x1D670...0x1D689, 65), // Monospace A-Z
+            (0x1D68A...0x1D6A3, 97), // Monospace a-z
+            (0x1D7CE...0x1D7D7, 48), // Digits 0-9
+            (0x1D7D8...0x1D7E1, 48),
+            (0x1D7E2...0x1D7EB, 48),
+            (0x1D7EC...0x1D7F5, 48),
+            (0x1D7F6...0x1D7FF, 48)
+        ]
+        for (range, base) in ranges {
+            if range.contains(val) {
+                if let scalar = UnicodeScalar(base + (val - range.lowerBound)) {
+                    return Character(scalar)
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func normalizeFontsAndHomoglyphs(_ text: String) -> (asciiText: String, cyrillicText: String) {
+        var asciiChars: [Character] = []
+        asciiChars.reserveCapacity(text.count)
+        
+        for scalar in text.unicodeScalars {
+            let val = scalar.value
+            if val >= 0x1D400 && val <= 0x1D7FF {
+                if let mapped = mapMathScalarToAscii(val) {
+                    asciiChars.append(mapped)
+                    continue
+                }
+            } else if val >= 0xFF01 && val <= 0xFF5E {
+                if let scalarAscii = UnicodeScalar(val - 0xFEE0) {
+                    asciiChars.append(Character(scalarAscii))
+                    continue
+                }
+            } else if val >= 0x24B6 && val <= 0x24CF {
+                if let scalarAscii = UnicodeScalar(val - 0x24B6 + 65) {
+                    asciiChars.append(Character(scalarAscii))
+                    continue
+                }
+            } else if val >= 0x24D0 && val <= 0x24E9 {
+                if let scalarAscii = UnicodeScalar(val - 0x24D0 + 97) {
+                    asciiChars.append(Character(scalarAscii))
+                    continue
+                }
+            }
+            asciiChars.append(Character(scalar))
+        }
+        
+        var lowered = String(asciiChars).lowercased()
+        
+        // Collapse symbol insertion like s#x -> sex, s*x -> sex, v.p.n -> vpn, v_p_n -> vpn
+        let symbolsToCollapse: [Character] = ["#", "*", "_", "-", ".", "/", "@", "$", "!", "—"]
+        for sym in symbolsToCollapse {
+            lowered = lowered.replacingOccurrences(of: String(sym), with: "")
+        }
+        
+        // Homoglyphs to Cyrillic
+        let latinToCyr: [Character: Character] = [
+            "a": "а", "b": "б", "c": "с", "e": "е", "k": "к", "m": "м",
+            "h": "н", "o": "о", "p": "р", "t": "т", "x": "х", "y": "у"
+        ]
+        var cyrChars: [Character] = []
+        cyrChars.reserveCapacity(lowered.count)
+        for ch in lowered {
+            cyrChars.append(latinToCyr[ch] ?? ch)
+        }
+        let cyrillicFolded = String(cyrChars)
+        
+        return (lowered, cyrillicFolded)
+    }
 
     private static func normalizeLeetspeak(_ text: String) -> String {
         let hasPotentialLeetspeak = text.unicodeScalars.contains { scalar in
@@ -591,19 +720,31 @@ public struct SGAdDetector {
 
         let result = evaluateIsAd(message)
 
-        cacheLock.lock()
-        if adCheckCache.count > 1000 {
-            adCheckCache.removeAll()
+        // Do not cache false if webpage preview is still pending
+        var hasPendingWebpage = false
+        for media in message.media {
+            if let webpage = media as? TelegramMediaWebpage, case .Pending = webpage.content {
+                hasPendingWebpage = true
+                break
+            }
         }
-        adCheckCache[message.id] = result
-        cacheLock.unlock()
+
+        if !hasPendingWebpage || result {
+            cacheLock.lock()
+            if adCheckCache.count > 1000 {
+                adCheckCache.removeAll()
+            }
+            adCheckCache[message.id] = result
+            cacheLock.unlock()
+        }
 
         return result
     }
 
     private static func evaluateIsAd(_ message: Message) -> Bool {
-        // Only target channel messages
-        guard message.id.peerId.namespace == Namespaces.Peer.CloudChannel else {
+        let isChannel = message.id.peerId.namespace == Namespaces.Peer.CloudChannel
+        let isGroup = message.id.peerId.namespace == Namespaces.Peer.CloudGroup
+        guard isChannel || isGroup else {
             return false
         }
         
@@ -640,10 +781,42 @@ public struct SGAdDetector {
         }
         
         let normalizedText = normalizeLeetspeak(fullText)
+        let (fontAscii, cyrillicFolded) = normalizeFontsAndHomoglyphs(fullText)
+        let allVariants = [fullText, normalizedText, fontAscii, cyrillicFolded]
         
-        // Adult, leaks & AI toy spam (with leetspeak normalization)
+        // Adult, leaks & AI girlfriend spam (with font, homoglyphs and leetspeak normalization)
         for keyword in adultAndLeakPromoKeywords {
-            if fullText.contains(keyword) || normalizedText.contains(keyword) {
+            if allVariants.contains(where: { $0.contains(keyword) }) {
+                return true
+            }
+        }
+
+        // White lists / "Белые списки" spam check (with context check to avoid false positives on legitimate mentions)
+        let hasWhiteListsMention = allVariants.contains(where: { $0.contains("белые списки") || $0.contains("белый список") || $0.contains("белых списков") || $0.contains("белых списках") })
+        if hasWhiteListsMention {
+            let whiteListPromoContext = [
+                "обход", "блокировк", "доступ", "инструкци", "подключ", "vpn", "впн", "vless", "outline",
+                "бот", "bot", "ссылк", "переходи", "канал", "вступай", "t.me/", "трафик", "сервер", "конфиг",
+                "купить", "бесплатно", "забирай", "настройк", "прокси", "proxy"
+            ]
+            let hasPromoAction = allVariants.contains(where: { text in
+                whiteListPromoContext.contains(where: { text.contains($0) })
+            }) || message.attributes.contains(where: { $0 is ReplyMarkupMessageAttribute })
+            if hasPromoAction {
+                return true
+            }
+        }
+
+        // VPN promotion check
+        let hasVpnWord = allVariants.contains(where: { $0.contains("vpn ") || $0.contains(" vpn") || $0.contains("впн ") || $0.contains(" впн") })
+        if hasVpnWord {
+            let vpnPromoContext = [
+                "подключ", "бот", "bot", "скачать", "быстрый", "бесплатн", "лучший", "vless", "outline", "shadowsocks",
+                "wireguard", "v2ray", "amnezia", "сервер", "конфиг", "доступ", "трафик", "интернет", "прокси", "proxy",
+                "канал", "ссылк", "переходи", "t.me/", "забирай", "скидк", "рубл", "руб/", "руб.", "месяц", "год", "безлимит"
+            ]
+            if allVariants.contains(where: { text in vpnPromoContext.contains(where: { text.contains($0) }) })
+                || message.attributes.contains(where: { $0 is ReplyMarkupMessageAttribute }) {
                 return true
             }
         }
@@ -663,7 +836,7 @@ public struct SGAdDetector {
         
         // 1. Official ad token / ERID marker
         for token in officialAdTokens {
-            if fullText.contains(token) || normalizedText.contains(token) {
+            if allVariants.contains(where: { $0.contains(token) }) {
                 return true
             }
         }
@@ -712,7 +885,7 @@ public struct SGAdDetector {
         
         // 5. VPN ads & disguised "TG not working?" promos
         for keyword in vpnDirectKeywords {
-            if fullText.contains(keyword) {
+            if allVariants.contains(where: { $0.contains(keyword) }) {
                 return true
             }
         }

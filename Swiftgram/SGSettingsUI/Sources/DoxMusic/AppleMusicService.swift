@@ -1061,7 +1061,37 @@ public final class AppleMusicService: @unchecked Sendable {
     
     public func fetchAlbumTracks(collectionId: String, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {
         let countries = ["KZ", "RU", "US"]
-        self.fetchAlbumTracksRecursive(collectionId: collectionId, countries: countries, index: 0, completion: completion)
+        let trimmed = collectionId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if Int64(trimmed) != nil {
+            self.fetchAlbumTracksRecursive(collectionId: trimmed, countries: countries, index: 0, completion: completion)
+        } else {
+            // Non-numeric collectionId (e.g. album title for collab / feat tracks): search album by term first
+            let cleanQuery = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
+            let searchUrl = "https://itunes.apple.com/search?term=\(cleanQuery)&entity=album&limit=1&country=KZ"
+            if let url = URL(string: searchUrl) {
+                var req = URLRequest(url: url)
+                req.timeoutInterval = 5.0
+                URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+                    guard let self = self else { return }
+                    var foundColId: String? = nil
+                    if let data = data,
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let results = json["results"] as? [[String: Any]],
+                       let first = results.first {
+                        if let cid = (first["collectionId"] as? Int64) ?? (first["collectionId"] as? Int).map(Int64.init) {
+                            foundColId = "\(cid)"
+                        }
+                    }
+                    if let foundColId = foundColId {
+                        self.fetchAlbumTracksRecursive(collectionId: foundColId, countries: countries, index: 0, completion: completion)
+                    } else {
+                        self.fetchAlbumTracksRecursive(collectionId: trimmed, countries: countries, index: 0, completion: completion)
+                    }
+                }.resume()
+            } else {
+                self.fetchAlbumTracksRecursive(collectionId: trimmed, countries: countries, index: 0, completion: completion)
+            }
+        }
     }
     
     private func fetchAlbumTracksRecursive(collectionId: String, countries: [String], index: Int, completion: @escaping @Sendable ([SGDoxMusicTrack]) -> Void) {

@@ -895,6 +895,17 @@ private func validateBatch(postbox: Postbox, network: Network, transaction: Tran
                                     
                                     transaction.updateMessage(id, update: { currentMessage in
                                         if updatedTimestamp != timestamp {
+                                            if SGSimpleSettings.shared.keepEditHistory {
+                                                if !previousMessage.text.isEmpty && previousMessage.text != message.text {
+                                                    SGAyugramStorage.shared.recordEdit(
+                                                        peerId: id.peerId.toInt64(),
+                                                        namespace: id.namespace,
+                                                        id: id.id,
+                                                        text: previousMessage.text,
+                                                        timestamp: timestamp
+                                                    )
+                                                }
+                                            }
                                             var updatedLocalTags = message.localTags
                                             if currentMessage.localTags.contains(.OutgoingLiveLocation) {
                                                 updatedLocalTags.insert(.OutgoingLiveLocation)
