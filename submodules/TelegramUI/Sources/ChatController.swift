@@ -7983,7 +7983,9 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         self.chatDisplayNode.historyNode.experimentalSnapScrollToItem = false
         self.chatDisplayNode.historyNode.canReadHistory.set(self.computedCanReadHistoryPromise.get())
         self.chatDisplayNode.historyNode.areContentAnimationsEnabled = true
-        self.chatDisplayNode.doxVideoWallpaperNode.play()
+        if self.context.sharedContext.energyUsageSettings.autoplayVideo && !ProcessInfo.processInfo.isLowPowerModeEnabled {
+            self.chatDisplayNode.doxVideoWallpaperNode.play()
+        }
         
         if !self.alwaysShowSearchResultsAsList {
             self.chatDisplayNode.loadInputPanels(theme: self.presentationInterfaceState.theme, strings: self.presentationInterfaceState.strings, fontSize: self.presentationInterfaceState.fontSize)
@@ -8389,6 +8391,11 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             |> distinctUntilChanged).startStrict(next: { [weak self] isPowerSavingEnabled in
                 guard let self else {
                     return
+                }
+                if isPowerSavingEnabled || !self.context.sharedContext.energyUsageSettings.autoplayVideo {
+                    self.chatDisplayNode.doxVideoWallpaperNode.pause()
+                } else if self.didAppear, self.view.window != nil, self.effectiveNavigationController?.topViewController === self {
+                    self.chatDisplayNode.doxVideoWallpaperNode.play()
                 }
                 var previousValueValue: Bool?
                 

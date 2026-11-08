@@ -180,6 +180,13 @@ public final class SGDoxAnimatedWallpaperManager {
         }
     }
     
+    private func removePoster(beside videoFile: URL) {
+        let poster = videoFile.deletingPathExtension().appendingPathExtension("poster.jpg")
+        if FileManager.default.fileExists(atPath: poster.path) {
+            try? FileManager.default.removeItem(at: poster)
+        }
+    }
+
     private func ensureDirectoryExists() {
         let dir = self.wallpapersDirectory
         if !FileManager.default.fileExists(atPath: dir.path) {
@@ -274,6 +281,7 @@ public final class SGDoxAnimatedWallpaperManager {
                 try FileManager.default.removeItem(at: destinationFile)
             }
             try FileManager.default.copyItem(at: sourceUrl, to: destinationFile)
+            self.removePoster(beside: destinationFile)
 
             self.queue.async {
                 var data = self.getStoredData()
@@ -524,6 +532,7 @@ public final class SGDoxAnimatedWallpaperManager {
                         try FileManager.default.removeItem(at: destinationFile)
                     }
                     try FileManager.default.moveItem(at: tempUrl, to: destinationFile)
+                    self.removePoster(beside: destinationFile)
 
                     self.queue.async {
                         var data = self.getStoredData()
@@ -563,6 +572,7 @@ public final class SGDoxAnimatedWallpaperManager {
             if let entry = data.removeValue(forKey: String(peerId)),
                let localPath = entry["localPath"] {
                 try? FileManager.default.removeItem(atPath: localPath)
+                self.removePoster(beside: URL(fileURLWithPath: localPath))
             }
             self.saveStoredData(data)
             

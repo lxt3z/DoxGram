@@ -1,27 +1,40 @@
 import Foundation
 import UIKit
+import ImageIO
+import CommonCrypto
 import MediaPlayer
 
 public final class SGDoxImageLoader: @unchecked Sendable {
     public static let shared = SGDoxImageLoader()
-    
+
+    /// Decoded-bitmap budget. Cost is width × height × 4, so this is real RAM, not JPEG size.
+    private static let memoryBudgetBytes = 24 * 1024 * 1024
+    /// On-disk artwork cap. Older files, including the pre-fix hash-named ones, are deleted past this.
+    private static let diskBudgetBytes: Int64 = 80 * 1024 * 1024
+    private static let maxPixelEdge: CGFloat = 600
+
     private let memoryCache = NSCache<NSString, UIImage>()
     private var placeholderCache: UIImage?
     private let session: URLSession
+    private let ioQueue = DispatchQueue(label: "org.doxgram.artwork.cache", qos: .utility)
     
     private init() {
-        self.memoryCache.countLimit = 50
-        self.memoryCache.totalCostLimit = 25 * 1024 * 1024 // 25 MB
+        self.memoryCache.countLimit = 40
+        self.memoryCache.totalCostLimit = Self.memoryBudgetBytes
         
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15.0
         config.timeoutIntervalForResource = 30.0
-        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.urlCache = URLCache(memoryCapacity: 2 * 1024 * 1024, diskCapacity: 0)
         config.httpAdditionalHeaders = [
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
             "Accept": "image/webp,image/png,image/jpeg,image/*;q=0.8"
         ]
         self.session = URLSession(configuration: config)
+        self.ioQueue.async { [weak self] in
+            self?.trimDiskCache()
+        }
         
         NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: nil) { [weak self] _ in
             self?.memoryCache.removeAllObjects()
@@ -58,10 +71,12 @@ public final class SGDoxImageLoader: @unchecked Sendable {
     
     @discardableResult
     public func saveImageToDisk(_ image: UIImage, name: String) -> URL? {
-        guard let dir = self.diskCacheDirectory, let data = image.jpegData(compressionQuality: 0.85) else { return nil }
+        let prepared = self.scaledImage(image, maxPixel: Self.maxPixelEdge)
+        guard let dir = self.diskCacheDirectory, let data = prepared.jpegData(compressionQuality: 0.82) else { return nil }
         let fileUrl = dir.appendingPathComponent(name)
         do {
             try data.write(to: fileUrl, options: .atomic)
+            self.noteDiskWrite()
             return fileUrl
         } catch {
             return nil
@@ -71,7 +86,7 @@ public final class SGDoxImageLoader: @unchecked Sendable {
     public func storeImage(_ image: UIImage, for key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        self.memoryCache.setObject(image, forKey: trimmed as NSString)
+        self.remember(image, forKey: trimmed as NSString)
     }
     
     public func cachedImage(for key: String) -> UIImage? {
@@ -81,10 +96,131 @@ public final class SGDoxImageLoader: @unchecked Sendable {
     }
     
     private func diskFileName(for key: String) -> String {
-        let clean = key.components(separatedBy: CharacterSet.alphanumerics.inverted).joined(separator: "_")
-        let hash = String(format: "%08x", key.hashValue)
-        let prefix = String(clean.prefix(32))
-        return "art_\(prefix)_\(hash).jpg"
+        let data = Data(key.utf8)
+        var buffer = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        data.withUnsafeBytes { raw in
+            _ = CC_SHA256(raw.baseAddress, CC_LONG(data.count), &buffer)
+        }
+        let hex = buffer.map { String(format: "%02x", $0) }.joined()
+        return "art_\(hex).jpg"
+    }
+
+    private func pixelEdge(for targetSize: CGSize?, scale: CGFloat) -> CGFloat {
+        let screen = scale > 0 ? scale : 2
+        let edge: CGFloat
+        if let targetSize, targetSize.width > 1, targetSize.height > 1 {
+            edge = max(targetSize.width, targetSize.height) * screen
+        } else {
+            edge = Self.maxPixelEdge
+        }
+        return min(Self.maxPixelEdge, max(64, edge))
+    }
+
+    private func sizedCacheKey(for key: String, maxPixel: CGFloat) -> NSString {
+        return "\(Int(maxPixel.rounded()))|\(key)" as NSString
+    }
+
+    private func decodedCost(_ image: UIImage) -> Int {
+        let width = image.size.width * image.scale
+        let height = image.size.height * image.scale
+        return Int(width * height * 4)
+    }
+
+    private func scaledImage(_ image: UIImage, maxPixel: CGFloat) -> UIImage {
+        let pixelW = image.size.width * image.scale
+        let pixelH = image.size.height * image.scale
+        let maxSide = max(pixelW, pixelH)
+        guard maxSide > maxPixel + 1, maxSide > 0 else {
+            return image
+        }
+        let ratio = maxPixel / maxSide
+        let newSize = CGSize(width: max(1, floor(pixelW * ratio)), height: max(1, floor(pixelH * ratio)))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+
+    private func remember(_ image: UIImage, forKey key: NSString) {
+        let prepared = self.scaledImage(image, maxPixel: Self.maxPixelEdge)
+        self.memoryCache.setObject(prepared, forKey: key, cost: self.decodedCost(prepared))
+    }
+
+    private func downsampledImage(data: Data, maxPixel: CGFloat) -> UIImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
+            return nil
+        }
+        return self.thumbnail(from: source, maxPixel: maxPixel)
+    }
+
+    private func downsampledImage(at path: String, maxPixel: CGFloat) -> UIImage? {
+        let url = URL(fileURLWithPath: path) as CFURL
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(url, sourceOptions) else {
+            return nil
+        }
+        return self.thumbnail(from: source, maxPixel: maxPixel)
+    }
+
+    private func thumbnail(from source: CGImageSource, maxPixel: CGFloat) -> UIImage? {
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: max(1, maxPixel)
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage)
+    }
+
+    private func noteDiskWrite() {
+        self.ioQueue.async { [weak self] in
+            self?.trimDiskCache()
+        }
+    }
+
+    private func trimDiskCache() {
+        guard let dir = self.diskCacheDirectory else {
+            return
+        }
+        let fileManager = FileManager.default
+        guard let urls = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey], options: .skipsHiddenFiles) else {
+            return
+        }
+        var entries: [(url: URL, size: Int64, date: Date)] = []
+        var total: Int64 = 0
+        for url in urls {
+            let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            let size = Int64(values?.fileSize ?? 0)
+            entries.append((url, size, values?.contentModificationDate ?? .distantPast))
+            total += size
+        }
+        guard total > Self.diskBudgetBytes else {
+            return
+        }
+        entries.sort { $0.date < $1.date }
+        let target = Self.diskBudgetBytes * 4 / 5
+        for entry in entries {
+            if total <= target {
+                break
+            }
+            try? fileManager.removeItem(at: entry.url)
+            total -= entry.size
+        }
+    }
+
+    private func writeImageToDisk(_ image: UIImage, fileName: String) {
+        guard let dir = self.diskCacheDirectory, let data = image.jpegData(compressionQuality: 0.82) else {
+            return
+        }
+        try? data.write(to: dir.appendingPathComponent(fileName), options: .atomic)
+        self.noteDiskWrite()
     }
 
     public func loadImage(urlString: String, targetSize: CGSize? = nil, scale: CGFloat = 2.0, completion: @escaping @MainActor (UIImage?) -> Void) {
@@ -94,29 +230,41 @@ public final class SGDoxImageLoader: @unchecked Sendable {
             return
         }
         
-        let cacheKey = trimmed as NSString
+        let maxPixel = self.pixelEdge(for: targetSize, scale: scale)
+        let cacheKey = self.sizedCacheKey(for: trimmed, maxPixel: maxPixel)
         if let cached = self.memoryCache.object(forKey: cacheKey) {
             self.dispatchMain(image: cached, completion: completion)
             return
         }
         
-        let fileName = self.diskFileName(for: trimmed)
+        let fileName = self.diskFileName(for: cacheKey as String)
         if let dir = self.diskCacheDirectory {
             let diskPath = dir.appendingPathComponent(fileName).path
-            if let img = UIImage(contentsOfFile: diskPath) {
-                self.memoryCache.setObject(img, forKey: cacheKey)
-                self.dispatchMain(image: img, completion: completion)
+            if FileManager.default.fileExists(atPath: diskPath) {
+                self.ioQueue.async { [weak self] in
+                    guard let self = self else { return }
+                    if let img = self.downsampledImage(at: diskPath, maxPixel: maxPixel) {
+                        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: diskPath)
+                        self.remember(img, forKey: cacheKey)
+                        self.dispatchMain(image: img, completion: completion)
+                    } else {
+                        self.fetchRemoteImage(trimmed: trimmed, maxPixel: maxPixel, cacheKey: cacheKey, fileName: fileName, completion: completion)
+                    }
+                }
                 return
             }
         }
         
-        // Handle local file URLs
+        self.fetchRemoteImage(trimmed: trimmed, maxPixel: maxPixel, cacheKey: cacheKey, fileName: fileName, completion: completion)
+    }
+
+    private func fetchRemoteImage(trimmed: String, maxPixel: CGFloat, cacheKey: NSString, fileName: String, completion: @escaping @MainActor (UIImage?) -> Void) {
         if trimmed.hasPrefix("file://") {
             if let url = URL(string: trimmed) {
-                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self.ioQueue.async { [weak self] in
                     guard let self = self else { return }
-                    if let img = UIImage(contentsOfFile: url.path) {
-                        self.memoryCache.setObject(img, forKey: cacheKey)
+                    if let img = self.downsampledImage(at: url.path, maxPixel: maxPixel) {
+                        self.remember(img, forKey: cacheKey)
                         self.dispatchMain(image: img, completion: completion)
                     } else {
                         self.dispatchMain(image: nil, completion: completion)
@@ -126,18 +274,16 @@ public final class SGDoxImageLoader: @unchecked Sendable {
             }
         }
         
-        // Handle local Apple Music library persistent IDs
         if trimmed.hasPrefix("am_local_") {
             let pidStr = trimmed.replacingOccurrences(of: "am_local_", with: "")
             if let pid = UInt64(pidStr) {
-                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self.ioQueue.async { [weak self] in
                     guard let self = self else { return }
                     
-                    // Check disk cache first
                     if let dir = self.diskCacheDirectory {
                         let diskPath = dir.appendingPathComponent("am_art_\(pid).jpg").path
-                        if let img = UIImage(contentsOfFile: diskPath) {
-                            self.memoryCache.setObject(img, forKey: cacheKey)
+                        if let img = self.downsampledImage(at: diskPath, maxPixel: maxPixel) {
+                            self.remember(img, forKey: cacheKey)
                             self.dispatchMain(image: img, completion: completion)
                             return
                         }
@@ -146,8 +292,9 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                     let query = MPMediaQuery.songs()
                     query.addFilterPredicate(MPMediaPropertyPredicate(value: NSNumber(value: pid), forProperty: MPMediaItemPropertyPersistentID))
                     var loadedImg: UIImage?
-                    if let item = query.items?.first, let art = item.artwork?.image(at: targetSize ?? CGSize(width: 300, height: 300)) {
-                        self.memoryCache.setObject(art, forKey: cacheKey)
+                    let point = max(64, maxPixel)
+                    if let item = query.items?.first, let art = item.artwork?.image(at: CGSize(width: point, height: point)) {
+                        self.remember(art, forKey: cacheKey)
                         self.saveImageToDisk(art, name: "am_art_\(pid).jpg")
                         loadedImg = art
                     }
@@ -157,14 +304,14 @@ public final class SGDoxImageLoader: @unchecked Sendable {
             }
         }
         
-        // Handle template URLs ({w}x{h} or {f}) from Apple Music / MusicKit
         var effectiveUrl = trimmed
         if effectiveUrl.hasPrefix("http://") {
             effectiveUrl = "https://" + effectiveUrl.dropFirst(7)
         }
+        let pixel = String(Int(maxPixel.rounded()))
         if effectiveUrl.contains("{w}") || effectiveUrl.contains("{h}") {
-            effectiveUrl = effectiveUrl.replacingOccurrences(of: "{w}", with: "600")
-                .replacingOccurrences(of: "{h}", with: "600")
+            effectiveUrl = effectiveUrl.replacingOccurrences(of: "{w}", with: pixel)
+                .replacingOccurrences(of: "{h}", with: pixel)
                 .replacingOccurrences(of: "{f}", with: "jpg")
         }
         
@@ -176,9 +323,8 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15.0
         
-        self.session.dataTask(with: request) { [weak self] data, response, error in
-            guard let self = self, let data = data, error == nil, let image = UIImage(data: data) else {
-                // Fallback sequence: 1200x1200 -> 600x600 -> 100x100
+        self.session.dataTask(with: request) { [weak self] data, _, error in
+            guard let self = self, let data = data, error == nil, let image = self.downsampledImage(data: data, maxPixel: maxPixel) else {
                 var fallbackStr: String? = nil
                 if effectiveUrl.contains("1200x1200") {
                     fallbackStr = effectiveUrl.replacingOccurrences(of: "1200x1200", with: "600x600")
@@ -190,12 +336,9 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                 if let fallbackStr = fallbackStr, let fallbackUrl = URL(string: fallbackStr) {
                     self?.session.dataTask(with: URLRequest(url: fallbackUrl)) { [weak self] fbData, _, _ in
                         guard let self = self else { return }
-                        if let fbData = fbData, let fbImg = UIImage(data: fbData) {
-                            self.memoryCache.setObject(fbImg, forKey: cacheKey, cost: fbData.count)
-                            if let dir = self.diskCacheDirectory {
-                                let fileUrl = dir.appendingPathComponent(fileName)
-                                try? fbData.write(to: fileUrl, options: .atomic)
-                            }
+                        if let fbData = fbData, let fbImg = self.downsampledImage(data: fbData, maxPixel: maxPixel) {
+                            self.remember(fbImg, forKey: cacheKey)
+                            self.writeImageToDisk(fbImg, fileName: fileName)
                             self.dispatchMain(image: fbImg, completion: completion)
                         } else {
                             self.dispatchMain(image: nil, completion: completion)
@@ -208,22 +351,27 @@ public final class SGDoxImageLoader: @unchecked Sendable {
                 return
             }
             
-            self.memoryCache.setObject(image, forKey: cacheKey, cost: data.count)
-            if let dir = self.diskCacheDirectory {
-                let fileUrl = dir.appendingPathComponent(fileName)
-                try? data.write(to: fileUrl, options: .atomic)
-            }
+            self.remember(image, forKey: cacheKey)
+            self.writeImageToDisk(image, fileName: fileName)
             self.dispatchMain(image: image, completion: completion)
         }.resume()
     }
     
     public func loadArtwork(for track: SGDoxMusicTrack, targetSize: CGSize? = nil, completion: @escaping @MainActor (UIImage?) -> Void) {
         // 0. Check offline manager downloaded artwork
-        if let offlineArtUrl = SGDoxMusicOfflineManager.shared.localArtworkUrl(for: track.id),
-           let img = UIImage(contentsOfFile: offlineArtUrl.path) {
-            self.storeImage(img, for: track.id)
-            if let artUrl = track.artworkUrl { self.storeImage(img, for: artUrl) }
-            self.dispatchMain(image: img, completion: completion)
+        if let offlineArtUrl = SGDoxMusicOfflineManager.shared.localArtworkUrl(for: track.id) {
+            let maxPixel = self.pixelEdge(for: targetSize, scale: 2)
+            let path = offlineArtUrl.path
+            self.ioQueue.async { [weak self] in
+                guard let self = self else { return }
+                guard let img = self.downsampledImage(at: path, maxPixel: maxPixel) else {
+                    self.dispatchMain(image: nil, completion: completion)
+                    return
+                }
+                self.storeImage(img, for: track.id)
+                if let artUrl = track.artworkUrl { self.storeImage(img, for: artUrl) }
+                self.dispatchMain(image: img, completion: completion)
+            }
             return
         }
 
@@ -258,18 +406,29 @@ public final class SGDoxImageLoader: @unchecked Sendable {
         if let dir = self.diskCacheDirectory {
             let pidStr = track.id.replacingOccurrences(of: "am_local_", with: "").replacingOccurrences(of: "local_", with: "")
             let candidates = ["am_art_\(track.id).jpg", "am_art_\(pidStr).jpg"]
+            let maxPixel = self.pixelEdge(for: targetSize, scale: 2)
             for cand in candidates {
                 let path = dir.appendingPathComponent(cand).path
-                if let img = UIImage(contentsOfFile: path) {
-                    self.storeImage(img, for: track.id)
-                    if let artUrl = track.artworkUrl { self.storeImage(img, for: artUrl) }
-                    self.dispatchMain(image: img, completion: completion)
+                if FileManager.default.fileExists(atPath: path) {
+                    self.ioQueue.async { [weak self] in
+                        guard let self = self else { return }
+                        guard let img = self.downsampledImage(at: path, maxPixel: maxPixel) else {
+                            self.resolveArtworkFromLibrary(for: track, targetSize: targetSize, completion: completion)
+                            return
+                        }
+                        self.storeImage(img, for: track.id)
+                        if let artUrl = track.artworkUrl { self.storeImage(img, for: artUrl) }
+                        self.dispatchMain(image: img, completion: completion)
+                    }
                     return
                 }
             }
         }
         
-        // 2. Try local MPMediaLibrary by persistentID or (Title + Artist)
+        self.resolveArtworkFromLibrary(for: track, targetSize: targetSize, completion: completion)
+    }
+
+    private func resolveArtworkFromLibrary(for track: SGDoxMusicTrack, targetSize: CGSize?, completion: @escaping @MainActor (UIImage?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
