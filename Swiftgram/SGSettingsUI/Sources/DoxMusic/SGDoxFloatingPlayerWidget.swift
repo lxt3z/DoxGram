@@ -5,6 +5,73 @@ import TelegramPresentationData
 import AccountContext
 import AppBundle
 
+final class SGDoxPlayerGlassView: UIView {
+    private let effectView = UIVisualEffectView()
+    private let sheen = CAGradientLayer()
+    private var isDark = true
+    private var emphasized = false
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        self.isUserInteractionEnabled = false
+        self.clipsToBounds = true
+        self.layer.cornerCurve = .continuous
+        self.addSubview(self.effectView)
+        self.layer.addSublayer(self.sheen)
+        self.sheen.startPoint = CGPoint(x: 0.15, y: 0)
+        self.sheen.endPoint = CGPoint(x: 0.85, y: 1)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.refreshMaterial), name: UIAccessibility.reduceTransparencyStatusDidChangeNotification, object: nil)
+        self.refreshMaterial()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    func configure(isDark: Bool, emphasized: Bool = false) {
+        self.isDark = isDark
+        self.emphasized = emphasized
+        self.refreshMaterial()
+    }
+
+    @objc private func refreshMaterial() {
+        let reduced = UIAccessibility.isReduceTransparencyEnabled
+        if reduced {
+            self.effectView.effect = nil
+            self.backgroundColor = UIColor(white: self.isDark ? 0.16 : 0.94, alpha: 1)
+        } else {
+            self.backgroundColor = .clear
+            if #available(iOS 26.0, *) {
+                let glass = UIGlassEffect(style: .regular)
+                glass.isInteractive = false
+                glass.tintColor = UIColor(white: self.isDark ? 0.18 : 1, alpha: self.emphasized ? 0.22 : 0.10)
+                self.effectView.effect = glass
+            } else {
+                self.effectView.effect = UIBlurEffect(style: self.isDark ? .systemThinMaterialDark : .systemThinMaterialLight)
+            }
+        }
+        self.layer.borderWidth = 0.5
+        self.layer.borderColor = UIColor(white: self.isDark ? 1 : 0, alpha: self.isDark ? 0.18 : 0.08).cgColor
+        self.sheen.isHidden = reduced
+        self.sheen.colors = [UIColor.white.withAlphaComponent(self.emphasized ? 0.16 : 0.09).cgColor, UIColor.white.withAlphaComponent(0.015).cgColor, UIColor.white.withAlphaComponent(0.04).cgColor]
+        self.sheen.locations = [0, 0.5, 1]
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        self.layer.cornerRadius = min(self.bounds.height, self.bounds.width) * 0.5
+        self.effectView.frame = self.bounds
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        self.sheen.frame = self.bounds
+        CATransaction.commit()
+    }
+}
+
 @MainActor
 public final class SGDoxFloatingPlayerWidget: UIView {
     private let context: AccountContext
@@ -13,9 +80,10 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     public var openPlayer: (() -> Void)?
     
     private let containerView = UIView()
-    private let blurView = UIVisualEffectView()
-    private let tintOverlayView = UIView()
-    private let playPauseGlassView = UIVisualEffectView()
+    private let capsuleGlassView = SGDoxPlayerGlassView()
+    private let playGlassView = SGDoxPlayerGlassView()
+    private let nextGlassView = SGDoxPlayerGlassView()
+    private let closeGlassView = SGDoxPlayerGlassView()
     
     private let artworkImageView = UIImageView()
     private let textContainerView = UIView()
@@ -69,11 +137,10 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.containerView.layer.borderWidth = 0.5
         self.addSubview(self.containerView)
 
-        self.blurView.clipsToBounds = true
-        self.blurView.layer.cornerCurve = .continuous
-        self.containerView.addSubview(self.blurView)
-        self.containerView.addSubview(self.tintOverlayView)
-        self.tintOverlayView.isUserInteractionEnabled = false
+        self.containerView.insertSubview(self.capsuleGlassView, at: 0)
+        self.playPauseContainer.insertSubview(self.playGlassView, at: 0)
+        self.nextButton.insertSubview(self.nextGlassView, at: 0)
+        self.closeButton.insertSubview(self.closeGlassView, at: 0)
         
         // Tap gesture to open player
         let tap = UITapGestureRecognizer(target: self, action: #selector(self.widgetTapped))
@@ -119,10 +186,6 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         self.playPauseContainer.layer.cornerCurve = .continuous
         self.playPauseContainer.clipsToBounds = true
         self.containerView.addSubview(self.playPauseContainer)
-        self.playPauseGlassView.clipsToBounds = true
-        self.playPauseGlassView.layer.cornerCurve = .continuous
-        self.playPauseGlassView.isUserInteractionEnabled = false
-        self.playPauseContainer.insertSubview(self.playPauseGlassView, at: 0)
         
         let playConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
         self.playPauseButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playConfig), for: .normal)
@@ -152,11 +215,10 @@ public final class SGDoxFloatingPlayerWidget: UIView {
     
     private func applyTheme() {
         let isDark = self.theme.overallDarkAppearance
-        self.applyChrome(isDark: isDark)
+        self.layer.shadowColor = UIColor.black.cgColor
         
         if isDark {
             if #unavailable(iOS 26.0) {
-                self.tintOverlayView.backgroundColor = UIColor(white: 0.12, alpha: 0.35)
                 self.containerView.layer.borderColor = UIColor(white: 1.0, alpha: 0.15).cgColor
                 self.containerView.layer.borderWidth = 0.5
                 self.layer.shadowColor = UIColor.black.cgColor
@@ -187,7 +249,6 @@ public final class SGDoxFloatingPlayerWidget: UIView {
             self.progressView.progressTintColor = self.theme.list.itemAccentColor
         } else {
             if #unavailable(iOS 26.0) {
-                self.tintOverlayView.backgroundColor = UIColor(white: 1.0, alpha: 0.35)
                 self.containerView.layer.borderColor = UIColor(white: 0.0, alpha: 0.10).cgColor
                 self.containerView.layer.borderWidth = 0.5
                 self.layer.shadowColor = UIColor.black.cgColor
@@ -218,38 +279,19 @@ public final class SGDoxFloatingPlayerWidget: UIView {
             self.progressView.trackTintColor = UIColor(white: 0.0, alpha: 0.06)
             self.progressView.progressTintColor = self.theme.list.itemAccentColor
         }
+        self.containerView.layer.borderWidth = 0
+        self.playPauseContainer.layer.borderWidth = 0
+        self.playPauseContainer.backgroundColor = .clear
+        self.closeButton.backgroundColor = .clear
+        self.capsuleGlassView.configure(isDark: isDark)
+        self.playGlassView.configure(isDark: isDark, emphasized: true)
+        self.nextGlassView.configure(isDark: isDark)
+        self.closeGlassView.configure(isDark: isDark)
+        self.layer.shadowOpacity = isDark ? 0.28 : 0.14
+        self.layer.shadowRadius = 18
+        self.layer.shadowOffset = CGSize(width: 0, height: 6)
     }
 
-    private func applyChrome(isDark: Bool) {
-        if #available(iOS 26.0, *) {
-            let bar = UIGlassEffect(style: .regular)
-            bar.isInteractive = true
-            bar.tintColor = isDark ? UIColor(white: 0.12, alpha: 0.42) : UIColor(white: 1.0, alpha: 0.50)
-            self.blurView.effect = bar
-            self.tintOverlayView.backgroundColor = .clear
-            self.containerView.layer.borderWidth = 0
-
-            let button = UIGlassEffect(style: .clear)
-            button.isInteractive = false
-            button.tintColor = isDark ? UIColor(white: 1.0, alpha: 0.16) : UIColor(white: 1.0, alpha: 0.42)
-            self.playPauseGlassView.effect = button
-            self.playPauseGlassView.isHidden = false
-            self.playPauseContainer.backgroundColor = .clear
-            self.playPauseContainer.layer.borderWidth = 0
-
-            self.layer.shadowColor = UIColor.black.cgColor
-            self.layer.shadowOpacity = isDark ? 0.28 : 0.12
-            self.layer.shadowRadius = isDark ? 16 : 12
-            self.layer.shadowOffset = CGSize(width: 0, height: 6)
-            return
-        }
-
-        self.playPauseGlassView.effect = nil
-        self.playPauseGlassView.isHidden = true
-        self.blurView.effect = UIBlurEffect(style: isDark ? .systemMaterialDark : .systemMaterialLight)
-        self.containerView.layer.borderWidth = 0.5
-    }
-    
     private func setupListeners() {
         self.stateToken = SGDoxMusicManager.shared.addStateListener { [weak self] in
             DispatchQueue.main.async {
@@ -382,10 +424,6 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         
         self.containerView.frame = self.bounds
         self.containerView.layer.cornerRadius = widgetHeight * 0.5
-        self.blurView.frame = self.bounds
-        self.blurView.layer.cornerRadius = widgetHeight * 0.5
-        self.tintOverlayView.frame = self.bounds
-        self.tintOverlayView.layer.cornerRadius = widgetHeight * 0.5
         
         // Artwork
         let artSide: CGFloat = 38.0
@@ -408,8 +446,6 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         
         self.playPauseContainer.frame = CGRect(x: playX, y: (widgetHeight - playSize) * 0.5, width: playSize, height: playSize)
         self.playPauseContainer.layer.cornerRadius = playSize * 0.5
-        self.playPauseGlassView.frame = self.playPauseContainer.bounds
-        self.playPauseGlassView.layer.cornerRadius = playSize * 0.5
         self.playPauseButton.frame = self.playPauseContainer.bounds
         
         // Text Container
@@ -423,6 +459,11 @@ public final class SGDoxFloatingPlayerWidget: UIView {
         // Progress Bar
         self.progressView.frame = CGRect(x: 20.0, y: widgetHeight - 3.0, width: widgetWidth - 40.0, height: 1.5)
         self.progressView.layer.cornerRadius = 0.75
+        self.capsuleGlassView.frame = self.containerView.bounds
+        self.playGlassView.frame = self.playPauseContainer.bounds
+        self.nextGlassView.frame = self.nextButton.bounds
+        self.closeGlassView.frame = self.closeButton.bounds
+        self.layer.shadowPath = UIBezierPath(roundedRect: self.bounds, cornerRadius: widgetHeight * 0.5).cgPath
     }
     
     private func updateContent(animated: Bool) {

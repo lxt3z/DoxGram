@@ -67,6 +67,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let ambientGradientLayer = CAGradientLayer()
     private let backgroundBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let darkDimOverlay = UIView()
+    private var glassSurfaces: [(UIView, SGDoxPlayerGlassView)] = []
     
     // Video Clip Background (Animated Canvas)
     private let videoContainerView = UIView()
@@ -241,6 +242,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             SGDoxMusicPlayerController.currentPresentedPlayer = nil
         }
         self.detachListeners()
+        NotificationCenter.default.removeObserver(self, name: UIAccessibility.reduceTransparencyStatusDidChangeNotification, object: nil)
     }
     
     public override func loadDisplayNode() {
@@ -631,6 +633,26 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.setupLyricsPane()
         self.setupQueuePane()
         self.setupSharedBottomControls()
+        let surfaces: [UIView] = [self.playPauseButton, self.previousButton, self.nextButton, self.favoriteButton, self.moreButton, self.lyricsFavoriteButton, self.lyricsMoreButton, self.lyricsSingButton, self.queueShuffleButton, self.queueClearButton, self.bottomLyricsButton, self.bottomAirplayButton, self.bottomQueueButton, self.formatBadgeButton, self.effectBadgeButton]
+        for host in surfaces {
+            let glass = SGDoxPlayerGlassView()
+            glass.configure(isDark: true, emphasized: host === self.playPauseButton)
+            host.backgroundColor = .clear
+            host.layer.cornerCurve = .continuous
+            host.insertSubview(glass, at: 0)
+            self.glassSurfaces.append((host, glass))
+        }
+        self.artworkImageView.layer.borderWidth = 0.5
+        self.artworkImageView.layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
+        NotificationCenter.default.addObserver(self, selector: #selector(self.updateGlassAccessibility), name: UIAccessibility.reduceTransparencyStatusDidChangeNotification, object: nil)
+        self.updateGlassAccessibility()
+    }
+
+    @objc private func updateGlassAccessibility() {
+        let reduced = UIAccessibility.isReduceTransparencyEnabled
+        self.backgroundBlurView.effect = reduced ? nil : UIBlurEffect(style: .systemUltraThinMaterialDark)
+        self.backgroundBlurView.backgroundColor = reduced ? UIColor(red: 0.07, green: 0.08, blue: 0.11, alpha: 1) : .clear
+        self.videoDimOverlay.backgroundColor = UIColor(white: 0, alpha: reduced ? 1 : 0.35)
     }
     
     // MARK: - Setup Now Playing Pane (Center Content)
@@ -738,14 +760,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.attachButtonBounceFeedback(self.shuffleButton)
         self.controlsContainerView.addSubview(self.shuffleButton)
         
-        let skipConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
+        let skipConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
         self.previousButton.setImage(UIImage(systemName: "backward.fill", withConfiguration: skipConfig), for: .normal)
         self.previousButton.tintColor = .white
         self.previousButton.addTarget(self, action: #selector(self.previousPressed), for: .touchUpInside)
         self.attachButtonBounceFeedback(self.previousButton)
         self.controlsContainerView.addSubview(self.previousButton)
         
-        let playConfig = UIImage.SymbolConfiguration(pointSize: 42, weight: .bold)
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
         self.playPauseButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playConfig), for: .normal)
         self.playPauseButton.tintColor = .white
         self.playPauseButton.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
@@ -1064,6 +1086,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.layoutNowPlayingPane(bounds: self.nowPlayingContainerView.bounds)
         self.layoutLyricsPane(bounds: self.lyricsContainerView.bounds)
         self.layoutQueuePane(bounds: self.queueContainerView.bounds)
+        for (host, glass) in self.glassSurfaces {
+            glass.frame = host.bounds
+            host.layer.cornerRadius = min(host.bounds.width, host.bounds.height) * 0.5
+        }
     }
     
     private func layoutBottomControls(rect: CGRect) {
@@ -1316,7 +1342,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         // Play / Pause Icons & Dynamic Spring Artwork Deflate/Expand
         let isPlaying = manager.isPlaying
         let playIconName = isPlaying ? "pause.fill" : "play.fill"
-        let playCfg = UIImage.SymbolConfiguration(pointSize: 42, weight: .bold)
+        let playCfg = UIImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
         self.playPauseButton.setImage(UIImage(systemName: playIconName, withConfiguration: playCfg), for: .normal)
         
         if self.currentMode == .lyrics {
