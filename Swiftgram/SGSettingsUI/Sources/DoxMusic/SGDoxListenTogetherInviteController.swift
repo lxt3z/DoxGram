@@ -14,8 +14,7 @@ public final class SGDoxListenTogetherInviteController: ViewController {
     // MARK: - UI Elements
     private let dimmingView = UIView()
     private let cardContainer = UIView()
-    private let blurView = UIVisualEffectView()
-    private let sheenGradient = CAGradientLayer()
+    private let cardGlass = SGDoxPlayerGlassView()
     private let artworkGlowView = UIView()
     private let artworkGlowLayer = CAGradientLayer()
     
@@ -115,21 +114,13 @@ public final class SGDoxListenTogetherInviteController: ViewController {
         self.cardContainer.layer.borderWidth = 0.75
         self.cardContainer.layer.borderColor = UIColor(white: 1.0, alpha: 0.28).cgColor
         self.cardContainer.clipsToBounds = true
-        self.cardContainer.backgroundColor = UIColor(red: 0.10, green: 0.11, blue: 0.16, alpha: 0.82)
+        self.cardContainer.backgroundColor = .clear
         
-        self.blurView.effect = UIBlurEffect(style: .systemUltraThinMaterialDark)
-        self.cardContainer.addSubview(self.blurView)
+        self.cardGlass.fixedCornerRadius = 32.0
+        self.cardGlass.configure(isDark: true, emphasized: true)
+        self.cardContainer.addSubview(self.cardGlass)
         
         // Specular Sheen Layer
-        self.sheenGradient.colors = [
-            UIColor(white: 1.0, alpha: 0.38).cgColor,
-            UIColor(white: 1.0, alpha: 0.08).cgColor,
-            UIColor.clear.cgColor
-        ]
-        self.sheenGradient.locations = [0.0, 0.35, 1.0]
-        self.sheenGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
-        self.sheenGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
-        self.cardContainer.layer.addSublayer(self.sheenGradient)
         
         // Artwork ambient aura glow
         self.artworkGlowLayer.type = .radial
@@ -262,8 +253,7 @@ public final class SGDoxListenTogetherInviteController: ViewController {
         let cardY = (bounds.height - cardHeight) * 0.5
         
         self.cardContainer.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight)
-        self.blurView.frame = self.cardContainer.bounds
-        self.sheenGradient.frame = CGRect(x: 0, y: 0, width: cardWidth, height: 160.0)
+        self.cardGlass.frame = self.cardContainer.bounds
         
         self.closeButton.frame = CGRect(x: cardWidth - 44.0, y: 14.0, width: 32.0, height: 32.0)
         

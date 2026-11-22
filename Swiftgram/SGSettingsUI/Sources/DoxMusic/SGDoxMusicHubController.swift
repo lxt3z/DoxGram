@@ -67,11 +67,7 @@ private final class SGDoxServiceCell: UITableViewCell {
 
 private final class SGDoxWaveHeroCell: UITableViewCell {
     let containerCard = UIView()
-    let blurView = UIVisualEffectView()
     let ambientGradient = CAGradientLayer()
-    let aiBadge = UIView()
-    let aiIcon = UIImageView()
-    let aiLabel = UILabel()
     let titleLabel = UILabel()
     let subtitleLabel = UILabel()
     let playCircle = UIView()
@@ -90,7 +86,6 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
         
         self.containerCard.layer.cornerRadius = 20
         self.containerCard.layer.cornerCurve = .continuous
-        self.containerCard.layer.borderWidth = 0.5
         self.containerCard.layer.borderColor = UIColor(white: 1.0, alpha: 0.12).cgColor
         self.containerCard.clipsToBounds = true
         self.contentView.addSubview(self.containerCard)
@@ -102,37 +97,14 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
         self.ambientGradient.startPoint = CGPoint(x: 0.0, y: 0.0)
         self.ambientGradient.endPoint = CGPoint(x: 1.0, y: 1.0)
         self.containerCard.layer.insertSublayer(self.ambientGradient, at: 0)
-        
-        self.blurView.effect = UIBlurEffect(style: .systemMaterialDark)
-        self.containerCard.addSubview(self.blurView)
-        
-        // AI Badge
-        self.aiBadge.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
-        self.aiBadge.layer.cornerRadius = 10
-        self.aiBadge.layer.cornerCurve = .continuous
-        self.aiBadge.layer.borderWidth = 0.5
-        self.aiBadge.layer.borderColor = UIColor(white: 1.0, alpha: 0.18).cgColor
-        self.aiBadge.clipsToBounds = true
-        self.containerCard.addSubview(self.aiBadge)
-        
-        let sparkCfg = UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
-        self.aiIcon.image = UIImage(systemName: "sparkles", withConfiguration: sparkCfg)
-        self.aiIcon.tintColor = UIColor(red: 0.40, green: 0.75, blue: 1.0, alpha: 1.0)
-        self.aiIcon.contentMode = .scaleAspectFit
-        self.aiBadge.addSubview(self.aiIcon)
-        
-        self.aiLabel.text = "AI FLOW"
-        self.aiLabel.font = UIFont.systemFont(ofSize: 10.5, weight: .bold)
-        self.aiLabel.textColor = UIColor(white: 1.0, alpha: 0.95)
-        self.aiBadge.addSubview(self.aiLabel)
-        
+
         // Title & Subtitle
         self.titleLabel.text = "Моя волна"
-        self.titleLabel.font = UIFont.systemFont(ofSize: 20, weight: .bold)
+        self.titleLabel.font = UIFont.systemFont(ofSize: 24, weight: .semibold)
         self.titleLabel.textColor = .white
         self.containerCard.addSubview(self.titleLabel)
         
-        self.subtitleLabel.text = "Умный персональный поток"
+        self.subtitleLabel.text = "Музыка по вашему вкусу"
         self.subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         self.subtitleLabel.textColor = UIColor(white: 1.0, alpha: 0.70)
         self.containerCard.addSubview(self.subtitleLabel)
@@ -160,9 +132,10 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
             btn.layer.cornerRadius = 14
             btn.layer.cornerCurve = .continuous
             btn.clipsToBounds = true
-            let iconCfg = UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
-            btn.setImage(UIImage(systemName: mode.icon, withConfiguration: iconCfg), for: .normal)
-            btn.setTitle(" \(mode.title)", for: .normal)
+            btn.setTitle(mode.title, for: .normal)
+            btn.titleLabel?.adjustsFontSizeToFitWidth = true
+            btn.titleLabel?.minimumScaleFactor = 0.82
+            btn.accessibilityLabel = mode.title
             btn.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
             btn.tag = modes.firstIndex(of: mode) ?? 0
             btn.addTarget(self, action: #selector(self.modeButtonTapped(_:)), for: .touchUpInside)
@@ -228,24 +201,19 @@ private final class SGDoxWaveHeroCell: UITableViewCell {
         
         self.containerCard.frame = CGRect(x: 16, y: 4, width: cardWidth, height: cardHeight)
         self.ambientGradient.frame = self.containerCard.bounds
-        self.blurView.frame = self.containerCard.bounds
         
-        // AI Badge
-        self.aiBadge.frame = CGRect(x: 16, y: 14, width: 78, height: 20)
-        self.aiIcon.frame = CGRect(x: 7, y: 4, width: 12, height: 12)
-        self.aiLabel.frame = CGRect(x: 23, y: 1, width: 50, height: 18)
         
         // Title & Subtitle
         let textWidth = max(0, cardWidth - 32 - 54)
-        self.titleLabel.frame = CGRect(x: 16, y: 38, width: textWidth, height: 24)
-        self.subtitleLabel.frame = CGRect(x: 16, y: 64, width: textWidth, height: 18)
+        self.titleLabel.frame = CGRect(x: 16, y: 18, width: textWidth, height: 30)
+        self.subtitleLabel.frame = CGRect(x: 16, y: 51, width: textWidth, height: 20)
         
         // Play circle
-        self.playCircle.frame = CGRect(x: cardWidth - 56, y: 32, width: 44, height: 44)
+        self.playCircle.frame = CGRect(x: cardWidth - 60, y: 22, width: 44, height: 44)
         self.playIcon.frame = CGRect(x: 14, y: 13, width: 18, height: 18)
         
         // 4 Chips
-        let chipsY: CGFloat = 94.0
+        let chipsY: CGFloat = 83.0
         let chipH: CGFloat = 32.0
         let spacing: CGFloat = 6.0
         let totalSpacing = spacing * 3.0
@@ -464,8 +432,9 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     
     private let miniPlayerContainer = UIView()
-    private let miniPlayerBlurView = UIVisualEffectView()
-    private let miniTintOverlayView = UIView()
+    private let miniPlayerGlass = SGDoxPlayerGlassView()
+    private var miniArtworkTrack: SGDoxMusicTrack?
+    private var miniPlayerLayout: ContainerViewLayout?
     private let miniArtworkImageView = UIImageView()
     private let miniTitleLabel = UILabel()
     private let miniArtistLabel = UILabel()
@@ -526,9 +495,15 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.updateMiniPlayer()
-                if let visible = self.tableView.indexPathsForVisibleRows {
-                    self.tableView.reloadRows(at: visible, with: .none)
-                } else {
+                let sectionCount = self.numberOfSections(in: self.tableView)
+                let sameCounts = self.tableView.numberOfSections == sectionCount && (0 ..< sectionCount).allSatisfy {
+                    self.tableView.numberOfRows(inSection: $0) == self.tableView(self.tableView, numberOfRowsInSection: $0)
+                }
+                if sameCounts, let visible = self.tableView.indexPathsForVisibleRows, !visible.isEmpty {
+                    UIView.performWithoutAnimation {
+                        self.tableView.reloadRows(at: visible, with: .none)
+                    }
+                } else if !sameCounts {
                     self.tableView.reloadData()
                 }
             }
@@ -605,17 +580,9 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.miniPlayerContainer.layer.shadowRadius = 18
         self.miniPlayerContainer.layer.shadowOffset = CGSize(width: 0, height: 6)
         
-        let blurEffect = UIBlurEffect(style: isDark ? .systemMaterialDark : .systemMaterialLight)
-        self.miniPlayerBlurView.effect = blurEffect
-        self.miniPlayerBlurView.layer.cornerCurve = .continuous
-        self.miniPlayerBlurView.layer.borderWidth = 0.5
-        self.miniPlayerBlurView.layer.borderColor = UIColor(white: 1.0, alpha: isDark ? 0.14 : 0.40).cgColor
-        self.miniPlayerBlurView.clipsToBounds = true
-        self.miniPlayerContainer.addSubview(self.miniPlayerBlurView)
-        
-        self.miniTintOverlayView.backgroundColor = isDark ? UIColor(white: 0.08, alpha: 0.40) : UIColor(white: 1.0, alpha: 0.45)
-        self.miniPlayerBlurView.contentView.addSubview(self.miniTintOverlayView)
-        
+        self.miniPlayerGlass.configure(isDark: isDark)
+        self.miniPlayerContainer.addSubview(self.miniPlayerGlass)
+
         let tap = UITapGestureRecognizer(target: self, action: #selector(self.miniPlayerTapped))
         self.miniPlayerContainer.addGestureRecognizer(tap)
         
@@ -626,23 +593,23 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         self.miniArtworkImageView.layer.borderWidth = 0.5
         self.miniArtworkImageView.layer.borderColor = UIColor(white: 1.0, alpha: isDark ? 0.12 : 0.08).cgColor
         self.miniArtworkImageView.backgroundColor = UIColor(white: isDark ? 0.20 : 0.90, alpha: 1.0)
-        self.miniPlayerBlurView.contentView.addSubview(self.miniArtworkImageView)
+        self.miniPlayerContainer.addSubview(self.miniArtworkImageView)
         
         self.miniTitleLabel.font = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
         self.miniTitleLabel.textColor = isDark ? .white : UIColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 1.0)
         self.miniTitleLabel.lineBreakMode = .byTruncatingTail
-        self.miniPlayerBlurView.contentView.addSubview(self.miniTitleLabel)
+        self.miniPlayerContainer.addSubview(self.miniTitleLabel)
         
         self.miniArtistLabel.font = UIFont.systemFont(ofSize: 11.5, weight: .regular)
         self.miniArtistLabel.textColor = isDark ? UIColor.white.withAlphaComponent(0.65) : UIColor(red: 0.44, green: 0.46, blue: 0.50, alpha: 1.0)
         self.miniArtistLabel.lineBreakMode = .byTruncatingTail
-        self.miniPlayerBlurView.contentView.addSubview(self.miniArtistLabel)
+        self.miniPlayerContainer.addSubview(self.miniArtistLabel)
         
         self.miniPlayPauseContainer.layer.cornerRadius = 16.0
         self.miniPlayPauseContainer.layer.cornerCurve = .continuous
         self.miniPlayPauseContainer.clipsToBounds = true
-        self.miniPlayPauseContainer.backgroundColor = isDark ? UIColor(white: 1.0, alpha: 0.14) : UIColor(white: 0.0, alpha: 0.08)
-        self.miniPlayerBlurView.contentView.addSubview(self.miniPlayPauseContainer)
+        SGDoxPlayerGlassView.addBackground(to: self.miniPlayPauseContainer, isDark: isDark, emphasized: true)
+        self.miniPlayerContainer.addSubview(self.miniPlayPauseContainer)
         
         let playConfig = UIImage.SymbolConfiguration(pointSize: 14, weight: .bold)
         self.miniPlayPauseButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playConfig), for: .normal)
@@ -652,15 +619,16 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         
         let nextConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
         self.miniNextButton.setImage(UIImage(systemName: "forward.fill", withConfiguration: nextConfig), for: .normal)
+        self.miniNextButton.accessibilityLabel = "Следующий трек"
         self.miniNextButton.tintColor = isDark ? UIColor.white.withAlphaComponent(0.85) : UIColor(red: 0.30, green: 0.32, blue: 0.36, alpha: 1.0)
         self.miniNextButton.addTarget(self, action: #selector(self.miniNextPressed), for: .touchUpInside)
-        self.miniPlayerBlurView.contentView.addSubview(self.miniNextButton)
+        self.miniPlayerContainer.addSubview(self.miniNextButton)
         
         self.miniProgressView.layer.cornerRadius = 0.75
         self.miniProgressView.clipsToBounds = true
         self.miniProgressView.progressTintColor = isDark ? UIColor(white: 1.0, alpha: 0.75) : self.presentationData.theme.list.itemAccentColor
         self.miniProgressView.trackTintColor = UIColor(white: isDark ? 1.0 : 0.0, alpha: 0.08)
-        self.miniPlayerBlurView.contentView.addSubview(self.miniProgressView)
+        self.miniPlayerContainer.addSubview(self.miniProgressView)
         
         self.view.addSubview(self.miniPlayerContainer)
         self.updateMiniPlayer()
@@ -669,6 +637,11 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
         
+        self.miniPlayerLayout = layout
+        self.layoutMusicContent(layout)
+    }
+
+    private func layoutMusicContent(_ layout: ContainerViewLayout) {
         let navHeight = self.navigationLayout(layout: layout).navigationFrame.maxY
         let bounds = CGRect(origin: .zero, size: layout.size)
         
@@ -680,9 +653,8 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         let miniPlayerX = floor((bounds.width - miniPlayerWidth) * 0.5)
         
         self.miniPlayerContainer.frame = CGRect(x: miniPlayerX, y: miniPlayerY, width: miniPlayerWidth, height: miniPlayerHeight)
-        self.miniPlayerBlurView.frame = self.miniPlayerContainer.bounds
-        self.miniPlayerBlurView.layer.cornerRadius = miniPlayerHeight * 0.5
-        self.miniTintOverlayView.frame = self.miniPlayerContainer.bounds
+        self.miniPlayerGlass.frame = self.miniPlayerContainer.bounds
+        self.miniPlayerContainer.layer.shadowPath = UIBezierPath(roundedRect: self.miniPlayerContainer.bounds, cornerRadius: miniPlayerHeight * 0.5).cgPath
         self.miniPlayerContainer.isHidden = miniPlayerHeight == 0
         
         let artSide: CGFloat = 38.0
@@ -713,25 +685,30 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
     
     private func updateMiniPlayer() {
         let manager = SGDoxMusicManager.shared
-        guard let track = manager.currentTrack else {
-            self.miniPlayerContainer.isHidden = true
+        let track = manager.currentTrack
+        if self.miniPlayerContainer.isHidden != (track == nil), let layout = self.miniPlayerLayout {
+            self.layoutMusicContent(layout)
+        }
+        self.miniPlayerContainer.isHidden = track == nil
+        guard let track else {
+            self.miniArtworkTrack = nil
             return
         }
-        
-        self.miniPlayerContainer.isHidden = false
-        self.view.bringSubviewToFront(self.miniPlayerContainer)
-        self.miniTitleLabel.text = track.title
-        self.miniArtistLabel.text = track.artist
-        
+
         let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .bold)
         let iconName = manager.isPlaying ? "pause.fill" : "play.fill"
         self.miniPlayPauseButton.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
-        
+        self.miniPlayPauseButton.accessibilityLabel = manager.isPlaying ? "Пауза" : "Воспроизвести"
+
+        guard self.miniArtworkTrack != track else { return }
+        self.miniArtworkTrack = track
+        self.miniTitleLabel.text = track.title
+        self.miniArtistLabel.text = track.artist
+        self.miniProgressView.setProgress(0, animated: false)
         self.miniArtworkImageView.image = SGDoxImageLoader.shared.placeholderArtwork()
-        SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 80, height: 80)) { [weak self] image in
-            if let image = image {
-                self?.miniArtworkImageView.image = image
-            }
+        SGDoxImageLoader.shared.loadArtwork(for: track, targetSize: CGSize(width: 44, height: 44)) { [weak self] image in
+            guard let self, self.miniArtworkTrack == track, let image else { return }
+            self.miniArtworkImageView.image = image
         }
     }
     
@@ -895,7 +872,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
         switch indexPath.section {
         case 0:
-            return 144.0
+            return 136.0
         case 1:
             if indexPath.row == 0 {
                 return 96.0
@@ -910,6 +887,10 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         }
     }
     
+    public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        return self.tableView(tableView, titleForHeaderInSection: section) == nil ? .leastNormalMagnitude : UITableView.automaticDimension
+    }
+
     public func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         if self.isSearching {
             return self.searchResults.isEmpty ? "Ничего не найдено" : "Результаты поиска (\(self.searchResults.count))"
@@ -918,7 +899,7 @@ public final class SGDoxMusicHubController: ViewController, UISearchBarDelegate,
         case 0:
             return nil
         case 1:
-            return self.hasFavorites ? "Моя медиатека" : nil
+            return nil
         case 2:
             return self.searchResults.isEmpty ? nil : (SGDoxMusicManager.shared.history.isEmpty ? "Рекомендации" : "Недавно прослушано")
         case 3:

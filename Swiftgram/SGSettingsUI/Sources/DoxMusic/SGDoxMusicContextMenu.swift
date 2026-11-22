@@ -108,8 +108,9 @@ private final class SGDoxMenuTopButton: UIButton {
 
 public final class SGDoxMusicContextMenu: UIView {
     private let dimmingView = UIView()
-    private let cardView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialDark))
-    private let cardTintOverlay = UIView()
+    private let cardView = UIView()
+    private let cardGlass = SGDoxPlayerGlassView()
+    private let contentScrollView = UIScrollView()
     private let contentStack = UIStackView()
     
     // Top capsule buttons (Favorite | Share)
@@ -145,22 +146,22 @@ public final class SGDoxMusicContextMenu: UIView {
         self.cardView.clipsToBounds = true
         self.cardView.layer.cornerRadius = 20.0
         self.cardView.layer.cornerCurve = .continuous
-        self.cardView.layer.borderWidth = 0.5
-        self.cardView.layer.borderColor = UIColor(white: 1.0, alpha: 0.22).cgColor
-        self.cardView.layer.shadowColor = UIColor.black.cgColor
-        self.cardView.layer.shadowOpacity = 0.45
-        self.cardView.layer.shadowRadius = 30.0
-        self.cardView.layer.shadowOffset = CGSize(width: 0, height: 14)
+        self.cardView.accessibilityViewIsModal = true
         self.addSubview(self.cardView)
-        
-        self.cardTintOverlay.backgroundColor = UIColor(red: 0.10, green: 0.12, blue: 0.18, alpha: 0.35)
-        self.cardView.contentView.addSubview(self.cardTintOverlay)
-        
+
+        self.cardGlass.fixedCornerRadius = 20.0
+        self.cardGlass.configure(isDark: true, emphasized: true)
+        self.cardView.addSubview(self.cardGlass)
+
+        self.contentScrollView.showsVerticalScrollIndicator = false
+        self.contentScrollView.contentInsetAdjustmentBehavior = .never
+        self.cardView.addSubview(self.contentScrollView)
+
         self.contentStack.axis = .vertical
         self.contentStack.spacing = 0
         self.contentStack.alignment = .fill
         self.contentStack.distribution = .fill
-        self.cardView.contentView.addSubview(self.contentStack)
+        self.contentScrollView.addSubview(self.contentStack)
     }
     
     required init?(coder: NSCoder) {
@@ -180,7 +181,6 @@ public final class SGDoxMusicContextMenu: UIView {
         self.topCapsuleView.layer.cornerCurve = .continuous
         self.topCapsuleView.clipsToBounds = true
         self.topCapsuleView.translatesAutoresizingMaskIntoConstraints = false
-        self.topCapsuleView.heightAnchor.constraint(equalToConstant: 48.0).isActive = true
         
         let starConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
         let starImg = UIImage(systemName: isFavorite ? "star.fill" : "star", withConfiguration: starConfig)
@@ -254,7 +254,7 @@ public final class SGDoxMusicContextMenu: UIView {
         }
         
         // Layout card
-        let cardWidth: CGFloat = min(280.0, self.bounds.width - 44.0)
+        let cardWidth = min(314.0, self.bounds.width - 32.0)
         self.contentStack.frame = CGRect(x: 0, y: 0, width: cardWidth, height: 1000)
         let neededSize = self.contentStack.systemLayoutSizeFitting(
             CGSize(width: cardWidth, height: UIView.layoutFittingCompressedSize.height),
@@ -262,25 +262,22 @@ public final class SGDoxMusicContextMenu: UIView {
             verticalFittingPriority: .fittingSizeLevel
         )
         
-        let cardHeight = neededSize.height
-        self.contentStack.frame = CGRect(origin: .zero, size: CGSize(width: cardWidth, height: cardHeight))
-        self.cardTintOverlay.frame = CGRect(origin: .zero, size: CGSize(width: cardWidth, height: cardHeight))
-        
-        // Position card near source button
+        let top = max(16.0, self.safeAreaInsets.top + 8.0)
+        let bottom = self.bounds.height - max(16.0, self.safeAreaInsets.bottom + 8.0)
+        let cardHeight = min(neededSize.height, max(0.0, bottom - top))
+        self.contentStack.frame = CGRect(x: 0, y: 0, width: cardWidth, height: neededSize.height)
+
         let buttonFrame = sourceButton.convert(sourceButton.bounds, to: self)
-        var cardX = buttonFrame.maxX - cardWidth
-        if cardX < 16.0 { cardX = 16.0 }
-        if cardX + cardWidth > self.bounds.width - 16.0 {
-            cardX = self.bounds.width - cardWidth - 16.0
-        }
-        
-        var cardY = buttonFrame.maxY + 6.0
-        if cardY + cardHeight > self.bounds.height - 24.0 {
-            cardY = max(44.0, buttonFrame.minY - cardHeight - 6.0)
-        }
-        
+        let cardX = min(max(16.0, buttonFrame.maxX - cardWidth), self.bounds.width - cardWidth - 16.0)
+        let below = buttonFrame.maxY + 6.0
+        let above = buttonFrame.minY - cardHeight - 6.0
+        let cardY = min(max(top, below + cardHeight <= bottom ? below : above), bottom - cardHeight)
         self.cardView.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight)
-        
+        self.cardGlass.frame = self.cardView.bounds
+        self.contentScrollView.frame = self.cardView.bounds
+        self.contentScrollView.contentSize = self.contentStack.frame.size
+        self.contentScrollView.isScrollEnabled = neededSize.height > cardHeight
+
         // Layout top capsule buttons
         let capW = cardWidth - 20.0
         let halfW = floor((capW - 1.0) * 0.5)
@@ -289,12 +286,10 @@ public final class SGDoxMusicContextMenu: UIView {
         self.shareButton.frame = CGRect(x: halfW + 0.5, y: 0, width: capW - halfW - 0.5, height: 48.0)
         
         // Presentation animation
-        self.cardView.alpha = 0.0
         self.cardView.transform = CGAffineTransform(scaleX: 0.88, y: 0.88).concatenating(CGAffineTransform(translationX: (buttonFrame.midX - self.cardView.center.x) * 0.2, y: -16))
         
-        UIView.animate(withDuration: 0.28, delay: 0, usingSpringWithDamping: 0.84, initialSpringVelocity: 0.6, options: [.allowUserInteraction], animations: {
+        UIView.animate(withDuration: UIAccessibility.isReduceMotionEnabled ? 0 : 0.28, delay: 0, usingSpringWithDamping: 0.84, initialSpringVelocity: 0.6, options: [.allowUserInteraction], animations: {
             self.dimmingView.alpha = 1.0
-            self.cardView.alpha = 1.0
             self.cardView.transform = .identity
         })
     }
@@ -302,8 +297,10 @@ public final class SGDoxMusicContextMenu: UIView {
     private func createRow(for item: SGDoxMusicMenuItem) -> UIView {
         let button = SGDoxMenuButton(type: .custom)
         button.translatesAutoresizingMaskIntoConstraints = false
-        let rowHeight: CGFloat = (item.subtitle != nil) ? 44.0 : 38.0
+        let rowHeight: CGFloat = item.subtitle != nil ? 48.0 : 44.0
         button.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
+        button.accessibilityLabel = item.title
+        button.accessibilityValue = item.subtitle
         
         let tintColor: UIColor = item.isDestructive ? UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : .white
         
@@ -373,7 +370,6 @@ public final class SGDoxMusicContextMenu: UIView {
     public func dismissAnimated(completion: (() -> Void)?) {
         UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseIn], animations: {
             self.dimmingView.alpha = 0.0
-            self.cardView.alpha = 0.0
             self.cardView.transform = CGAffineTransform(scaleX: 0.90, y: 0.90)
         }) { _ in
             self.removeFromSuperview()

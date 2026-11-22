@@ -12,7 +12,6 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
     
     private var tracks: [SGDoxMusicTrack] = []
     
-    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialDark))
     private let grabber = UIView()
     private let closeButton = UIButton(type: .system)
     private let tableView = UITableView(frame: .zero, style: .plain)
@@ -41,14 +40,13 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
     
     public override func loadDisplayNode() {
         super.loadDisplayNode()
-        self.displayNode.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
+        self.displayNode.backgroundColor = UIColor(white: 0.075, alpha: 1)
     }
     
     public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
         self.displayNode.frame = CGRect(origin: .zero, size: layout.size)
         self.view.frame = CGRect(origin: .zero, size: layout.size)
-        self.blurView.frame = CGRect(origin: .zero, size: layout.size)
         
         let inNav = self.navigationController != nil
         self.grabber.isHidden = inNav
@@ -68,11 +66,8 @@ public final class SGDoxAlbumViewController: ViewController, UITableViewDataSour
     
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
+        self.view.backgroundColor = UIColor(white: 0.075, alpha: 1)
         
-        self.blurView.frame = self.view.bounds
-        self.blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        self.view.addSubview(self.blurView)
         
         // Grabber
         self.grabber.backgroundColor = UIColor(white: 1.0, alpha: 0.35)

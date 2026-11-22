@@ -10,7 +10,6 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
     private let context: AccountContext
     private var presentationData: PresentationData
     
-    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialDark))
     private let headerLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let closeButton = UIButton(type: .system)
@@ -40,17 +39,13 @@ public final class SGDoxMusicQueueController: ViewController, UITableViewDataSou
     
     public override func loadDisplayNode() {
         super.loadDisplayNode()
-        self.displayNode.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
+        self.displayNode.backgroundColor = UIColor(white: 0.075, alpha: 1)
     }
     
     public override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = UIColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 1.0)
+        self.view.backgroundColor = UIColor(white: 0.075, alpha: 1)
         
-        self.blurView.frame = self.view.bounds
-        self.blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        self.blurView.effect = UIBlurEffect(style: .systemMaterialDark)
-        self.view.addSubview(self.blurView)
         
         // Grabber
         let grabber = UIView(frame: CGRect(x: (self.view.bounds.width - 38) * 0.5, y: 10, width: 38, height: 5))

@@ -63,9 +63,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private var presentationData: PresentationData
     
     // Background Layers
-    private let backgroundImageView = UIImageView()
     private let ambientGradientLayer = CAGradientLayer()
-    private let backgroundBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let darkDimOverlay = UIView()
     private var glassSurfaces: [(UIView, SGDoxPlayerGlassView)] = []
     
@@ -176,6 +174,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private let queueTableView = UITableView(frame: .zero, style: .plain)
     
     private var cachedQueue: [SGDoxMusicTrack] = []
+    private var highlightedQueueTrack: SGDoxMusicTrack?
+    private var displayedPlayingState: Bool?
     private var isDraggingSlider = false
     private var displayedTrackId: String?
     private var stateToken: UUID?
@@ -270,7 +270,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         }
         
         self.darkDimOverlay.alpha = 1.0
-        self.backgroundBlurView.alpha = 1.0
     }
     
     public override func viewDidAppear(_ animated: Bool) {
@@ -280,7 +279,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             let screenHeight = self.view.bounds.height > 0 ? self.view.bounds.height : UIScreen.main.bounds.height
             self.displayNode.layer.animateBoundsOriginYAdditive(from: -screenHeight, to: 0.0, duration: 0.35, timingFunction: kCAMediaTimingFunctionSpring)
             self.darkDimOverlay.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
-            self.backgroundBlurView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
         }
     }
     
@@ -580,18 +578,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     // MARK: - Setup Views
     private func setupViews() {
         // 1. Background Layers
-        self.backgroundImageView.contentMode = .scaleAspectFill
-        self.backgroundImageView.clipsToBounds = true
-        self.view.addSubview(self.backgroundImageView)
         
+        self.ambientGradientLayer.colors = [UIColor(white: 0.13, alpha: 1).cgColor, UIColor(white: 0.055, alpha: 1).cgColor]
         self.ambientGradientLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
         self.ambientGradientLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
         self.view.layer.addSublayer(self.ambientGradientLayer)
         
-        self.backgroundBlurView.effect = UIBlurEffect(style: .systemUltraThinMaterialDark)
-        self.view.addSubview(self.backgroundBlurView)
         
-        self.darkDimOverlay.backgroundColor = UIColor(red: 0.05, green: 0.06, blue: 0.10, alpha: 0.38)
+        self.darkDimOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.18)
         self.view.addSubview(self.darkDimOverlay)
         
         // Video layer (Animated cover canvas)
@@ -629,11 +623,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         // Shared Bottom Controls Container
         self.view.addSubview(self.bottomControlsContainer)
         
+        self.queueCountLabel.text = "0 треков"
         self.setupNowPlayingPane()
         self.setupLyricsPane()
         self.setupQueuePane()
         self.setupSharedBottomControls()
-        let surfaces: [UIView] = [self.playPauseButton, self.previousButton, self.nextButton, self.favoriteButton, self.moreButton, self.lyricsFavoriteButton, self.lyricsMoreButton, self.lyricsSingButton, self.queueShuffleButton, self.queueClearButton, self.bottomLyricsButton, self.bottomAirplayButton, self.bottomQueueButton, self.formatBadgeButton, self.effectBadgeButton]
+        let surfaces: [UIView] = [self.playPauseButton, self.moreButton, self.lyricsMoreButton, self.queueShuffleButton, self.queueClearButton, self.bottomLyricsButton, self.bottomAirplayButton, self.bottomQueueButton, self.effectBadgeButton]
         for host in surfaces {
             let glass = SGDoxPlayerGlassView()
             glass.configure(isDark: true, emphasized: host === self.playPauseButton)
@@ -650,8 +645,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
 
     @objc private func updateGlassAccessibility() {
         let reduced = UIAccessibility.isReduceTransparencyEnabled
-        self.backgroundBlurView.effect = reduced ? nil : UIBlurEffect(style: .systemUltraThinMaterialDark)
-        self.backgroundBlurView.backgroundColor = reduced ? UIColor(red: 0.07, green: 0.08, blue: 0.11, alpha: 1) : .clear
         self.videoDimOverlay.backgroundColor = UIColor(white: 0, alpha: reduced ? 1 : 0.35)
     }
     
@@ -686,12 +679,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.nowPlayingContainerView.addSubview(self.infoContainerView)
         
         self.titleLabel.textColor = .white
-        self.titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
+        self.titleLabel.font = UIFont.systemFont(ofSize: 23, weight: .semibold)
         self.titleLabel.lineBreakMode = .byTruncatingTail
         self.infoContainerView.addSubview(self.titleLabel)
         
         self.artistLabel.textColor = UIColor(white: 1.0, alpha: 0.65)
-        self.artistLabel.font = UIFont.systemFont(ofSize: 17, weight: .regular)
+        self.artistLabel.font = UIFont.systemFont(ofSize: 15, weight: .medium)
         self.artistLabel.lineBreakMode = .byTruncatingTail
         self.artistLabel.isUserInteractionEnabled = true
         self.artistLabel.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.artistLabelTapped)))
@@ -744,6 +737,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Format Badge Pill (Lossless / Dolby Atmos)
         self.setupFormatBadge(self.formatBadgeButton)
+        self.formatBadgeButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        self.formatBadgeButton.titleLabel?.minimumScaleFactor = 0.7
+        self.effectBadgeButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        self.effectBadgeButton.titleLabel?.minimumScaleFactor = 0.7
         self.attachButtonBounceFeedback(self.formatBadgeButton)
         self.bottomControlsContainer.addSubview(self.formatBadgeButton)
         
@@ -1041,24 +1038,14 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func applyLayout(bounds: CGRect, safeArea: UIEdgeInsets) {
         guard bounds.width > 0 && bounds.height > 0 else { return }
         
-        self.backgroundImageView.frame = bounds
         self.ambientGradientLayer.frame = bounds
-        self.backgroundBlurView.frame = bounds
         self.darkDimOverlay.frame = bounds
         self.videoContainerView.frame = bounds
         self.videoDimOverlay.frame = bounds
         self.videoPlayerLayer?.frame = bounds
         
         let statusBarH = self.validLayout?.statusBarHeight ?? 0.0
-        let winSafeTop: CGFloat = {
-            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-            for scene in scenes {
-                if let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first {
-                    return window.safeAreaInsets.top
-                }
-            }
-            return 0.0
-        }()
+        let winSafeTop = self.view.window?.safeAreaInsets.top ?? 0
         let topSafe = max(safeArea.top, self.view.safeAreaInsets.top, self.validLayout?.safeInsets.top ?? 0, statusBarH, winSafeTop, 52.0)
         let grabberY = topSafe + 6.0
         self.grabberView.frame = CGRect(x: (bounds.width - 40.0) * 0.5, y: grabberY, width: 40.0, height: 5.0)
@@ -1099,7 +1086,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.progressSlider.frame = CGRect(x: 28.0, y: 0.0, width: rect.width - 56.0, height: 24.0)
         
         let labelY: CGFloat = 28.0
-        let labelW: CGFloat = 54.0
+        let labelW: CGFloat = 49.0
         let labelH: CGFloat = 15.0
         self.currentTimeLabel.frame = CGRect(x: 28.0, y: labelY, width: labelW, height: labelH)
         self.remainingTimeLabel.frame = CGRect(x: rect.width - 28.0 - labelW, y: labelY, width: labelW, height: labelH)
@@ -1112,10 +1099,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let effectSize = self.effectBadgeButton.sizeThatFits(CGSize(width: 250, height: badgeH))
         let effectBadgeW: CGFloat = max(80.0, ceil(effectSize.width) + 12.0)
         let totalBadgesW = formatBadgeW + badgeGap + effectBadgeW
-        let badgesStartX = (rect.width - totalBadgesW) * 0.5
-        
-        self.formatBadgeButton.frame = CGRect(x: badgesStartX, y: badgeY, width: formatBadgeW, height: badgeH)
-        self.effectBadgeButton.frame = CGRect(x: badgesStartX + formatBadgeW + badgeGap, y: badgeY, width: effectBadgeW, height: badgeH)
+        let available = max(0.0, rect.width - 2.0 * (28.0 + labelW + 4.0))
+        let scale = min(1.0, max(0.0, available - badgeGap) / (totalBadgesW - badgeGap))
+        let contentWidth = (formatBadgeW + effectBadgeW) * scale + badgeGap
+        let badgesStartX = (rect.width - contentWidth) * 0.5
+
+        self.formatBadgeButton.frame = CGRect(x: badgesStartX, y: badgeY, width: formatBadgeW * scale, height: badgeH)
+        self.effectBadgeButton.frame = CGRect(x: badgesStartX + formatBadgeW * scale + badgeGap, y: badgeY, width: effectBadgeW * scale, height: badgeH)
         
         // 2. Transport Controls Row
         let transY: CGFloat = 56.0
@@ -1124,13 +1114,13 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let cW = self.controlsContainerView.bounds.width
         let cMid = cW * 0.5
         
-        let playSize: CGFloat = 52.0
+        let playSize: CGFloat = 56.0
         self.playPauseButton.frame = CGRect(x: cMid - playSize * 0.5, y: (transH - playSize) * 0.5, width: playSize, height: playSize)
         
-        let skipSize: CGFloat = 40.0
-        let skipDist: CGFloat = 64.0
-        self.previousButton.frame = CGRect(x: cMid - skipDist - skipSize, y: (transH - skipSize) * 0.5, width: skipSize, height: skipSize)
-        self.nextButton.frame = CGRect(x: cMid + skipDist, y: (transH - skipSize) * 0.5, width: skipSize, height: skipSize)
+        let skipSize: CGFloat = 44.0
+        let skipDist = min(84.0, cW * 0.245)
+        self.previousButton.frame = CGRect(x: cMid - skipDist - skipSize * 0.5, y: (transH - skipSize) * 0.5, width: skipSize, height: skipSize)
+        self.nextButton.frame = CGRect(x: cMid + skipDist - skipSize * 0.5, y: (transH - skipSize) * 0.5, width: skipSize, height: skipSize)
         
         let subSize: CGFloat = 34.0
         self.shuffleButton.frame = CGRect(x: 10.0, y: (transH - subSize) * 0.5, width: subSize, height: subSize)
@@ -1270,6 +1260,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     private func updateContent() {
         let manager = SGDoxMusicManager.shared
         guard let track = manager.currentTrack else {
+            self.displayedTrackId = nil
+            self.displayedPlayingState = nil
             self.titleLabel.text = "Нет трека"
             self.artistLabel.text = "DoxMusic"
             self.lyricsTrackTitle.text = "Нет трека"
@@ -1295,7 +1287,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
                 guard let self = self, self.displayedTrackId == track.id, let img = image else { return }
                 self.artworkImageView.image = img
                 self.lyricsHeaderArtwork.image = img
-                self.backgroundImageView.image = img
                 self.updateAmbientColor(from: img)
             }
             
@@ -1341,6 +1332,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         
         // Play / Pause Icons & Dynamic Spring Artwork Deflate/Expand
         let isPlaying = manager.isPlaying
+        self.playPauseButton.accessibilityLabel = isPlaying ? "Пауза" : "Воспроизвести"
         let playIconName = isPlaying ? "pause.fill" : "play.fill"
         let playCfg = UIImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
         self.playPauseButton.setImage(UIImage(systemName: playIconName, withConfiguration: playCfg), for: .normal)
@@ -1353,21 +1345,22 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
             }
         }
         
-        UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.72, initialSpringVelocity: 0.6, options: [.allowUserInteraction, .beginFromCurrentState], animations: {
-            if isPlaying {
-                self.artworkContainerView.transform = .identity
-                self.artworkContainerView.layer.shadowRadius = 24.0
-                self.artworkContainerView.layer.shadowOpacity = 0.42
-                self.artworkAmbientGlowView.transform = .identity
-                self.artworkAmbientGlowView.alpha = 1.0
-            } else {
-                self.artworkContainerView.transform = CGAffineTransform(scaleX: 0.82, y: 0.82)
-                self.artworkContainerView.layer.shadowRadius = 12.0
-                self.artworkContainerView.layer.shadowOpacity = 0.22
-                self.artworkAmbientGlowView.transform = CGAffineTransform(scaleX: 0.82, y: 0.82)
-                self.artworkAmbientGlowView.alpha = 0.35
+        if self.displayedPlayingState != isPlaying {
+            self.displayedPlayingState = isPlaying
+            let updateArtwork = {
+                let scale: CGFloat = isPlaying ? 1.0 : 0.91
+                let transform = CGAffineTransform(scaleX: scale, y: scale)
+                self.artworkContainerView.transform = transform
+                self.artworkContainerView.layer.shadowOpacity = isPlaying ? 0.38 : 0.20
+                self.artworkAmbientGlowView.transform = transform
+                self.artworkAmbientGlowView.alpha = isPlaying ? 0.8 : 0.3
             }
-        })
+            if UIAccessibility.isReduceMotionEnabled {
+                updateArtwork()
+            } else {
+                UIView.animate(withDuration: 0.30, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState], animations: updateArtwork)
+            }
+        }
         
         // Star Favorite Icons
         let isFav = manager.isFavorite(track: track)
@@ -1436,7 +1429,12 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     }
     
     private func reloadQueueData() {
-        self.cachedQueue = SGDoxMusicManager.shared.queue
+        let manager = SGDoxMusicManager.shared
+        let queue = manager.queue
+        let currentTrack = manager.currentTrack
+        guard self.cachedQueue != queue || self.highlightedQueueTrack != currentTrack else { return }
+        self.cachedQueue = queue
+        self.highlightedQueueTrack = currentTrack
         let count = self.cachedQueue.count
         let countStr: String
         let mod10 = count % 10

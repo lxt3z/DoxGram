@@ -1115,7 +1115,15 @@ final class OverlayAudioPlayerControllerNode: ViewControllerTracingNode, ASGestu
                 let sourceFrame = self.controlsNode.albumArtNode.view.convert(self.controlsNode.albumArtNode.bounds, to: self.albumArtBackground.contentView)
                 ContainedViewLayoutTransition.animated(duration: 0.4, curve: .spring).animateFrame(node: self.albumArtNode, from: sourceFrame)
                 UIView.animate(withDuration: 0.2, animations: {
-                    self.albumArtBackground.effect = UIBlurEffect(style: self.presentationData.theme.overallDarkAppearance ? .dark : .light)
+                    let dark = self.presentationData.theme.overallDarkAppearance
+                    if #available(iOS 26.0, *), !UIAccessibility.isReduceTransparencyEnabled {
+                        let glass = UIGlassEffect(style: .regular)
+                        glass.tintColor = UIColor(white: dark ? 0.12 : 1.0, alpha: 0.24)
+                        self.albumArtBackground.overrideUserInterfaceStyle = dark ? .dark : .light
+                        self.albumArtBackground.effect = glass
+                    } else {
+                        self.albumArtBackground.backgroundColor = UIColor(white: dark ? 0.12 : 0.95, alpha: 1.0)
+                    }
                 })
             }
         } else {
@@ -1123,14 +1131,13 @@ final class OverlayAudioPlayerControllerNode: ViewControllerTracingNode, ASGestu
             
             if self.albumArtBackground.superview != nil {
                 let fadeTransition = ComponentTransition(transition)
-                fadeTransition.setBlur(layer: self.albumArtNode.layer, radius: 10.0)
                 fadeTransition.setAlpha(layer: self.albumArtNode.layer, alpha: 0.0)
                 
                 UIView.animate(withDuration: 0.2, animations: {
                     self.albumArtBackground.effect = nil
+                    self.albumArtBackground.backgroundColor = .clear
                 }, completion: { _ in
                     self.albumArtBackground.removeFromSuperview()
-                    ComponentTransition.immediate.setBlur(layer: self.albumArtNode.layer, radius: 0.0)
                     ComponentTransition.immediate.setAlpha(layer: self.albumArtNode.layer, alpha: 1.0)
                 })
             }
