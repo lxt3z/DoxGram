@@ -65,7 +65,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
     // Background Layers
     private let ambientGradientLayer = CAGradientLayer()
     private let darkDimOverlay = UIView()
-    private var glassSurfaces: [(UIView, SGDoxPlayerGlassView)] = []
     
     // Video Clip Background (Animated Canvas)
     private let videoContainerView = UIView()
@@ -628,14 +627,10 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.setupLyricsPane()
         self.setupQueuePane()
         self.setupSharedBottomControls()
-        let surfaces: [UIView] = [self.playPauseButton, self.moreButton, self.lyricsMoreButton, self.queueShuffleButton, self.queueClearButton, self.bottomLyricsButton, self.bottomAirplayButton, self.bottomQueueButton, self.effectBadgeButton]
-        for host in surfaces {
-            let glass = SGDoxPlayerGlassView()
-            glass.configure(isDark: true, emphasized: host === self.playPauseButton)
-            host.backgroundColor = .clear
-            host.layer.cornerCurve = .continuous
-            host.insertSubview(glass, at: 0)
-            self.glassSurfaces.append((host, glass))
+        for button in [self.moreButton, self.lyricsMoreButton] {
+            button.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+            button.layer.cornerRadius = 17
+            button.layer.cornerCurve = .continuous
         }
         self.artworkImageView.layer.borderWidth = 0.5
         self.artworkImageView.layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
@@ -757,21 +752,23 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.attachButtonBounceFeedback(self.shuffleButton)
         self.controlsContainerView.addSubview(self.shuffleButton)
         
-        let skipConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
-        self.previousButton.setImage(UIImage(systemName: "backward.fill", withConfiguration: skipConfig), for: .normal)
+        let skipConfig = UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)
+        self.previousButton.setImage(UIImage(systemName: "backward.end.fill", withConfiguration: skipConfig), for: .normal)
         self.previousButton.tintColor = .white
         self.previousButton.addTarget(self, action: #selector(self.previousPressed), for: .touchUpInside)
         self.attachButtonBounceFeedback(self.previousButton)
         self.controlsContainerView.addSubview(self.previousButton)
         
-        let playConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
+        let playConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
         self.playPauseButton.setImage(UIImage(systemName: "play.fill", withConfiguration: playConfig), for: .normal)
-        self.playPauseButton.tintColor = .white
+        self.playPauseButton.tintColor = UIColor(white: 0.10, alpha: 1.0)
+        self.playPauseButton.backgroundColor = UIColor(white: 0.96, alpha: 1.0)
+        self.playPauseButton.layer.cornerRadius = 28
         self.playPauseButton.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
         self.attachButtonBounceFeedback(self.playPauseButton)
         self.controlsContainerView.addSubview(self.playPauseButton)
         
-        self.nextButton.setImage(UIImage(systemName: "forward.fill", withConfiguration: skipConfig), for: .normal)
+        self.nextButton.setImage(UIImage(systemName: "forward.end.fill", withConfiguration: skipConfig), for: .normal)
         self.nextButton.tintColor = .white
         self.nextButton.addTarget(self, action: #selector(self.nextPressed), for: .touchUpInside)
         self.attachButtonBounceFeedback(self.nextButton)
@@ -1073,10 +1070,6 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.layoutNowPlayingPane(bounds: self.nowPlayingContainerView.bounds)
         self.layoutLyricsPane(bounds: self.lyricsContainerView.bounds)
         self.layoutQueuePane(bounds: self.queueContainerView.bounds)
-        for (host, glass) in self.glassSurfaces {
-            glass.frame = host.bounds
-            host.layer.cornerRadius = min(host.bounds.width, host.bounds.height) * 0.5
-        }
     }
     
     private func layoutBottomControls(rect: CGRect) {
@@ -1118,7 +1111,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         self.playPauseButton.frame = CGRect(x: cMid - playSize * 0.5, y: (transH - playSize) * 0.5, width: playSize, height: playSize)
         
         let skipSize: CGFloat = 44.0
-        let skipDist = min(84.0, cW * 0.245)
+        let skipDist = min(82.0, cW * 0.22)
         self.previousButton.frame = CGRect(x: cMid - skipDist - skipSize * 0.5, y: (transH - skipSize) * 0.5, width: skipSize, height: skipSize)
         self.nextButton.frame = CGRect(x: cMid + skipDist - skipSize * 0.5, y: (transH - skipSize) * 0.5, width: skipSize, height: skipSize)
         
@@ -1154,17 +1147,20 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let infoBottomGap: CGFloat = 6.0
         let infoY = max(80.0, bounds.height - infoH - infoBottomGap)
         
-        let availableArtHeight = max(100.0, infoY - 14.0)
-        let artSide = min(bounds.width - 56.0, availableArtHeight)
+        let availableArtHeight = max(0.0, infoY - 20.0)
+        let artSide = min(max(0.0, bounds.width - 48.0), availableArtHeight)
         let artX = (bounds.width - artSide) * 0.5
-        let artY = max(4.0, (infoY - artSide) * 0.5)
+        let artY = max(4.0, (infoY - artSide) * 0.60)
         
-        self.artworkContainerView.frame = CGRect(x: artX, y: artY, width: artSide, height: artSide)
+        let artworkCenter = CGPoint(x: artX + artSide * 0.5, y: artY + artSide * 0.5)
+        self.artworkContainerView.bounds = CGRect(x: 0, y: 0, width: artSide, height: artSide)
+        self.artworkContainerView.center = artworkCenter
         self.artworkImageView.frame = self.artworkContainerView.bounds
         self.artworkContainerView.layer.shadowPath = UIBezierPath(roundedRect: self.artworkContainerView.bounds, cornerRadius: 24.0).cgPath
         
         let glowPad: CGFloat = 28.0
-        self.artworkAmbientGlowView.frame = CGRect(x: artX - glowPad * 0.5, y: artY - glowPad * 0.5, width: artSide + glowPad, height: artSide + glowPad)
+        self.artworkAmbientGlowView.bounds = CGRect(x: 0, y: 0, width: artSide + glowPad, height: artSide + glowPad)
+        self.artworkAmbientGlowView.center = artworkCenter
         self.artworkGlowGradientLayer.frame = self.artworkAmbientGlowView.bounds
         
         // Info Row below Artwork
@@ -1334,7 +1330,7 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         let isPlaying = manager.isPlaying
         self.playPauseButton.accessibilityLabel = isPlaying ? "Пауза" : "Воспроизвести"
         let playIconName = isPlaying ? "pause.fill" : "play.fill"
-        let playCfg = UIImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
+        let playCfg = UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
         self.playPauseButton.setImage(UIImage(systemName: playIconName, withConfiguration: playCfg), for: .normal)
         
         if self.currentMode == .lyrics {
@@ -1365,8 +1361,8 @@ public final class SGDoxMusicPlayerController: ViewController, UIGestureRecogniz
         // Star Favorite Icons
         let isFav = manager.isFavorite(track: track)
         let starName = isFav ? "star.fill" : "star"
-        let starColor = isFav ? UIColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : .white
-        let starConfig = UIImage.SymbolConfiguration(pointSize: 21, weight: .medium)
+        let starColor = isFav ? UIColor(red: 1.0, green: 0.52, blue: 0.60, alpha: 1.0) : .white
+        let starConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
         let starImg = UIImage(systemName: starName, withConfiguration: starConfig)
         self.favoriteButton.setImage(starImg, for: .normal)
         self.favoriteButton.tintColor = starColor

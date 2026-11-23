@@ -574,12 +574,12 @@ public final class CallController: ViewController {
         self.recordingBusy = true
         self.updateRecordButton()
         device.setRecordingHandler(nil, muted: true, completion: { _ in
-            recording.finish {
+            recording.finish { result in
                 if let video {
-                    video.finish { result in
+                    video.finish { videoResult in
                         self.recordingBusy = false
                         self.updateRecordButton()
-                        self.presentSavedRecording(result)
+                        self.presentSavedRecording(videoResult)
                     }
                     return
                 }

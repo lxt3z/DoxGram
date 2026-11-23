@@ -6,7 +6,6 @@ import AccountContext
 import AppBundle
 
 final class SGDoxPlayerGlassView: UIView {
-    private let effectView = UIVisualEffectView()
     private var isDark = true
     private var emphasized = false
 
@@ -18,8 +17,6 @@ final class SGDoxPlayerGlassView: UIView {
         super.init(frame: frame)
         self.isUserInteractionEnabled = false
         self.layer.cornerCurve = .continuous
-        self.effectView.layer.cornerCurve = .continuous
-        self.addSubview(self.effectView)
         NotificationCenter.default.addObserver(self, selector: #selector(self.refreshMaterial), name: UIAccessibility.reduceTransparencyStatusDidChangeNotification, object: nil)
         self.refreshMaterial()
     }
@@ -47,20 +44,10 @@ final class SGDoxPlayerGlassView: UIView {
     }
 
     @objc private func refreshMaterial() {
-        if #available(iOS 26.0, *), !UIAccessibility.isReduceTransparencyEnabled {
-            let glass = UIGlassEffect(style: .regular)
-            glass.tintColor = UIColor(white: self.isDark ? 0.12 : 1.0, alpha: self.emphasized ? 0.30 : 0.12)
-            self.effectView.overrideUserInterfaceStyle = self.isDark ? .dark : .light
-            self.effectView.effect = glass
-            self.backgroundColor = .clear
-            self.layer.borderWidth = 0
-        } else {
-            self.effectView.effect = nil
-            let white: CGFloat = self.isDark ? (self.emphasized ? 0.24 : 0.16) : (self.emphasized ? 0.91 : 0.97)
-            self.backgroundColor = UIColor(white: white, alpha: 1)
-            self.layer.borderWidth = 1.0 / max(1, self.traitCollection.displayScale)
-            self.layer.borderColor = UIColor(white: self.isDark ? 1 : 0, alpha: 0.12).cgColor
-        }
+        let white: CGFloat = self.isDark ? (self.emphasized ? 0.25 : 0.13) : (self.emphasized ? 0.89 : 0.97)
+        self.backgroundColor = UIColor(white: white, alpha: UIAccessibility.isReduceTransparencyEnabled ? 1.0 : 0.98)
+        self.layer.borderWidth = 1.0 / max(1, self.traitCollection.displayScale)
+        self.layer.borderColor = UIColor(white: self.isDark ? 1 : 0, alpha: 0.12).cgColor
     }
 
     override func layoutSubviews() {
@@ -68,8 +55,6 @@ final class SGDoxPlayerGlassView: UIView {
         let capsuleRadius = min(self.bounds.height, self.bounds.width) * 0.5
         let radius = min(self.fixedCornerRadius ?? capsuleRadius, capsuleRadius)
         self.layer.cornerRadius = radius
-        self.effectView.frame = self.bounds
-        self.effectView.layer.cornerRadius = radius
     }
 }
 
