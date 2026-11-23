@@ -14,7 +14,6 @@ import AppBundle
 import TooltipUI
 import CallScreen
 import PresentationDataUtils
-import Postbox
 
 protocol CallControllerNodeProtocol: AnyObject {
     var isMuted: Bool { get set }
@@ -592,12 +591,12 @@ public final class CallController: ViewController {
                 }
                 self.presentRecordingAlert(title: "Отправить запись?", text: "Запись целиком отправится в чат с собеседником как голосовое сообщение.", actions: [
                     TextAlertAction(type: .genericAction, title: "Удалить", action: {}),
-                    TextAlertAction(type: .defaultAction, title: "Отправить", action: { [account = self.account, peerId = self.call.peerId] in
+                    TextAlertAction(type: .defaultAction, title: "Отправить", action: { [account = self.account, context = self.call.context, peerId = self.call.peerId] in
                         let id = Int64.random(in: Int64.min ... Int64.max)
                         let resource = LocalFileMediaResource(fileId: id, size: Int64(data.count))
-                        account.postbox.mediaBox.storeResourceData(resource.id, data: data)
+                        context.engine.resources.storeResourceData(id: EngineMediaResource.Id(resource.id), data: data)
                         let media = TelegramMediaFile(
-                            fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: id), partialReference: nil,
+                            fileId: EngineMedia.Id(namespace: Namespaces.Media.LocalFile, id: id), partialReference: nil,
                             resource: resource, previewRepresentations: [], videoThumbnails: [], immediateThumbnailData: nil,
                             mimeType: "audio/ogg", size: Int64(data.count),
                             attributes: [.Audio(isVoice: true, duration: duration, title: nil, performer: nil, waveform: nil)],
