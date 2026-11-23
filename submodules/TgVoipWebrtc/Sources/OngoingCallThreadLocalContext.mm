@@ -146,6 +146,41 @@ public:
 
 class WrappedAudioDeviceModuleIOS : public tgcalls::DefaultWrappedAudioDeviceModule, public webrtc::AudioTransport {
 public:
+    using RecordingHandler = void (^)(NSData *, int, int, bool);
+
+    bool SetCallRecordingHandler(RecordingHandler handler, bool muted) {
+        _mutex.Lock();
+        bool available = !handler || (_audioTransports.size() == 1 && _audioTransports.front().second && !_recordingHandler);
+        if (available) {
+            _recordingHandler = [handler copy];
+            _recordedTransport = handler ? _audioTransports.front().first : nullptr;
+            _recordingMuted = muted;
+        }
+        _mutex.Unlock();
+        return available;
+    }
+
+    void SetCallRecordingMuted(bool muted) {
+        _mutex.Lock();
+        _recordingMuted = muted;
+        if (muted && _recordingHandler) {
+            _recordingHandler([NSData data], 16000, 1, true);
+        }
+        _mutex.Unlock();
+    }
+
+    // Called with _mutex held. Capture only the original transport, never a shared mix.
+    void CapturePacket(const void *samples, size_t frames, size_t bytesPerFrame, size_t channels, uint32_t rate, bool microphone) {
+        if (!_recordingHandler || _audioTransports.size() != 1 || !_audioTransports.front().second ||
+            _audioTransports.front().first != _recordedTransport || (microphone && _recordingMuted) ||
+            channels == 0 || channels > 2 || bytesPerFrame != channels * sizeof(int16_t) || frames == 0 || frames > 1920) {
+            return;
+        }
+        @autoreleasepool {
+            _recordingHandler([NSData dataWithBytes:samples length:frames * bytesPerFrame], (int)rate, (int)channels, microphone);
+        }
+    }
+
     WrappedAudioDeviceModuleIOS(webrtc::scoped_refptr<webrtc::AudioDeviceModule> impl) :
     tgcalls::DefaultWrappedAudioDeviceModule(impl) {
     }
@@ -164,6 +199,9 @@ public:
         if (audioCallback) {
             _audioTransports.push_back(std::make_pair(audioCallback, isActive));
         } else if (previousAudioCallback) {
+            if (previousAudioCallback == _recordedTransport) {
+                _recordedTransport = nullptr;
+            }
             for (size_t i = 0; i < _audioTransports.size(); i++) {
                 if (_audioTransports[i].first == previousAudioCallback) {
                     _audioTransports.erase(_audioTransports.begin() + i);
@@ -495,6 +533,7 @@ public:
         uint32_t& newMicLevel
     ) override {
         _mutex.Lock();
+        CapturePacket(audioSamples, nSamples, nBytesPerSample, nChannels, samplesPerSec, true);
         if (!_audioTransports.empty()) {
             for (size_t i = 0; i < _audioTransports.size(); i++) {
                 _audioTransports[i].first->RecordedDataIsAvailable(
@@ -529,6 +568,7 @@ public:
         absl::optional<int64_t> estimatedCaptureTimeNS
     ) override {
         _mutex.Lock();
+        CapturePacket(audioSamples, nSamples, nBytesPerSample, nChannels, samplesPerSec, true);
         if (!_audioTransports.empty()) {
             for (size_t i = 0; i < _audioTransports.size(); i++) {
                 _audioTransports[i].first->RecordedDataIsAvailable(
@@ -623,6 +663,9 @@ public:
             }
         } else {
             nSamplesOut = 0;
+        }
+        if (result == 0) {
+            CapturePacket(audioSamples, std::min(nSamples, nSamplesOut), nBytesPerSample, nChannels, samplesPerSec, false);
         }
         
         _mutex.Unlock();
@@ -760,6 +803,9 @@ public:
     
 private:
     bool _isStarted = false;
+    RecordingHandler _recordingHandler = nil;
+    webrtc::AudioTransport *_recordedTransport = nullptr;
+    bool _recordingMuted = false;
     std::vector<std::pair<webrtc::AudioTransport *, bool>> _audioTransports;
     webrtc::Mutex _mutex;
     std::vector<int16_t> _mixAudioSamples;
@@ -971,6 +1017,28 @@ static std::atomic<bool> sharedCallAudioDeviceLegacyBehavior{false};
         deviceModule_iOS->setTone([tone asTone]);
         #endif
     });
+}
+
+- (void)setCallRecordingHandler:(void (^)(NSData *, int, int, bool))handler initiallyMuted:(bool)muted completion:(void (^)(bool))completion {
+    void (^handlerCopy)(NSData *, int, int, bool) = [handler copy];
+    void (^completionCopy)(bool) = [completion copy];
+    _audioDeviceModule->perform([handlerCopy, muted, completionCopy](tgcalls::SharedAudioDeviceModule *module) {
+        bool result = false;
+        #ifdef WEBRTC_IOS
+        auto device = static_cast<WrappedAudioDeviceModuleIOS *>(module->audioDeviceModule().get());
+        result = device->SetCallRecordingHandler(handlerCopy, muted);
+        #endif
+        dispatch_async(dispatch_get_main_queue(), ^{ completionCopy(result); });
+    });
+}
+
+- (void)setCallRecordingMuted:(bool)muted {
+    #ifdef WEBRTC_IOS
+    _audioDeviceModule->perform([muted](tgcalls::SharedAudioDeviceModule *module) {
+        auto device = static_cast<WrappedAudioDeviceModuleIOS *>(module->audioDeviceModule().get());
+        device->SetCallRecordingMuted(muted);
+    });
+    #endif
 }
 
 - (std::shared_ptr<tgcalls::ThreadLocalObject<tgcalls::SharedAudioDeviceModule>>)getAudioDeviceModule {

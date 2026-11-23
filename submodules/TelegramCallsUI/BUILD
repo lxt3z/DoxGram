@@ -43,7 +43,8 @@ apple_resource_bundle(
 )
 
 sgdeps = [
-    "//Swiftgram/SGAppGroupIdentifier:SGAppGroupIdentifier"
+    "//Swiftgram/SGAppGroupIdentifier:SGAppGroupIdentifier",
+    "//Swiftgram/SGCallRecordings:SGCallRecordings",
 ]
 
 swift_library(
@@ -72,6 +73,7 @@ swift_library(
         "//submodules/DeviceAccess:DeviceAccess",
         "//submodules/TelegramAudio:TelegramAudio",
         "//submodules/TelegramVoip:TelegramVoip",
+        "//submodules/OpusBinding:OpusBinding",
         "//submodules/ItemListUI:ItemListUI",
         "//submodules/OverlayStatusController:OverlayStatusController",
         "//submodules/AppBundle:AppBundle",

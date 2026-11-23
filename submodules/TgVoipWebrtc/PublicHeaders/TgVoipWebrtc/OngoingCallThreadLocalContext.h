@@ -53,6 +53,11 @@
 
 @interface SharedCallAudioDevice : NSObject
 
+- (void)setCallRecordingHandler:(void (^ _Nullable)(NSData * _Nonnull, int, int, bool))handler
+                   initiallyMuted:(bool)muted
+                       completion:(void (^ _Nonnull)(bool))completion;
+- (void)setCallRecordingMuted:(bool)muted;
+
 - (instancetype _Nonnull)initWithDisableRecording:(bool)disableRecording enableSystemMute:(bool)enableSystemMute;
 
 + (void)setupAudioSession;

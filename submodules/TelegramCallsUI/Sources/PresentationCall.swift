@@ -47,6 +47,13 @@ public final class PresentationCallImpl: PresentationCall {
     private let updatedNetworkType: Signal<NetworkType, NoError>
     
     public private(set) var sharedAudioContext: SharedCallAudioContext?
+
+    var recordableAudioDevice: OngoingCallContext.AudioDevice? {
+        guard !self.isMovedToConference, self.conferenceCallContext == nil else { return nil }
+        return self.sharedAudioContext?.audioDevice
+    }
+
+    var recordingMicrophoneMuted: Bool { self.isMutedValue }
     
     private var sessionState: CallSession?
     private var callContextState: OngoingCallContextState?
@@ -1570,6 +1577,7 @@ public final class PresentationCallImpl: PresentationCall {
             return
         }
         self.isMutedValue = value
+        self.sharedAudioContext?.audioDevice?.setRecordingMuted(value)
         self.isMutedPromise.set(self.isMutedValue)
         if let conferenceCallContext = self.conferenceCallContext {
             conferenceCallContext.setIsMuted(action: value ? .muted(isPushToTalkActive: false) : .unmuted)

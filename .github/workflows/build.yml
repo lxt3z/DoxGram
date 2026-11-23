@@ -1,8 +1,8 @@
 name: CI
 
 on:
-  # push:
-  #   branches: [ master ]
+  push:
+    branches: [doxgram/call-recording]
 
   workflow_dispatch:
     inputs:
@@ -150,9 +150,10 @@ jobs:
           retention-days: 14
 
       - name: Publish Release
-        if: ${{ inputs.publish_release }}
+        if: ${{ github.event_name == 'push' || inputs.publish_release }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -e
           TAG="build-${{ env.BUILD_NUMBER }}"
@@ -160,6 +161,12 @@ jobs:
           NOTES="An unsigned build of DoxGram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})"
           ARTIFACTS_DIR="/Users/Shared/telegram-ios/build/artifacts"
           IPA_FILE="$ARTIFACTS_DIR/DoxGram.ipa"
+          RELEASE_FLAGS=()
+          if [ "$GITHUB_REF_NAME" = "doxgram/call-recording" ]; then
+            TAG="call-recording-$GITHUB_RUN_NUMBER"
+            TITLE="DoxGram Call Recording ($GITHUB_RUN_NUMBER)"
+            RELEASE_FLAGS+=(--prerelease)
+          fi
 
           if [ ! -f "$IPA_FILE" ]; then
             echo "ERROR: $IPA_FILE does not exist!"
@@ -171,7 +178,7 @@ jobs:
           # 1. Try atomic create with IPA if release does not exist yet
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             echo "Creating release $TAG with DoxGram.ipa..."
-            if gh release create "$TAG" "$IPA_FILE" --title "$TITLE" --notes "$NOTES"; then
+            if gh release create "$TAG" "$IPA_FILE" --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES" "${RELEASE_FLAGS[@]}"; then
               echo "Release $TAG created and DoxGram.ipa uploaded successfully!"
               exit 0
             fi
@@ -197,5 +204,6 @@ jobs:
           done
 
           if [ "$UPLOADED" -eq 0 ]; then
-            echo "::warning::GitHub Releases upload endpoint returned 500 after $MAX_RETRIES attempts. DoxGram.ipa is safely available in the Actions Artifacts tab above."
+            echo "::error::Release upload failed after $MAX_RETRIES attempts. The IPA is available in Actions Artifacts."
+            exit 1
           fi

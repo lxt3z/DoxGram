@@ -861,6 +861,14 @@ public final class OngoingCallContext {
         public func setIsAudioSessionActive(_ isActive: Bool) {
             self.impl.setManualAudioSessionIsActive(isActive)
         }
+
+        public func setRecordingHandler(_ handler: ((Data, Int32, Int32, Bool) -> Void)?, muted: Bool, completion: @escaping (Bool) -> Void) {
+            self.impl.setCallRecordingHandler(handler, initiallyMuted: muted, completion: completion)
+        }
+
+        public func setRecordingMuted(_ muted: Bool) {
+            self.impl.setCallRecordingMuted(muted)
+        }
         
         /// Stops the device for good. Later activation changes are ignored.
         public func stop() {

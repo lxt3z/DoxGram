@@ -73,6 +73,7 @@ private enum SGDoxOneFromManySetting: String {
 private enum SGDoxDisclosureLink: String {
     case sessionBackupManager
     case messageFilter
+    case callRecordings
     case appIcons
     case appBages
     case doxMusic
@@ -100,6 +101,7 @@ private func SGDoxControllerEntries(presentationData: PresentationData) -> [SGDo
     entries.append(.header(id: id.count, section: .doxgramPro, text: "DoxGram Pro", badge: nil))
     entries.append(.disclosure(id: id.count, section: .doxgramPro, link: .sessionBackupManager, text: "SessionBackup.Title".i18n(lang)))
     entries.append(.disclosure(id: id.count, section: .doxgramPro, link: .messageFilter, text: "MessageFilter.Title".i18n(lang)))
+    entries.append(.disclosure(id: id.count, section: .doxgramPro, link: .callRecordings, text: isRu ? "Записи звонков" : "Call Recordings"))
     entries.append(.toggle(id: id.count, section: .doxgramPro, settingName: .inputToolbar, value: SGSimpleSettings.shared.inputToolbar, text: "InputToolbar.Title".i18n(lang), enabled: true))
     entries.append(.oneFromManySelector(id: id.count, section: .doxgramPro, settingName: .pinnedMessageNotifications, text: "Notifications.PinnedMessages.Title".i18n(lang), value: "Notifications.PinnedMessages.value.\(SGSimpleSettings.shared.pinnedMessageNotifications)".i18n(lang), enabled: true))
     entries.append(.oneFromManySelector(id: id.count, section: .doxgramPro, settingName: .mentionsAndRepliesNotifications, text: "Notifications.MentionsAndReplies.Title".i18n(lang), value: "Notifications.MentionsAndReplies.value.\(SGSimpleSettings.shared.mentionsAndRepliesNotifications)".i18n(lang), enabled: true))
@@ -370,6 +372,8 @@ public func doxSettingsController(context: AccountContext) -> ViewController {
             pushControllerImpl?(sgSessionBackupManagerController(context: context, presentationData: presentationData))
         case .messageFilter:
             pushControllerImpl?(sgMessageFilterController(presentationData: presentationData))
+        case .callRecordings:
+            pushControllerImpl?(sgCallRecordingsController(context: context))
         case .appIcons:
             pushControllerImpl?(themeSettingsController(context: context, focusOnItemTag: .icon))
         case .appBages:
